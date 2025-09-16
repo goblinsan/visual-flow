@@ -1,3 +1,10 @@
+node_modules
+dist
+storybook-static
+.turbo
+.cache
+.vite
+coverage
 # Logs
 logs
 *.log
