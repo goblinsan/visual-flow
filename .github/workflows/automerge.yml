@@ -1,0 +1,19 @@
+name: automerge
+on:
+  pull_request:
+    types: [labeled, reopened, synchronize]
+  check_suite:
+    types: [completed]
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  merge:
+    if: contains(join(fromJson(toJson(github.event.pull_request.labels)).*.name, ','), 'automerge')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: pascalgn/automerge-action@v0.16.6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MERGE_METHOD: squash
+          MERGE_COMMIT_MESSAGE: pull-request-title
