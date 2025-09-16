@@ -18,7 +18,7 @@ export const adventureInventory: RootSpec = {
         children: [
           // Left column (span 3)
           {
-            type: "box", id: "equipped", variant: "card", padding: 4, className: "col-span-12 md:col-span-3",
+            type: "box", id: "equipped", variant: "card", padding: 4, className: "col-span-3",
             children: [
               { type: "text", text: "Equipped", variant: "h3" },
               {
@@ -38,11 +38,11 @@ export const adventureInventory: RootSpec = {
           },
           // Middle inventory grid (span 6)
           {
-            type: "stack", direction: "vertical", gap: 3, className: "col-span-12 md:col-span-6",
+            type: "stack", direction: "vertical", gap: 4, className: "col-span-6",
             children: [
               { type: "text", text: "Inventory", variant: "h3" },
               {
-                type: "grid", columns: 6, gap: 3,
+                type: "grid", columns: 6, gap: 4,
                 children: [
                   // First row
                   { type: "box", id: "item-1", variant: "card", selectable: true, children: [ { type: "text", text: "⚔️", variant: "h3", align: "center" } ] },
@@ -64,7 +64,7 @@ export const adventureInventory: RootSpec = {
           },
           // Right details panel (span 3)
           {
-            type: "box", id: "details", variant: "card", padding: 4, className: "col-span-12 md:col-span-3",
+            type: "box", id: "details", variant: "card", padding: 4, className: "col-span-3",
             children: [
               { type: "text", text: "📦", variant: "h3", align: "center" },
               { type: "text", text: "Select an item to view details", variant: "body", align: "center" },

@@ -46,7 +46,20 @@ function Stack({ node, onSelect, selectedId }: { node: StackNode; onSelect?: (id
 }
 
 function Grid({ node, onSelect, selectedId }: { node: GridNode; onSelect?: (id: string) => void; selectedId?: string }) {
-  const cols = `grid-cols-${node.columns}`;
+  // Use a static mapping so Tailwind includes these classes at build time
+  const cols =
+    node.columns === 1 ? "grid-cols-1" :
+    node.columns === 2 ? "grid-cols-2" :
+    node.columns === 3 ? "grid-cols-3" :
+    node.columns === 4 ? "grid-cols-4" :
+    node.columns === 5 ? "grid-cols-5" :
+    node.columns === 6 ? "grid-cols-6" :
+    node.columns === 7 ? "grid-cols-7" :
+    node.columns === 8 ? "grid-cols-8" :
+    node.columns === 9 ? "grid-cols-9" :
+    node.columns === 10 ? "grid-cols-10" :
+    node.columns === 11 ? "grid-cols-11" :
+    node.columns === 12 ? "grid-cols-12" : undefined;
   const gap = node.gap ? `gap-${node.gap}` : undefined;
   const pad = node.padding ? `p-${node.padding}` : undefined;
   return (

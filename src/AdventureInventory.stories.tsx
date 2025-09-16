@@ -6,6 +6,14 @@ import type { RootSpec, NodeSpec } from "./dsl";
 const meta: Meta<typeof Renderer> = {
   title: "VisualFlow/AdventureInventory",
   component: Renderer,
+  parameters: { layout: "fullscreen" },
+  decorators: [
+    (Story) => (
+      <div className="min-w-[60vw] w-full max-w-7xl mx-auto p-6">
+        <Story />
+      </div>
+    ),
+  ],
 };
 export default meta;
 
@@ -16,9 +24,38 @@ export const Example: Story = {
   parameters: { backgrounds: { default: "dark" } },
 };
 
+export const FixedThreeColumns: Story = {
+  args: {
+    spec: {
+      ...adventureInventory,
+      body: {
+        type: "grid",
+        columns: 12,
+        gap: 6,
+        children: [
+          { type: "box", id: "equipped", variant: "card", padding: 4, className: "col-span-3", children: [
+            { type: "text", text: "Equipped", variant: "h3" },
+          ] },
+          { type: "stack", direction: "vertical", gap: 4, className: "col-span-6", children: [
+            { type: "text", text: "Inventory", variant: "h3" },
+            { type: "grid", columns: 6, gap: 4, children: Array.from({ length: 12 }, (_, i) => ({
+              type: "box", id: `fixed-${i+1}`, variant: "card", selectable: true,
+              children: [ { type: "text", text: "📦", variant: "h3", align: "center" } ],
+            })) },
+          ] },
+          { type: "box", id: "details", variant: "card", padding: 4, className: "col-span-3", children: [
+            { type: "text", text: "Details", variant: "h3", align: "center" },
+          ] },
+        ],
+      },
+    },
+  },
+  parameters: { backgrounds: { default: "dark" } },
+};
+
 function sectionEquipped(): NodeSpec {
   return {
-    type: "box", id: "equipped", variant: "card", padding: 4, className: "col-span-12 md:col-span-3",
+    type: "box", id: "equipped", variant: "card", padding: 4, className: "col-span-3",
     children: [
       { type: "text", text: "Equipped", variant: "h3" },
       {
@@ -40,7 +77,7 @@ function sectionEquipped(): NodeSpec {
 
 function sectionDetails(): NodeSpec {
   return {
-    type: "box", id: "details", variant: "card", padding: 4, className: "col-span-12 md:col-span-3",
+    type: "box", id: "details", variant: "card", padding: 4, className: "col-span-3",
     children: [
       { type: "text", text: "📦", variant: "h3", align: "center" },
       { type: "text", text: "Select an item to view details", variant: "body", align: "center" },
@@ -54,7 +91,7 @@ function sectionInventory(title: string, columns: number, gap: number, count: nu
     children: [ { type: "text", text: emoji, variant: "h3", align: "center" } ],
   }));
   return {
-    type: "stack", direction: "vertical", gap: 3, className: "col-span-12 md:col-span-6",
+    type: "stack", direction: "vertical", gap: 3, className: "col-span-6",
     children: [
       { type: "text", text: title, variant: "h3" },
       { type: "grid", columns, gap, children: items },
