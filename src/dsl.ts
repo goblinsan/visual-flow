@@ -28,7 +28,43 @@ export type GridNode = {
   children: NodeSpec[];
 };
 
-export type NodeSpec = TextNode | StackNode | GridNode;
+export type IconNode = {
+  type: "icon";
+  id?: string;
+  emoji?: string; // simple emoji icon
+  className?: string;
+  label?: string; // accessible label
+};
+
+export type ImageNode = {
+  type: "image";
+  id?: string;
+  src: string;
+  alt: string;
+  className?: string;
+};
+
+export type BadgeNode = {
+  type: "badge";
+  id?: string;
+  text: string;
+  className?: string;
+  position?: "top-left" | "top-right" | "bottom-left" | "bottom-right";
+};
+
+export type BoxNode = {
+  type: "box";
+  id?: string; // strongly recommended when selectable
+  variant?: "card" | "plain";
+  padding?: number;
+  gap?: number;
+  className?: string;
+  selectable?: boolean;
+  selected?: boolean; // static default selection in uncontrolled mode
+  children: NodeSpec[];
+};
+
+export type NodeSpec = TextNode | StackNode | GridNode | IconNode | ImageNode | BadgeNode | BoxNode;
 
 export type RootSpec = {
   id?: string;

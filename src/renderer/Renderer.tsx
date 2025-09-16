@@ -1,4 +1,4 @@
-import { type GridNode, type NodeSpec, type RootSpec, type StackNode, type TextNode, cx } from "../dsl";
+import { type GridNode, type NodeSpec, type RootSpec, type StackNode, type TextNode, type BoxNode, type IconNode, type ImageNode, type BadgeNode, cx } from "../dsl";
 
 function Text({ node }: { node: TextNode }) {
   const base = "text-slate-900 dark:text-slate-100";
@@ -16,7 +16,7 @@ function Text({ node }: { node: TextNode }) {
   return <div className={cx(base, align, cls)}>{node.text}</div>;
 }
 
-function Stack({ node }: { node: StackNode }) {
+function Stack({ node, onSelect, selectedId }: { node: StackNode; onSelect?: (id: string) => void; selectedId?: string }) {
   const dir = node.direction === "horizontal" ? "flex-row" : "flex-col";
   const gap = node.gap ? `gap-${node.gap}` : "gap-2";
   const pad = node.padding ? `p-${node.padding}` : undefined;
@@ -39,20 +39,20 @@ function Stack({ node }: { node: StackNode }) {
   return (
     <div className={cx("flex", dir, gap, pad, align, justify, node.className)}>
       {node.children.map((child, i) => (
-        <NodeView key={("id" in child && child.id) ? child.id! : i} node={child} />
+        <NodeViewWithActions key={("id" in child && child.id) ? child.id! : i} node={child} onSelect={onSelect} selectedId={selectedId} />
       ))}
     </div>
   );
 }
 
-function Grid({ node }: { node: GridNode }) {
+function Grid({ node, onSelect, selectedId }: { node: GridNode; onSelect?: (id: string) => void; selectedId?: string }) {
   const cols = `grid-cols-${node.columns}`;
   const gap = node.gap ? `gap-${node.gap}` : undefined;
   const pad = node.padding ? `p-${node.padding}` : undefined;
   return (
     <div className={cx("grid", cols, gap, pad, node.className)}>
       {node.children.map((child, i) => (
-        <NodeView key={("id" in child && child.id) ? child.id! : i} node={child} />
+        <NodeViewWithActions key={("id" in child && child.id) ? child.id! : i} node={child} onSelect={onSelect} selectedId={selectedId} />
       ))}
     </div>
   );
@@ -66,12 +66,20 @@ export function NodeView({ node }: { node: NodeSpec }) {
       return <Stack node={node} />;
     case "grid":
       return <Grid node={node} />;
+    case "box":
+      return <Box node={node} />;
+    case "icon":
+      return <Icon node={node} />;
+    case "image":
+      return <Image node={node} />;
+    case "badge":
+      return <Badge node={node} />;
     default:
       return null;
   }
 }
 
-export function Renderer({ spec }: { spec: RootSpec }) {
+export function Renderer({ spec, onSelect, selectedId }: { spec: RootSpec; onSelect?: (id: string) => void; selectedId?: string }) {
   const bg = spec.background === "slate"
     ? "bg-slate-50 dark:bg-slate-900"
     : spec.background === "transparent"
@@ -80,7 +88,72 @@ export function Renderer({ spec }: { spec: RootSpec }) {
   const pad = spec.padding ? `p-${spec.padding}` : undefined;
   return (
     <div className={cx("w-full h-full", bg, pad, spec.className)}>
-      <NodeView node={spec.body} />
+      <NodeViewWithActions node={spec.body} onSelect={onSelect} selectedId={selectedId} />
     </div>
+  );
+}
+
+function NodeViewWithActions({ node, onSelect, selectedId }: { node: NodeSpec; onSelect?: (id: string) => void; selectedId?: string }) {
+  switch (node.type) {
+    case "box":
+      return <Box node={node} onSelect={onSelect} selectedId={selectedId} />;
+    case "stack":
+      return <Stack node={node as StackNodeWithActions} onSelect={onSelect} selectedId={selectedId} />;
+    case "grid":
+      return <Grid node={node as GridNodeWithActions} onSelect={onSelect} selectedId={selectedId} />;
+    default:
+      return <NodeView node={node} />;
+  }
+}
+
+type StackNodeWithActions = StackNode & { children: NodeSpec[] };
+type GridNodeWithActions = GridNode & { children: NodeSpec[] };
+
+function Box({ node, onSelect, selectedId }: { node: BoxNode; onSelect?: (id: string) => void; selectedId?: string }) {
+  const pad = node.padding ? `p-${node.padding}` : "p-3";
+  const gap = node.gap ? `gap-${node.gap}` : "gap-2";
+  const base = node.variant === "plain" ? "border-transparent" : "border-slate-300/70 dark:border-slate-700/60 bg-white/70 dark:bg-slate-900/40 backdrop-blur";
+  const isSelected = node.selected || (node.id && selectedId === node.id);
+  const selected = isSelected ? "ring-2 ring-[--color-brand] border-[--color-brand]" : undefined;
+  const clickable = node.selectable ? "cursor-pointer hover:border-[--color-brand]" : undefined;
+  const content = (
+    <div
+      className={cx("relative rounded-xl border", pad, gap, base, selected, clickable, node.className)}
+      data-testid={node.id}
+      onClick={() => {
+        if (node.selectable && node.id && onSelect) onSelect(node.id);
+      }}
+    >
+      {/* Render children, allowing badges to position absolutely if present */}
+      {node.children.map((child, i) => (
+        <NodeViewWithActions key={("id" in child && child.id) ? child.id! : i} node={child} onSelect={onSelect} selectedId={selectedId} />
+      ))}
+    </div>
+  );
+  return content;
+}
+
+function Icon({ node }: { node: IconNode }) {
+  return (
+    <span role={node.label ? "img" : undefined} aria-label={node.label} className={cx("inline-flex", node.className)}>
+      {node.emoji}
+    </span>
+  );
+}
+
+function Image({ node }: { node: ImageNode }) {
+  return <img src={node.src} alt={node.alt} className={cx("block", node.className)} />;
+}
+
+function Badge({ node }: { node: BadgeNode }) {
+  const pos =
+    node.position === "top-left" ? "top-1 left-1" :
+    node.position === "bottom-left" ? "bottom-1 left-1" :
+    node.position === "bottom-right" ? "bottom-1 right-1" :
+    "top-1 right-1";
+  return (
+    <span className={cx("absolute text-xs px-1.5 py-0.5 rounded-md bg-[--color-brand] text-white", pos, node.className)}>
+      {node.text}
+    </span>
   );
 }
