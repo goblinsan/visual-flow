@@ -1,4 +1,4 @@
-import { type GridNode, type NodeSpec, type RootSpec, type StackNode, type TextNode, type BoxNode, type IconNode, type ImageNode, type BadgeNode, cx } from "../dsl";
+import { type GridNode, type NodeSpec, type RootSpec, type StackNode, type TextNode, type BoxNode, type IconNode, type ImageNode, type BadgeNode, type ProgressNode, cx } from "../dsl";
 
 function Text({ node }: { node: TextNode }) {
   const base = "text-slate-900 dark:text-slate-100";
@@ -13,7 +13,7 @@ function Text({ node }: { node: TextNode }) {
       : node.variant === "caption"
       ? "text-xs opacity-70"
       : "text-base";
-  return <div className={cx(base, align, cls)}>{node.text}</div>;
+  return <div className={cx(base, align, cls, node.className)}>{node.text}</div>;
 }
 
 function Stack({ node, onSelect, selectedId }: { node: StackNode; onSelect?: (id: string) => void; selectedId?: string }) {
@@ -87,6 +87,8 @@ export function NodeView({ node }: { node: NodeSpec }) {
       return <Image node={node} />;
     case "badge":
       return <Badge node={node} />;
+    case "progress":
+      return <Progress node={node} />;
     default:
       return null;
   }
@@ -168,5 +170,22 @@ function Badge({ node }: { node: BadgeNode }) {
     <span className={cx("absolute text-xs px-1.5 py-0.5 rounded-md bg-[--color-brand] text-white", pos, node.className)}>
       {node.text}
     </span>
+  );
+}
+
+function Progress({ node }: { node: ProgressNode }) {
+  const value = Math.max(0, Math.min(100, node.value ?? 0));
+  return (
+    <div className={cx("w-full", node.className)} aria-label={node.label ?? "progress"}>
+      {node.label ? (
+        <div className="text-xs mb-1 opacity-80">{node.label}</div>
+      ) : null}
+      <div className="h-2 w-full rounded bg-slate-700/60 overflow-hidden">
+        <div
+          className={cx("h-full bg-[--color-brand] rounded", node.barClassName)}
+          style={{ width: `${value}%` }}
+        />
+      </div>
+    </div>
   );
 }

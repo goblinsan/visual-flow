@@ -3,6 +3,11 @@
 /* optional theme tokens (Tailwind v4 “CSS-first”) */
 @theme {
   --color-brand: #2563eb;
+  --rarity-common: #9CA3AF; /* gray-400 */
+  --rarity-rare: #60A5FA;   /* blue-400 */
+  --rarity-epic: #A78BFA;   /* violet-400 */
+  --rarity-legendary: #F59E0B; /* amber-500 */
+  --rarity-unique: #F472B6; /* pink-400 */
 }
 
 
@@ -19,6 +24,13 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Dark blue gradient helper (for story wrappers) */
+.bg-dark-gradient {
+  background: radial-gradient(1200px 600px at 20% 40%, rgba(30,58,138,0.45), rgba(2,6,23,0.8) 60%),
+              radial-gradient(900px 500px at 80% 30%, rgba(59,7,100,0.35), rgba(2,6,23,0.8) 60%),
+              linear-gradient(180deg, rgba(2,6,23,1), rgba(2,6,23,1));
 }
 
 a {

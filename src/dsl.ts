@@ -4,6 +4,7 @@ export type TextNode = {
   text: string;
   variant?: "h1" | "h2" | "h3" | "body" | "caption";
   align?: "start" | "center" | "end";
+  className?: string;
 };
 
 export type StackNode = {
@@ -52,6 +53,15 @@ export type BadgeNode = {
   position?: "top-left" | "top-right" | "bottom-left" | "bottom-right";
 };
 
+export type ProgressNode = {
+  type: "progress";
+  id?: string;
+  value: number; // 0-100
+  label?: string;
+  className?: string; // wrapper classes
+  barClassName?: string; // inner bar classes (color)
+};
+
 export type BoxNode = {
   type: "box";
   id?: string; // strongly recommended when selectable
@@ -64,7 +74,7 @@ export type BoxNode = {
   children: NodeSpec[];
 };
 
-export type NodeSpec = TextNode | StackNode | GridNode | IconNode | ImageNode | BadgeNode | BoxNode;
+export type NodeSpec = TextNode | StackNode | GridNode | IconNode | ImageNode | BadgeNode | ProgressNode | BoxNode;
 
 export type RootSpec = {
   id?: string;
