@@ -32,7 +32,7 @@ export type NodeSpec = TextNode | StackNode | GridNode;
 
 export type RootSpec = {
   id?: string;
-  background?: "white" | "slate";
+  background?: "white" | "slate" | "transparent";
   padding?: number;
   className?: string;
   body: NodeSpec;

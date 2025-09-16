@@ -72,7 +72,11 @@ export function NodeView({ node }: { node: NodeSpec }) {
 }
 
 export function Renderer({ spec }: { spec: RootSpec }) {
-  const bg = spec.background === "slate" ? "bg-slate-50 dark:bg-slate-900" : "bg-white dark:bg-slate-950";
+  const bg = spec.background === "slate"
+    ? "bg-slate-50 dark:bg-slate-900"
+    : spec.background === "transparent"
+    ? "bg-transparent"
+    : "bg-white dark:bg-slate-950";
   const pad = spec.padding ? `p-${spec.padding}` : undefined;
   return (
     <div className={cx("w-full h-full", bg, pad, spec.className)}>
