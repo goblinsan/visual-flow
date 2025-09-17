@@ -5,7 +5,13 @@ const config: StorybookConfig = {
     name: "@storybook/react-vite",
     options: {},
   },
-  stories: ["../src/**/*.stories.@(tsx|mdx)"],
+  // Only include canonical canvas stories
+  stories: [
+    "../src/Canvas.stories.@(tsx|mdx)",
+    "../src/CanvasGrid.stories.@(tsx|mdx)",
+    "../src/CanvasImage.stories.@(tsx|mdx)",
+    "../src/CanvasStage.stories.@(tsx|mdx)",
+  ],
   addons: [
     "@storybook/addon-essentials",
     "@storybook/addon-interactions",

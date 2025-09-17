@@ -1,6 +1,7 @@
+import type { JSX } from "react";
 import { type GridNode, type NodeSpec, type RootSpec, type StackNode, type TextNode, type BoxNode, type IconNode, type ImageNode, type BadgeNode, type ProgressNode, cx } from "../dsl";
 
-type EditProps = { editing?: boolean; path?: string; onSelectNode?: (path: string, node: NodeSpec) => void; selectedPath?: string };
+type EditProps = { editing?: boolean; path?: string; onSelectNode?: (path: string, node: NodeSpec) => void; selectedPath?: string; wrapChild?: (path: string, element: JSX.Element) => JSX.Element };
 
 function Text({ node, editing, path, onSelectNode, selectedPath }: { node: TextNode } & EditProps) {
   const base = "text-slate-900 dark:text-slate-100";
@@ -19,7 +20,7 @@ function Text({ node, editing, path, onSelectNode, selectedPath }: { node: TextN
   return <div className={cx(base, align, cls, sel, node.className)} onClick={editing && onSelectNode && path != null ? (e) => { e.stopPropagation(); onSelectNode(path, node); } : undefined}>{node.text}</div>;
 }
 
-function Stack({ node, onSelect, selectedId, editing, path, onSelectNode, selectedPath }: { node: StackNode; onSelect?: (id: string) => void; selectedId?: string } & EditProps) {
+function Stack({ node, onSelect, selectedId, editing, path, onSelectNode, selectedPath, wrapChild }: { node: StackNode; onSelect?: (id: string) => void; selectedId?: string } & EditProps) {
   const dir = node.direction === "horizontal" ? "flex-row" : "flex-col";
   const gap = node.gap ? `gap-${node.gap}` : "gap-2";
   const pad = node.padding ? `p-${node.padding}` : undefined;
@@ -42,14 +43,16 @@ function Stack({ node, onSelect, selectedId, editing, path, onSelectNode, select
   const sel = editing ? (selectedPath === path ? "outline outline-2 outline-[--color-brand]" : "outline outline-1 outline-transparent hover:outline-[--color-brand]/60") : undefined;
   return (
     <div className={cx("flex", dir, gap, pad, align, justify, sel, node.className)} onClick={editing && onSelectNode && path != null ? (e) => { e.stopPropagation(); onSelectNode(path, node); } : undefined}>
-      {node.children.map((child, i) => (
-        <NodeViewWithActions key={("id" in child && child.id) ? child.id! : i} node={child} onSelect={onSelect} selectedId={selectedId} editing={editing} path={path != null ? (path === "" ? `${i}` : `${path}.${i}`) : undefined} onSelectNode={onSelectNode} selectedPath={selectedPath} />
-      ))}
+      {node.children.map((child, i) => {
+        const childPath = path != null ? (path === "" ? `${i}` : `${path}.${i}`) : `${i}`;
+        const el = <NodeViewWithActions key={("id" in child && child.id) ? child.id! : i} node={child} onSelect={onSelect} selectedId={selectedId} editing={editing} path={childPath} onSelectNode={onSelectNode} selectedPath={selectedPath} wrapChild={wrapChild} />;
+        return wrapChild ? wrapChild(childPath, el) : el;
+      })}
     </div>
   );
 }
 
-function Grid({ node, onSelect, selectedId, editing, path, onSelectNode, selectedPath }: { node: GridNode; onSelect?: (id: string) => void; selectedId?: string } & EditProps) {
+function Grid({ node, onSelect, selectedId, editing, path, onSelectNode, selectedPath, wrapChild }: { node: GridNode; onSelect?: (id: string) => void; selectedId?: string } & EditProps) {
   // Use a static mapping so Tailwind includes these classes at build time
   const cols =
     node.columns === 1 ? "grid-cols-1" :
@@ -69,23 +72,25 @@ function Grid({ node, onSelect, selectedId, editing, path, onSelectNode, selecte
   const sel = editing ? (selectedPath === path ? "outline outline-2 outline-[--color-brand]" : "outline outline-1 outline-transparent hover:outline-[--color-brand]/60") : undefined;
   return (
     <div className={cx("grid", cols, gap, pad, sel, node.className)} onClick={editing && onSelectNode && path != null ? (e) => { e.stopPropagation(); onSelectNode(path, node); } : undefined}>
-      {node.children.map((child, i) => (
-        <NodeViewWithActions key={("id" in child && child.id) ? child.id! : i} node={child} onSelect={onSelect} selectedId={selectedId} editing={editing} path={path != null ? (path === "" ? `${i}` : `${path}.${i}`) : undefined} onSelectNode={onSelectNode} selectedPath={selectedPath} />
-      ))}
+      {node.children.map((child, i) => {
+        const childPath = path != null ? (path === "" ? `${i}` : `${path}.${i}`) : `${i}`;
+        const el = <NodeViewWithActions key={("id" in child && child.id) ? child.id! : i} node={child} onSelect={onSelect} selectedId={selectedId} editing={editing} path={childPath} onSelectNode={onSelectNode} selectedPath={selectedPath} wrapChild={wrapChild} />;
+        return wrapChild ? wrapChild(childPath, el) : el;
+      })}
     </div>
   );
 }
 
-export function NodeView({ node, editing, path, onSelectNode, selectedPath }: { node: NodeSpec } & EditProps) {
+export function NodeView({ node, editing, path, onSelectNode, selectedPath, wrapChild }: { node: NodeSpec } & EditProps) {
   switch (node.type) {
     case "text":
       return <Text node={node} editing={editing} path={path} onSelectNode={onSelectNode} selectedPath={selectedPath} />;
     case "stack":
-      return <Stack node={node} editing={editing} path={path} onSelectNode={onSelectNode} selectedPath={selectedPath} />;
+      return <Stack node={node} editing={editing} path={path} onSelectNode={onSelectNode} selectedPath={selectedPath} wrapChild={wrapChild} />;
     case "grid":
-      return <Grid node={node} editing={editing} path={path} onSelectNode={onSelectNode} selectedPath={selectedPath} />;
+      return <Grid node={node} editing={editing} path={path} onSelectNode={onSelectNode} selectedPath={selectedPath} wrapChild={wrapChild} />;
     case "box":
-      return <Box node={node} editing={editing} path={path} onSelectNode={onSelectNode} selectedPath={selectedPath} />;
+      return <Box node={node} editing={editing} path={path} onSelectNode={onSelectNode} selectedPath={selectedPath} wrapChild={wrapChild} />;
     case "icon":
       return <Icon node={node} editing={editing} path={path} onSelectNode={onSelectNode} selectedPath={selectedPath} />;
     case "image":
@@ -99,7 +104,7 @@ export function NodeView({ node, editing, path, onSelectNode, selectedPath }: { 
   }
 }
 
-export function Renderer({ spec, onSelect, selectedId, onSelectNode, selectedPath, editing }: { spec: RootSpec; onSelect?: (id: string) => void; selectedId?: string; onSelectNode?: (path: string, node: NodeSpec) => void; selectedPath?: string; editing?: boolean }) {
+export function Renderer({ spec, onSelect, selectedId, onSelectNode, selectedPath, editing, wrapChild }: { spec: RootSpec; onSelect?: (id: string) => void; selectedId?: string; onSelectNode?: (path: string, node: NodeSpec) => void; selectedPath?: string; editing?: boolean; wrapChild?: (path: string, element: JSX.Element) => JSX.Element }) {
   const bg = spec.background === "slate"
     ? "bg-slate-50 dark:bg-slate-900"
     : spec.background === "transparent"
@@ -108,28 +113,28 @@ export function Renderer({ spec, onSelect, selectedId, onSelectNode, selectedPat
   const pad = spec.padding ? `p-${spec.padding}` : undefined;
   return (
     <div className={cx("w-full h-full", bg, pad, spec.className)}>
-      <NodeViewWithActions node={spec.body} onSelect={onSelect} selectedId={selectedId} editing={editing} path="" onSelectNode={onSelectNode} selectedPath={selectedPath} />
+      <NodeViewWithActions node={spec.body} onSelect={onSelect} selectedId={selectedId} editing={editing} path="" onSelectNode={onSelectNode} selectedPath={selectedPath} wrapChild={wrapChild} />
     </div>
   );
 }
 
-function NodeViewWithActions({ node, onSelect, selectedId, editing, path, onSelectNode, selectedPath }: { node: NodeSpec; onSelect?: (id: string) => void; selectedId?: string } & EditProps) {
+function NodeViewWithActions({ node, onSelect, selectedId, editing, path, onSelectNode, selectedPath, wrapChild }: { node: NodeSpec; onSelect?: (id: string) => void; selectedId?: string } & EditProps) {
   switch (node.type) {
     case "box":
-      return <Box node={node} onSelect={onSelect} selectedId={selectedId} editing={editing} path={path} onSelectNode={onSelectNode} selectedPath={selectedPath} />;
+      return <Box node={node} onSelect={onSelect} selectedId={selectedId} editing={editing} path={path} onSelectNode={onSelectNode} selectedPath={selectedPath} wrapChild={wrapChild} />;
     case "stack":
-      return <Stack node={node as StackNodeWithActions} onSelect={onSelect} selectedId={selectedId} editing={editing} path={path} onSelectNode={onSelectNode} selectedPath={selectedPath} />;
+      return <Stack node={node as StackNodeWithActions} onSelect={onSelect} selectedId={selectedId} editing={editing} path={path} onSelectNode={onSelectNode} selectedPath={selectedPath} wrapChild={wrapChild} />;
     case "grid":
-      return <Grid node={node as GridNodeWithActions} onSelect={onSelect} selectedId={selectedId} editing={editing} path={path} onSelectNode={onSelectNode} selectedPath={selectedPath} />;
+      return <Grid node={node as GridNodeWithActions} onSelect={onSelect} selectedId={selectedId} editing={editing} path={path} onSelectNode={onSelectNode} selectedPath={selectedPath} wrapChild={wrapChild} />;
     default:
-      return <NodeView node={node} editing={editing} path={path} onSelectNode={onSelectNode} selectedPath={selectedPath} />;
+      return <NodeView node={node} editing={editing} path={path} onSelectNode={onSelectNode} selectedPath={selectedPath} wrapChild={wrapChild} />;
   }
 }
 
 type StackNodeWithActions = StackNode & { children: NodeSpec[] };
 type GridNodeWithActions = GridNode & { children: NodeSpec[] };
 
-function Box({ node, onSelect, selectedId, editing, path, onSelectNode, selectedPath }: { node: BoxNode; onSelect?: (id: string) => void; selectedId?: string } & EditProps) {
+function Box({ node, onSelect, selectedId, editing, path, onSelectNode, selectedPath, wrapChild }: { node: BoxNode; onSelect?: (id: string) => void; selectedId?: string } & EditProps) {
   const pad = node.padding ? `p-${node.padding}` : "p-3";
   const gap = node.gap ? `gap-${node.gap}` : "gap-2";
   const base = node.variant === "plain" ? "border-transparent" : "border-slate-300/70 dark:border-slate-700/60 bg-white/70 dark:bg-slate-900/40 backdrop-blur";
@@ -147,9 +152,11 @@ function Box({ node, onSelect, selectedId, editing, path, onSelectNode, selected
       }}
     >
       {/* Render children, allowing badges to position absolutely if present */}
-      {node.children.map((child, i) => (
-        <NodeViewWithActions key={("id" in child && child.id) ? child.id! : i} node={child} onSelect={onSelect} selectedId={selectedId} editing={editing} path={path != null ? (path === "" ? `${i}` : `${path}.${i}`) : undefined} onSelectNode={onSelectNode} selectedPath={selectedPath} />
-      ))}
+      {node.children.map((child, i) => {
+        const childPath = path != null ? (path === "" ? `${i}` : `${path}.${i}`) : `${i}`;
+        const el = <NodeViewWithActions key={("id" in child && child.id) ? child.id! : i} node={child} onSelect={onSelect} selectedId={selectedId} editing={editing} path={childPath} onSelectNode={onSelectNode} selectedPath={selectedPath} wrapChild={wrapChild} />;
+        return wrapChild ? wrapChild(childPath, el) : el;
+      })}
     </div>
   );
   return content;
