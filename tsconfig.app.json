@@ -22,7 +22,7 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
-    "types": ["vitest/globals"]
+    "types": ["vitest/globals", "react", "react-dom"]
   },
   "include": ["src"]
   ,"exclude": [
