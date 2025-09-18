@@ -4,7 +4,7 @@ import type Konva from "konva";
 import type { LayoutSpec } from "../layout-schema.ts";
 import { renderNode } from "./CanvasRenderer.tsx";
 import { deleteNodes, duplicateNodes, nudgeNodes } from "./editing";
-import { applyPosition, groupNodes, ungroupNodes } from "./stage-internal";
+import { applyPosition, applyPositionAndSize, groupNodes, ungroupNodes } from "./stage-internal";
 
 // Props
 interface CanvasStageProps {
@@ -115,11 +115,40 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     return out;
   }, [getTopContainerAncestor, spec.root.id]);
 
+  // Helper to check if target is transformer-related
+  const isTransformerTarget = useCallback((target: any): boolean => {
+    if (!target) return false;
+    
+    // Direct transformer check
+    if (target.getClassName && target.getClassName() === 'Transformer') {
+      return true;
+    }
+    
+    // Check ancestors
+    let current = target;
+    while (current && current.getStage) {
+      if (current.getClassName && current.getClassName() === 'Transformer') {
+        return true;
+      }
+      const parent = current.getParent();
+      if (!parent || parent === current.getStage()) break;
+      current = parent;
+    }
+    
+    return false;
+  }, []);
+
   // Enhanced mouse handlers with proper interaction detection
   const onMouseDown = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     if (!isSelectMode) return;
     const stage = e.target.getStage();
     if (!stage) return;
+
+    // Don't process selection if clicking on transformer handles
+    if (isTransformerTarget(e.target)) {
+      console.log('MouseDown on transformer, ignoring selection logic');
+      return;
+    }
 
     // Handle panning
     if (e.evt.button === 1 || (e.evt.button === 0 && (e.evt.altKey || spacePan))) {
@@ -202,7 +231,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     }
     
     setMenu(null);
-  }, [isSelectMode, spacePan, spec.root.id, toWorld, selected, getTopContainerAncestor, normalizeSelection]);
+  }, [isSelectMode, spacePan, spec.root.id, toWorld, selected, getTopContainerAncestor, normalizeSelection, isTransformerTarget]);
 
   const onMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     const stage = e.target.getStage();
@@ -383,11 +412,18 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     const stage = e.target.getStage();
     if (!stage) return;
     
+    // Don't clear selection if clicking on transformer handles
+    if (isTransformerTarget(e.target)) {
+      console.log('Clicked on transformer, not clearing selection');
+      return;
+    }
+    
     if (e.target === stage && !dragState.hasPassedThreshold && !marqueeState.active) {
+      console.log('Clicking on empty stage, clearing selection');
       setSelected([]);
       setMenu(null);
     }
-  }, [isSelectMode, dragState.hasPassedThreshold, marqueeState.active]);
+  }, [isSelectMode, dragState.hasPassedThreshold, marqueeState.active, isTransformerTarget]);
 
   // Wheel zoom
   const onWheel = useCallback((e: Konva.KonvaEventObject<WheelEvent>) => {
@@ -605,12 +641,14 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     const stage = tr.getStage();
     if (!stage) return;
     const targets = selected.map(id => stage.findOne(`#${CSS.escape(id)}`)).filter(Boolean) as Konva.Node[];
+    console.log('Attaching transformer to targets:', targets.length, 'selected:', selected);
     tr.nodes(targets);
     tr.getLayer()?.batchDraw();
   }, [selected]);
 
   // Handle ongoing transform (during drag/resize)
   const onTransform = useCallback(() => {
+    console.log('onTransform called - transform in progress');
     // This is a placeholder. The important logic is in onTransformEnd.
     // We can use this to provide real-time feedback if needed in the future.
   }, []);
@@ -630,44 +668,191 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   // Commit transform (resize, scale, rotate)
   const onTransformEnd = useCallback(() => {
     const nodes = trRef.current?.nodes() ?? [];
-    nodes.forEach(node => {
+    if (nodes.length === 0) return;
+    
+    // For multi-selection, we need to get the transform values that were applied to all nodes
+    // and apply them uniformly to our spec
+    if (nodes.length > 1) {
+      console.log('Multi-selection transform - capturing collective transform');
+      
+      // All nodes should have the same scale and rotation applied by the transformer
+      const firstNode = nodes[0];
+      const scaleX = firstNode.scaleX();
+      const scaleY = firstNode.scaleY();
+      const rotationRad = firstNode.rotation();
+      const rotationDeg = Math.round((rotationRad * 180) / Math.PI);
+      
+      console.log('Collective transform:', { scaleX, scaleY, rotationDeg });
+      
+      // Apply the transform to each selected node
+      nodes.forEach(node => {
+        const nodeId = node.id();
+        if (!nodeId) return;
+        
+        const currentNode = findNode(spec.root, nodeId);
+        if (!currentNode) return;
+        
+        // Get the node's current position after transform
+        const newPos = { x: node.x(), y: node.y() };
+        
+        // Update position
+        setSpec(prev => applyPosition(prev, nodeId, newPos));
+        
+        // Update rotation - just set the total rotation that Konva computed
+        if (rotationDeg !== 0) {
+          // Konva has already rotated the object and positioned it correctly
+          // Just capture the final rotation and position
+          setSpec(prev => ({
+            ...prev,
+            root: mapNode(prev.root, nodeId, (n: any) => ({ 
+              ...n, 
+              rotation: (n.rotation ?? 0) + rotationDeg 
+            }))
+          }));
+        }
+        
+        // Update size if scaled
+        if ((scaleX !== 1 || scaleY !== 1) && currentNode.size) {
+          const newSize = {
+            width: Math.round(currentNode.size.width * scaleX),
+            height: Math.round(currentNode.size.height * scaleY)
+          };
+          setSpec(prev => applyPositionAndSize(prev, nodeId, newPos, newSize));
+        }
+        
+        // Reset the node's transform properties
+        node.scaleX(1);
+        node.scaleY(1);
+        node.rotation(0);
+      });
+    } else {
+      // Single node transform
+      const node = nodes[0];
       const nodeId = node.id();
       if (!nodeId) return;
 
       const newPos = { x: node.x(), y: node.y() };
-      const newScale = { x: node.scaleX(), y: node.scaleY() };
-      const newRotation = node.rotation();
+      const scaleX = node.scaleX();
+      const scaleY = node.scaleY();
+      const rotationRad = node.rotation();
+      const rotationDeg = Math.round((rotationRad * 180) / Math.PI);
 
-      // "Bake" the transform into the spec and "reset" the node's transform in Konva
-      setSpec(prev => {
-        const root = JSON.parse(JSON.stringify(prev.root)); // Deep copy
-        const specNode = findNode(root, nodeId);
+      console.log('Single node transform:', { nodeId, newPos, scaleX, scaleY, rotationDeg });
 
-        if (specNode) {
-          // Apply new position
-          specNode.position = newPos;
+      const currentNode = findNode(spec.root, nodeId);
+      if (!currentNode) return;
+      
+      const isGroup = currentNode?.type === 'group';
 
-          // Apply new size based on scale
-          if (specNode.size) {
-            specNode.size.width = Math.round(specNode.size.width * newScale.x);
-            specNode.size.height = Math.round(specNode.size.height * newScale.y);
+      // Update position
+      setSpec(prev => applyPosition(prev, nodeId, newPos));
+      
+      // Update rotation - just capture what Konva computed  
+      if (rotationDeg !== 0) {
+        // Konva has already positioned the object correctly during rotation
+        // Just capture the final state
+        setSpec(prev => ({
+          ...prev,
+          root: mapNode(prev.root, nodeId, (n: any) => ({ 
+            ...n, 
+            rotation: (n.rotation ?? 0) + rotationDeg
+          }))
+        }));
+      }
+      
+      // Handle scaling
+      if (scaleX !== 1 || scaleY !== 1) {
+        if (isGroup && currentNode.children) {
+          // For groups: scale the group container and all children
+          console.log('Scaling group and children...');
+          
+          setSpec(prev => ({
+            ...prev,
+            root: mapNode(prev.root, nodeId, (groupNode: any) => {
+              if (groupNode.type !== 'group') return groupNode;
+              
+              // Scale the group's size if it has one
+              let newGroupSize = groupNode.size;
+              if (groupNode.size) {
+                newGroupSize = {
+                  width: Math.round(groupNode.size.width * scaleX),
+                  height: Math.round(groupNode.size.height * scaleY)
+                };
+              }
+              
+              // Scale all children positions and sizes
+              const scaledChildren = groupNode.children.map((child: any) => {
+                const scaledChild = { ...child };
+                
+                // Scale position
+                if (child.position) {
+                  scaledChild.position = {
+                    x: Math.round(child.position.x * scaleX),
+                    y: Math.round(child.position.y * scaleY)
+                  };
+                }
+                
+                // Scale size
+                if (child.size) {
+                  scaledChild.size = {
+                    width: Math.round(child.size.width * scaleX),
+                    height: Math.round(child.size.height * scaleY)
+                  };
+                }
+                
+                return scaledChild;
+              });
+              
+              return {
+                ...groupNode,
+                size: newGroupSize,
+                children: scaledChildren
+              };
+            })
+          }));
+        } else {
+          // For individual nodes: just scale the node itself
+          if (currentNode && currentNode.size) {
+            const newSize = {
+              width: Math.round(currentNode.size.width * scaleX),
+              height: Math.round(currentNode.size.height * scaleY)
+            };
+            setSpec(prev => applyPositionAndSize(prev, nodeId, newPos, newSize));
           }
-
-          // Apply new rotation (convert from radians to degrees)
-          specNode.rotation = Math.round((newRotation * 180) / Math.PI);
         }
+      }
 
-        return { ...prev, root };
-      });
-
-      // Reset Konva node's transform properties
+      // Reset the node's transform properties
       node.scaleX(1);
       node.scaleY(1);
-      node.rotation(0); // Reset rotation since it's now baked into the spec
-    });
+      node.rotation(0);
+    }
 
-    trRef.current?.getLayer()?.batchDraw();
-  }, [setSpec]);
+    // Force transformer to update its targets after React re-renders
+    setTimeout(() => {
+      const tr = trRef.current;
+      if (!tr) return;
+      const stage = tr.getStage();
+      if (!stage) return;
+      
+      // Re-attach transformer to the updated nodes
+      const targets = selected.map(id => stage.findOne(`#${CSS.escape(id)}`)).filter(Boolean) as Konva.Node[];
+      console.log('Re-attaching transformer to updated targets:', targets.length);
+      tr.nodes(targets);
+      tr.forceUpdate();
+      tr.getLayer()?.batchDraw();
+    }, 0);
+  }, [setSpec, spec.root, selected]);
+
+  // Helper function to map nodes (from stage-internal.ts pattern)
+  const mapNode = (n: any, id: string, f: (n: any) => any): any => {
+    if (n.id === id) return f(n);
+    if (n.children && Array.isArray(n.children)) {
+      const children = n.children.map((c: any) => mapNode(c, id, f));
+      return { ...n, children };
+    }
+    return n;
+  };
 
   return (
     <div ref={wrapperRef} style={{ position: 'relative', width, height }} onContextMenu={onWrapperContextMenu}>
@@ -695,7 +880,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
               ref={trRef as unknown as React.RefObject<Konva.Transformer>} 
               rotateEnabled={true} 
               resizeEnabled={true}
-              keepRatio={false}
+              keepRatio={false} // Always allow independent width/height resizing
               rotationSnaps={[0, 90, 180, 270]}
               boundBoxFunc={(oldBox, newBox) => {
                 // Prevent scaling to zero or negative size
