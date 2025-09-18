@@ -57,6 +57,8 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
 
   const isSelectMode = tool === "select";
   const [spacePan, setSpacePan] = useState(false);
+  // Track shift key globally for aspect-ratio constrained resize
+  const [shiftPressed, setShiftPressed] = useState(false);
 
   // Konva refs
   const stageRef = useRef<Konva.Stage>(null);
@@ -460,9 +462,11 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.code === 'Space') { setSpacePan(true); e.preventDefault(); }
+      if (e.key === 'Shift') setShiftPressed(true);
     };
     const up = (e: KeyboardEvent) => {
       if (e.code === 'Space') { setSpacePan(false); }
+      if (e.key === 'Shift') setShiftPressed(false);
     };
     window.addEventListener('keydown', down, { capture: true });
     window.addEventListener('keyup', up, { capture: true });
@@ -939,14 +943,28 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
               ref={trRef as unknown as React.RefObject<Konva.Transformer>} 
               rotateEnabled={true} 
               resizeEnabled={true}
-              keepRatio={false} // Always allow independent width/height resizing
+              keepRatio={false} // we enforce manually only while shift is held via boundBoxFunc
               rotationSnaps={[0, 90, 180, 270]}
               boundBoxFunc={(oldBox, newBox) => {
                 // Prevent scaling to zero or negative size
                 if (newBox.width < 10 || newBox.height < 10) {
                   return oldBox;
                 }
-                return newBox;
+                if (!shiftPressed) return newBox;
+                // Constrain proportionally relative to old box when shift held.
+                const aspect = oldBox.width / (oldBox.height || 1);
+                // Determine which dimension changed more in relative terms
+                const dw = Math.abs(newBox.width - oldBox.width);
+                const dh = Math.abs(newBox.height - oldBox.height);
+                if (dw > dh) {
+                  // Width is driver -> derive height
+                  const constrainedHeight = newBox.width / aspect;
+                  return { ...newBox, height: constrainedHeight };
+                } else {
+                  // Height driver -> derive width
+                  const constrainedWidth = newBox.height * aspect;
+                  return { ...newBox, width: constrainedWidth };
+                }
               }}
               onTransform={onTransform}
               onTransformEnd={onTransformEnd} 
