@@ -2,6 +2,7 @@ import { Group, Rect, Text } from "react-konva";
 import { type ReactNode } from "react";
 import type { LayoutNode, FrameNode, StackNode, TextNode, BoxNode, GridNode, GroupNode, ImageNode } from "../layout-schema.ts";
 import { CanvasImage } from "./components/CanvasImage";
+import { debugOnce, logger } from "../utils/logger";
 
 // Text
 function renderText(n: TextNode) {
@@ -30,7 +31,7 @@ function renderBox(n: BoxNode) {
   const w = n.size?.width ?? 200;
   const h = n.size?.height ?? 120;
   return (
-    <Group key={n.id} id={n.id} name={`node ${n.type}`} x={x} y={y} opacity={n.opacity ?? 1} draggable>
+    <Group key={n.id} id={n.id} name={`node ${n.type}`} x={x} y={y} opacity={n.opacity ?? 1}>
       <Rect
         width={w}
         height={h}
@@ -91,16 +92,17 @@ function renderStack(n: StackNode) {
     }
     return node;
   });
-  return <Group key={n.id} id={n.id} name={`node ${n.type}`} x={x} y={y} opacity={n.opacity ?? 1} draggable>{items}</Group>;
+  return <Group key={n.id} id={n.id} name={`node ${n.type}`} x={x} y={y} opacity={n.opacity ?? 1}>{items}</Group>;
 }
 
 // Frame
 function renderFrame(n: FrameNode) {
-  const { size, background, padding } = n;
+  const { size, padding, background } = n;
   const pad = typeof padding === "number" ? padding : padding ? padding.t : 0;
+  const draggable = false; // root / frames currently static
   return (
-    <Group key={n.id} id={n.id} name={`node ${n.type}`} x={n.position?.x ?? 0} y={n.position?.y ?? 0} opacity={n.opacity ?? 1} draggable>
-      <Rect width={size.width} height={size.height} fill={background ?? "#ffffff"} />
+    <Group key={n.id} id={n.id} name={`node ${n.type}`} x={n.position?.x ?? 0} y={n.position?.y ?? 0} opacity={n.opacity ?? 1} draggable={draggable}>
+      <Rect width={size.width} height={size.height} fill={background ?? '#ffffff'} stroke={background ? '#e2e8f0' : undefined} listening={false} />
       <Group x={pad} y={pad}>{n.children.map(renderNode)}</Group>
     </Group>
   );
@@ -108,8 +110,10 @@ function renderFrame(n: FrameNode) {
 
 // Group
 function renderGroup(n: GroupNode) {
+  const x = n.position?.x ?? 0;
+  const y = n.position?.y ?? 0;
   return (
-    <Group key={n.id} id={n.id} name={`node ${n.type}`} opacity={n.opacity ?? 1} draggable>
+    <Group key={n.id} id={n.id} name={`node ${n.type}`} x={x} y={y} opacity={n.opacity ?? 1}>
       {n.children.map(renderNode)}
     </Group>
   );
@@ -155,7 +159,7 @@ function renderGrid(n: GridNode) {
   }
 
   return (
-    <Group key={n.id} id={n.id} name={`node ${n.type}`} x={x} y={y} opacity={n.opacity ?? 1} draggable>
+    <Group key={n.id} id={n.id} name={`node ${n.type}`} x={x} y={y} opacity={n.opacity ?? 1}>
       {n.size ? <Rect width={n.size.width} height={n.size.height} fillEnabled={false} /> : null}
       <Group x={0} y={0}>{items}</Group>
     </Group>
@@ -169,7 +173,7 @@ function renderImage(n: ImageNode) {
   const w = n.size?.width ?? 100;
   const h = n.size?.height ?? 100;
   return (
-    <Group key={n.id} id={n.id} name={`node ${n.type}`} x={x} y={y} opacity={n.opacity ?? 1} draggable>
+    <Group key={n.id} id={n.id} name={`node ${n.type}`} x={x} y={y} opacity={n.opacity ?? 1}>
       <CanvasImage src={n.src} width={w} height={h} objectFit={n.objectFit} radius={n.radius}
       />
     </Group>
@@ -177,6 +181,7 @@ function renderImage(n: ImageNode) {
 }
 
 export function renderNode(n: LayoutNode): ReactNode {
+  debugOnce('renderNode:'+n.id, n.id, n.type);
   switch (n.type) {
     case "text": return renderText(n);
     case "box": return renderBox(n);
@@ -186,6 +191,7 @@ export function renderNode(n: LayoutNode): ReactNode {
     case "group": return renderGroup(n as GroupNode);
     case "image": return renderImage(n as ImageNode);
     default:
+      logger.warn('Unknown node type', (n as any).type, n);
       return null;
   }
 }

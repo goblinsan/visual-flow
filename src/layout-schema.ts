@@ -50,7 +50,7 @@ export interface FrameNode extends BaseNode {
   children: LayoutNode[]; // children are absolute by default (unless stack/grid)
 }
 
-export interface GroupNode extends BaseNode {
+export interface GroupNode extends BaseNode, Partial<AbsoluteChild> {
   type: "group";
   children: LayoutNode[]; // bounding box is union(children)
 }
