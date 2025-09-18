@@ -1,24 +1,10 @@
 import { Stage, Layer, Transformer, Rect, Group } from "react-konva";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type Konva from "konva";
-import type { LayoutNode, LayoutSpec } from "../layout-schema.ts";
+import type { LayoutSpec } from "../layout-schema.ts";
 import { renderNode } from "./CanvasRenderer.tsx";
 import { deleteNodes, duplicateNodes, nudgeNodes } from "./editing";
-import { applyPosition, applyPositionAndSize, groupNodes, ungroupNodes } from "./stage-internal";
-
-function findNode(spec: LayoutSpec, id: string): LayoutNode | null {
-  function walk(node: LayoutNode): LayoutNode | null {
-    if (node.id === id) return node;
-    if ('children' in node && Array.isArray(node.children)) {
-      for (const child of (node as any).children) {
-        const found = walk(child);
-        if (found) return found;
-      }
-    }
-    return null;
-  }
-  return walk(spec.root);
-}
+import { applyPosition, groupNodes, ungroupNodes } from "./stage-internal";
 
 // Props
 interface CanvasStageProps {
@@ -254,9 +240,9 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
             });
           }
         }
-        stage.batchDraw();
         // Force re-render of selection outlines during drag
-        // setTransforming(prev => !prev);
+        // A bit of a hack, but it works for now
+        trRef.current?.forceUpdate();
       }
       return;
     }
@@ -625,70 +611,61 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
 
   // Handle ongoing transform (during drag/resize)
   const onTransform = useCallback(() => {
-    setTransforming(prev => !prev); // Toggle to force re-render
+    // This is a placeholder. The important logic is in onTransformEnd.
+    // We can use this to provide real-time feedback if needed in the future.
   }, []);
 
-  // Commit transform (resize)
+  // Find a node in the spec by its ID
+  const findNode = (node: any, id: string): any | null => {
+    if (node.id === id) return node;
+    if (node.children) {
+      for (const child of node.children) {
+        const found = findNode(child, id);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+
+  // Commit transform (resize, scale, rotate)
   const onTransformEnd = useCallback(() => {
     const nodes = trRef.current?.nodes() ?? [];
     nodes.forEach(node => {
       const nodeId = node.id();
       if (!nodeId) return;
 
-      const sx = node.scaleX();
-      const sy = node.scaleY();
+      const newPos = { x: node.x(), y: node.y() };
+      const newScale = { x: node.scaleX(), y: node.scaleY() };
       const newRotation = node.rotation();
 
-      // Update spec with new dimensions and rotation
+      // "Bake" the transform into the spec and "reset" the node's transform in Konva
       setSpec(prev => {
-        const specNode = findNode(prev, nodeId);
-        if (!specNode) return prev;
+        const root = JSON.parse(JSON.stringify(prev.root)); // Deep copy
+        const specNode = findNode(root, nodeId);
 
-        const newWidth = (specNode.size?.width ?? node.width()) * sx;
-        const newHeight = (specNode.size?.height ?? node.height()) * sy;
+        if (specNode) {
+          // Apply new position
+          specNode.position = newPos;
 
-        let next = applyPositionAndSize(prev, nodeId, node.position(), { width: newWidth, height: newHeight });
-        
-        const nodeInNext = findNode(next, nodeId);
-        if (nodeInNext) {
-          nodeInNext.rotation = newRotation;
-        }
-        
-        // Handle group resizing
-        if (specNode?.type === 'group' && specNode.size && specNode.size.width && specNode.size.height && Array.isArray(specNode.children)) {
-          const prevW = specNode.size.width || 1;
-          const prevH = specNode.size.height || 1;
-          const sxC = prevW ? newWidth / prevW : 1;
-          const syC = prevH ? newHeight / prevH : 1;
-          
-          function map(nl: any): any {
-            if (nl.id === nodeId && Array.isArray(nl.children)) {
-              return { 
-                ...nl, 
-                size: { width: newWidth, height: newHeight }, 
-                children: nl.children.map((c: any) => {
-                  const cpos = c.position ?? { x: 0, y: 0 };
-                  const csize = c.size ?? null;
-                  const newPos = { x: cpos.x * sxC, y: cpos.y * syC };
-                  let newSize = csize;
-                  if (csize) newSize = { width: csize.width * sxC, height: csize.height * syC };
-                  return { ...c, position: newPos, size: newSize ?? c.size };
-                }) 
-              };
-            }
-            if (Array.isArray(nl.children)) return { ...nl, children: nl.children.map(map) };
-            return nl;
+          // Apply new size based on scale
+          if (specNode.size) {
+            specNode.size.width = Math.round(specNode.size.width * newScale.x);
+            specNode.size.height = Math.round(specNode.size.height * newScale.y);
           }
-          next = { ...next, root: map(next.root) };
+
+          // Apply new rotation (convert from radians to degrees)
+          specNode.rotation = Math.round((newRotation * 180) / Math.PI);
         }
-        return next;
+
+        return { ...prev, root };
       });
 
-      // Reset node transformations
+      // Reset Konva node's transform properties
       node.scaleX(1);
       node.scaleY(1);
-      node.rotation(0);
+      node.rotation(0); // Reset rotation since it's now baked into the spec
     });
+
     trRef.current?.getLayer()?.batchDraw();
   }, [setSpec]);
 
@@ -716,12 +693,12 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
           {isSelectMode && (
             <Transformer 
               ref={trRef as unknown as React.RefObject<Konva.Transformer>} 
-              rotateEnabled={true}
+              rotateEnabled={true} 
               resizeEnabled={true}
               keepRatio={false}
               rotationSnaps={[0, 90, 180, 270]}
               boundBoxFunc={(oldBox, newBox) => {
-                // Enforce a minimum size
+                // Prevent scaling to zero or negative size
                 if (newBox.width < 10 || newBox.height < 10) {
                   return oldBox;
                 }
