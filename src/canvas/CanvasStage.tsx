@@ -254,18 +254,12 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       
       // Update marquee rectangle
       const rect = marqueeRectRef.current;
-      const pointer = stage.getPointerPosition();
-      if (rect && marqueeState.startPoint && pointer) {
-        // Store screen coordinates for marquee start point
-        const startScreen = {
-          x: marqueeState.startPoint.x * stage.scaleX() + stage.x(),
-          y: marqueeState.startPoint.y * stage.scaleY() + stage.y()
-        };
-        
-        const minX = Math.min(startScreen.x, pointer.x);
-        const minY = Math.min(startScreen.y, pointer.y);
-        const width = Math.abs(pointer.x - startScreen.x);
-        const height = Math.abs(pointer.y - startScreen.y);
+      if (rect && marqueeState.startPoint) {
+        const start = marqueeState.startPoint;
+        const minX = Math.min(start.x, worldPos.x);
+        const minY = Math.min(start.y, worldPos.y);
+        const width = Math.abs(worldPos.x - start.x);
+        const height = Math.abs(worldPos.y - start.y);
         
         rect.position({ x: minX, y: minY });
         rect.size({ width, height });
@@ -315,18 +309,12 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       const rect = marqueeRectRef.current;
       if (rect && rect.visible() && marqueeState.startPoint && marqueeState.currentPoint) {
         // Find nodes intersecting with marquee
-        // Convert screen marquee bounds to same coordinate system as getClientRect()
-        const transform = stage.getAbsoluteTransform().copy().invert();
-        const marqueeTopLeft = transform.point({ x: rect.x(), y: rect.y() });
-        const marqueeBottomRight = transform.point({ 
-          x: rect.x() + rect.width(), 
-          y: rect.y() + rect.height() 
-        });
+        // Marquee is now in world coordinates, so direct comparison is fine
         const marqueeBounds = {
-          x: marqueeTopLeft.x,
-          y: marqueeTopLeft.y,
-          width: marqueeBottomRight.x - marqueeTopLeft.x,
-          height: marqueeBottomRight.y - marqueeTopLeft.y,
+          x: rect.x(),
+          y: rect.y(),
+          width: rect.width(),
+          height: rect.height(),
         };
         
         const intersectingNodes: string[] = [];
@@ -334,8 +322,8 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
         
         for (const node of nodes) {
           try {
-            // Get node bounds in same coordinate system as selection outlines
-            const worldBounds = node.getClientRect();
+            // Get node bounds relative to the stage (world coordinates)
+            const worldBounds = node.getClientRect({ relativeTo: stage });
             
             // Check intersection
             if (!(marqueeBounds.x + marqueeBounds.width < worldBounds.x ||
@@ -612,7 +600,8 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   }, [selected, normalizeSelection]);
 
   // Transformer target attachment
-  const onTransformerRef = useCallback((tr: Konva.Transformer | null) => {
+  useEffect(() => {
+    const tr = trRef.current;
     if (!tr) return;
     const stage = tr.getStage();
     if (!stage) return;
@@ -708,42 +697,12 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
               ref={trRef as unknown as React.RefObject<Konva.Transformer>} 
               rotateEnabled={true} 
               keepRatio={false}
-              refFn={onTransformerRef} 
               onTransform={onTransform}
               onTransformEnd={onTransformEnd} 
             />
           )}
           
-          {/* Selection outlines */}
-          {isSelectMode && selected.length > 0 && (
-            <Group listening={false}>
-              {selected.map(id => {
-                if (id === spec.root.id) return null;
-                const stage = stageRef.current;
-                if (!stage) return null;
-                const node = stage.findOne(`#${CSS.escape(id)}`) as Konva.Node | null;
-                if (!node) return null;
-                const box = node.getClientRect();
-                return (
-                  <Rect 
-                    key={id} 
-                    x={box.x} 
-                    y={box.y} 
-                    width={box.width} 
-                    height={box.height}
-                    stroke="#2563eb" 
-                    strokeWidth={1} 
-                    dash={[6,4]} 
-                    listening={false} 
-                  />
-                );
-              })}
-            </Group>
-          )}
-        </Layer>
-        
-        {/* Untransformed layer for marquee - screen coordinates */}
-        <Layer>
+          {/* Marquee rectangle */}
           <Rect
             ref={marqueeRectRef}
             x={0}
