@@ -57,6 +57,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
 
   const isSelectMode = tool === "select";
   const [spacePan, setSpacePan] = useState(false);
+  const [transforming, setTransforming] = useState(false);
 
   // Konva refs
   const stageRef = useRef<Konva.Stage>(null);
@@ -241,6 +242,8 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
           }
         }
         stage.batchDraw();
+        // Force re-render of selection outlines during drag
+        setTransforming(prev => !prev);
       }
       return;
     }
@@ -251,12 +254,18 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       
       // Update marquee rectangle
       const rect = marqueeRectRef.current;
-      if (rect && marqueeState.startPoint) {
-        const start = marqueeState.startPoint;
-        const minX = Math.min(start.x, worldPos.x);
-        const minY = Math.min(start.y, worldPos.y);
-        const width = Math.abs(worldPos.x - start.x);
-        const height = Math.abs(worldPos.y - start.y);
+      const pointer = stage.getPointerPosition();
+      if (rect && marqueeState.startPoint && pointer) {
+        // Store screen coordinates for marquee start point
+        const startScreen = {
+          x: marqueeState.startPoint.x * stage.scaleX() + stage.x(),
+          y: marqueeState.startPoint.y * stage.scaleY() + stage.y()
+        };
+        
+        const minX = Math.min(startScreen.x, pointer.x);
+        const minY = Math.min(startScreen.y, pointer.y);
+        const width = Math.abs(pointer.x - startScreen.x);
+        const height = Math.abs(pointer.y - startScreen.y);
         
         rect.position({ x: minX, y: minY });
         rect.size({ width, height });
@@ -306,11 +315,18 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       const rect = marqueeRectRef.current;
       if (rect && rect.visible() && marqueeState.startPoint && marqueeState.currentPoint) {
         // Find nodes intersecting with marquee
+        // Convert screen marquee bounds to same coordinate system as getClientRect()
+        const transform = stage.getAbsoluteTransform().copy().invert();
+        const marqueeTopLeft = transform.point({ x: rect.x(), y: rect.y() });
+        const marqueeBottomRight = transform.point({ 
+          x: rect.x() + rect.width(), 
+          y: rect.y() + rect.height() 
+        });
         const marqueeBounds = {
-          x: rect.x(),
-          y: rect.y(),
-          width: rect.width(),
-          height: rect.height(),
+          x: marqueeTopLeft.x,
+          y: marqueeTopLeft.y,
+          width: marqueeBottomRight.x - marqueeTopLeft.x,
+          height: marqueeBottomRight.y - marqueeTopLeft.y,
         };
         
         const intersectingNodes: string[] = [];
@@ -318,14 +334,8 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
         
         for (const node of nodes) {
           try {
-            const nodeBounds = node.getClientRect();
-            // Convert to world coordinates
-            const worldBounds = {
-              x: (nodeBounds.x - stage.x()) / stage.scaleX(),
-              y: (nodeBounds.y - stage.y()) / stage.scaleY(),
-              width: nodeBounds.width / stage.scaleX(),
-              height: nodeBounds.height / stage.scaleY(),
-            };
+            // Get node bounds in same coordinate system as selection outlines
+            const worldBounds = node.getClientRect();
             
             // Check intersection
             if (!(marqueeBounds.x + marqueeBounds.width < worldBounds.x ||
@@ -611,6 +621,11 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     tr.getLayer()?.batchDraw();
   }, [selected]);
 
+  // Handle ongoing transform (during drag/resize)
+  const onTransform = useCallback(() => {
+    setTransforming(prev => !prev); // Toggle to force re-render
+  }, []);
+
   // Commit transform (resize)
   const onTransformEnd = useCallback(() => {
     const nodes = trRef.current?.nodes() ?? [];
@@ -694,6 +709,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
               rotateEnabled={true} 
               keepRatio={false}
               refFn={onTransformerRef} 
+              onTransform={onTransform}
               onTransformEnd={onTransformEnd} 
             />
           )}
@@ -724,8 +740,10 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
               })}
             </Group>
           )}
-          
-          {/* Marquee rectangle */}
+        </Layer>
+        
+        {/* Untransformed layer for marquee - screen coordinates */}
+        <Layer>
           <Rect
             ref={marqueeRectRef}
             x={0}
