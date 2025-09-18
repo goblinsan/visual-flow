@@ -64,6 +64,16 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   const wrapperRef = useRef<HTMLDivElement>(null);
   const marqueeRectRef = useRef<Konva.Rect>(null);
 
+  // Transform session snapshot (captured at first transform frame)
+  const [transformSession, setTransformSession] = useState<null | {
+    nodes: Record<string, {
+      topLeft: { x: number; y: number };
+      size: { width: number; height: number };
+      center: { x: number; y: number };
+    }>;
+    selectionBox?: { x: number; y: number; width: number; height: number; center: { x: number; y: number } };
+  }>(null);
+
   // Utility: world coordinate conversion
   const toWorld = useCallback((stage: Konva.Stage, p: { x: number; y: number }) => ({
     x: (p.x - stage.x()) / stage.scaleX(),
@@ -648,9 +658,45 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
 
   // Handle ongoing transform (during drag/resize)
   const onTransform = useCallback(() => {
-    console.log('onTransform called - transform in progress');
-    // This is a placeholder. The important logic is in onTransformEnd.
-    // We can use this to provide real-time feedback if needed in the future.
+    // Initialize transform session snapshot once per gesture.
+    if (transformSession) return; // already captured
+    const tr = trRef.current; if (!tr) return;
+    const stage = tr.getStage(); if (!stage) return;
+    const nodes = tr.nodes(); if (!nodes.length) return;
+
+    const snapshot: {
+      nodes: Record<string, { topLeft: {x:number;y:number}; size:{width:number;height:number}; center:{x:number;y:number} }>;
+      selectionBox?: { x:number; y:number; width:number; height:number; center:{x:number;y:number} };
+    } = { nodes: {} };
+
+    let minX = Number.POSITIVE_INFINITY, minY = Number.POSITIVE_INFINITY;
+    let maxX = Number.NEGATIVE_INFINITY, maxY = Number.NEGATIVE_INFINITY;
+
+    nodes.forEach(n => {
+      const id = n.id(); if (!id) return;
+      // Derive untransformed size from spec (source of truth)
+      const specNode = (function find(node:any, id:string):any|null { if (node.id===id) return node; if (node.children) { for (const c of node.children) { const f=find(c,id); if (f) return f; } } return null; })(spec.root, id);
+      let width = 0, height = 0;
+      if (specNode?.size) { width = specNode.size.width; height = specNode.size.height; }
+      else {
+        // Fallback to Konva bounding box (approx for text/etc.)
+        const bb = n.getClientRect({ relativeTo: stage });
+        width = bb.width; height = bb.height;
+      }
+      const topLeft = { x: n.x(), y: n.y() };
+      const center = { x: topLeft.x + width / 2, y: topLeft.y + height / 2 };
+      snapshot.nodes[id] = { topLeft, size: { width, height }, center };
+      minX = Math.min(minX, center.x); minY = Math.min(minY, center.y);
+      maxX = Math.max(maxX, center.x); maxY = Math.max(maxY, center.y);
+    });
+
+    if (nodes.length > 1 && isFinite(minX) && isFinite(minY) && isFinite(maxX) && isFinite(maxY)) {
+      const selW = maxX - minX;
+      const selH = maxY - minY;
+      snapshot.selectionBox = { x: minX, y: minY, width: selW, height: selH, center: { x: minX + selW/2, y: minY + selH/2 } };
+    }
+
+    setTransformSession(snapshot);
   }, []);
 
   // Find a node in the spec by its ID
@@ -669,49 +715,33 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   const onTransformEnd = useCallback(() => {
     const nodes = trRef.current?.nodes() ?? [];
     if (nodes.length === 0) return;
+  // const session = transformSession; // snapshot no longer used in current simplified bake
     
     // For multi-selection, we need to get the transform values that were applied to all nodes
     // and apply them uniformly to our spec
     if (nodes.length > 1) {
       console.log('Multi-selection transform - capturing collective transform');
-      
-      // All nodes should have the same scale and rotation applied by the transformer
+      // NOTE: Current implementation still naive for relative offsets; we only remove cumulative rotation bug here.
       const firstNode = nodes[0];
       const scaleX = firstNode.scaleX();
       const scaleY = firstNode.scaleY();
-      const rotationRad = firstNode.rotation();
-      const rotationDeg = Math.round((rotationRad * 180) / Math.PI);
-      
+      const rotationDeg = firstNode.rotation(); // absolute final rotation
       console.log('Collective transform:', { scaleX, scaleY, rotationDeg });
-      
-      // Apply the transform to each selected node
       nodes.forEach(node => {
-        const nodeId = node.id();
-        if (!nodeId) return;
-        
-        const currentNode = findNode(spec.root, nodeId);
-        if (!currentNode) return;
-        
-        // Get the node's current position after transform
-        const newPos = { x: node.x(), y: node.y() };
-        
-        // Update position
+        const nodeId = node.id(); if (!nodeId) return;
+        const currentNode = findNode(spec.root, nodeId); if (!currentNode) return;
+        const newPos = { x: node.x(), y: node.y() }; // Konva final top-left already adjusted for center-rotation illusion
+        // Store position directly (remove prior inverse compensation)
         setSpec(prev => applyPosition(prev, nodeId, newPos));
-        
-        // Update rotation - just set the total rotation that Konva computed
-        if (rotationDeg !== 0) {
-          // Konva has already rotated the object and positioned it correctly
-          // Just capture the final rotation and position
-          setSpec(prev => ({
-            ...prev,
-            root: mapNode(prev.root, nodeId, (n: any) => ({ 
-              ...n, 
-              rotation: (n.rotation ?? 0) + rotationDeg 
+        // Store absolute rotation (no cumulative addition)
+        setSpec(prev => ({
+          ...prev,
+            root: mapNode(prev.root, nodeId, (n: any) => ({
+              ...n,
+              rotation: rotationDeg
             }))
-          }));
-        }
-        
-        // Update size if scaled
+        }));
+        // Scale size if present
         if ((scaleX !== 1 || scaleY !== 1) && currentNode.size) {
           const newSize = {
             width: Math.round(currentNode.size.width * scaleX),
@@ -719,11 +749,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
           };
           setSpec(prev => applyPositionAndSize(prev, nodeId, newPos, newSize));
         }
-        
-        // Reset the node's transform properties
-        node.scaleX(1);
-        node.scaleY(1);
-        node.rotation(0);
+        node.scaleX(1); node.scaleY(1); node.rotation(0);
       });
     } else {
       // Single node transform
@@ -734,8 +760,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       const newPos = { x: node.x(), y: node.y() };
       const scaleX = node.scaleX();
       const scaleY = node.scaleY();
-      const rotationRad = node.rotation();
-      const rotationDeg = Math.round((rotationRad * 180) / Math.PI);
+      const rotationDeg = node.rotation(); // absolute degrees
 
       console.log('Single node transform:', { nodeId, newPos, scaleX, scaleY, rotationDeg });
 
@@ -744,21 +769,16 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       
       const isGroup = currentNode?.type === 'group';
 
-      // Update position
+      // Store the position exactly as provided by Konva (already adjusted for center-rotation illusion)
       setSpec(prev => applyPosition(prev, nodeId, newPos));
-      
-      // Update rotation - just capture what Konva computed  
-      if (rotationDeg !== 0) {
-        // Konva has already positioned the object correctly during rotation
-        // Just capture the final state
-        setSpec(prev => ({
-          ...prev,
-          root: mapNode(prev.root, nodeId, (n: any) => ({ 
-            ...n, 
-            rotation: (n.rotation ?? 0) + rotationDeg
-          }))
-        }));
-      }
+      // Set absolute rotation (no cumulative add)
+      setSpec(prev => ({
+        ...prev,
+        root: mapNode(prev.root, nodeId, (n: any) => ({
+          ...n,
+          rotation: rotationDeg
+        }))
+      }));
       
       // Handle scaling
       if (scaleX !== 1 || scaleY !== 1) {
@@ -828,6 +848,9 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       node.rotation(0);
     }
 
+    // Clear transform session after bake
+    setTransformSession(null);
+
     // Force transformer to update its targets after React re-renders
     setTimeout(() => {
       const tr = trRef.current;
@@ -842,7 +865,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       tr.forceUpdate();
       tr.getLayer()?.batchDraw();
     }, 0);
-  }, [setSpec, spec.root, selected]);
+  }, [setSpec, spec.root, selected, transformSession]);
 
   // Helper function to map nodes (from stage-internal.ts pattern)
   const mapNode = (n: any, id: string, f: (n: any) => any): any => {
