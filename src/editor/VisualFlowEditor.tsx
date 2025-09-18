@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Modal } from "../components/Modal";
 import type React from "react";
 import { Renderer } from "../renderer/Renderer.tsx";
 import type { NodeSpec, RootSpec, GridNode, StackNode, BoxNode, TextNode } from "../dsl.ts";
@@ -353,8 +354,27 @@ export function VisualFlowEditor({ initial }: EditorProps) {
           </div>
         </div>
         {/* Modals */}
-        <CheatsheetModal open={cheatOpen} onClose={() => setCheatOpen(false)} />
-        <AboutModal open={aboutOpen} onClose={() => setAboutOpen(false)} version={appVersion} />
+        <Modal open={aboutOpen} onClose={() => setAboutOpen(false)} title="About Visual Flow" size="sm">
+          <p><strong>visual-flow</strong> version <code>{appVersion}</code></p>
+          <p className="mt-2">A lightweight experimental visual layout & canvas transform playground built with React, Konva & Tailwind.</p>
+          <p className="mt-2">Transforms use a bake & reset pattern: live manipulations are applied via Konva, then persisted to a schema on release.</p>
+          <p className="mt-4 opacity-70">© {new Date().getFullYear()} visual-flow (experimental)</p>
+        </Modal>
+        <Modal open={cheatOpen} onClose={() => setCheatOpen(false)} title="Interaction Cheatsheet" size="md">
+          <ul className="space-y-2 list-disc pl-4">
+            <li><strong>Select:</strong> Click. Shift/Ctrl+Click to multi-select. Drag empty space for marquee.</li>
+            <li><strong>Pan:</strong> Middle mouse, Alt+Drag, or hold Space.</li>
+            <li><strong>Zoom:</strong> Mouse wheel (focus under cursor).</li>
+            <li><strong>Resize:</strong> Drag handles. Shift for aspect lock. Alt for centered. Shift+Alt for centered uniform.</li>
+            <li><strong>Rotate:</strong> Use rotate handle (snaps at 0/90/180/270°).</li>
+            <li><strong>Images:</strong> Non-uniform stretch disables aspect. Context menu → Re-enable Aspect to restore.</li>
+            <li><strong>Group:</strong> Ctrl/Cmd+G. Ungroup: Ctrl/Cmd+Shift+G.</li>
+            <li><strong>Duplicate:</strong> Ctrl/Cmd+D.</li>
+            <li><strong>Delete:</strong> Delete / Backspace.</li>
+            <li><strong>Nudge:</strong> Arrows (1px) or Shift+Arrows (10px).</li>
+            <li><strong>Spec JSON:</strong> Open/Close JSON panel, edit, Apply to persist.</li>
+          </ul>
+        </Modal>
         <div className="grid grid-cols-12 gap-4">
           {/* Left Outline */}
           <div className="col-span-2">
@@ -418,55 +438,3 @@ export function VisualFlowEditor({ initial }: EditorProps) {
   );
 }
 
-// Local lightweight modals
-function ModalFrame({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: React.ReactNode }) {
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-24">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative w-full max-w-lg rounded-lg border border-slate-600 bg-slate-900 shadow-xl p-5 space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold tracking-wide uppercase opacity-80">{title}</h2>
-          <button onClick={onClose} className="text-xs opacity-70 hover:opacity-100">✕</button>
-        </div>
-        <div className="text-xs leading-relaxed max-h-[60vh] overflow-y-auto pr-1">
-          {children}
-        </div>
-        <div className="flex justify-end pt-2">
-          <button onClick={onClose} className="px-3 py-1 rounded border border-slate-600 bg-slate-800 text-slate-100 text-xs">Close</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function AboutModal({ open, onClose, version }: { open: boolean; onClose: () => void; version: string }) {
-  return (
-    <ModalFrame open={open} onClose={onClose} title="About Visual Flow">
-      <p><strong>visual-flow</strong> version <code>{version}</code></p>
-      <p className="mt-2">A lightweight experimental visual layout & canvas transform playground built with React, Konva & Tailwind.</p>
-      <p className="mt-2">Transforms use a bake & reset pattern: live manipulations are applied via Konva, then persisted to a schema on release.</p>
-      <p className="mt-4 opacity-70">© {new Date().getFullYear()} visual-flow (experimental)</p>
-    </ModalFrame>
-  );
-}
-
-function CheatsheetModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  return (
-    <ModalFrame open={open} onClose={onClose} title="Interaction Cheatsheet">
-      <ul className="space-y-2 list-disc pl-4">
-        <li><strong>Select:</strong> Click. Shift/Ctrl+Click to multi-select. Drag empty space for marquee.</li>
-        <li><strong>Pan:</strong> Middle mouse, Alt+Drag, or hold Space.</li>
-        <li><strong>Zoom:</strong> Mouse wheel (focus under cursor).</li>
-        <li><strong>Resize:</strong> Drag handles. Shift for aspect lock. Alt for centered. Shift+Alt for centered uniform.</li>
-        <li><strong>Rotate:</strong> Use rotate handle (snaps at 0/90/180/270°).</li>
-        <li><strong>Images:</strong> Non-uniform stretch disables aspect. Context menu → Re-enable Aspect to restore.</li>
-        <li><strong>Group:</strong> Ctrl/Cmd+G. Ungroup: Ctrl/Cmd+Shift+G.</li>
-        <li><strong>Duplicate:</strong> Ctrl/Cmd+D.</li>
-        <li><strong>Delete:</strong> Delete / Backspace.</li>
-        <li><strong>Nudge:</strong> Arrows (1px) or Shift+Arrows (10px).</li>
-        <li><strong>Spec JSON:</strong> Open/Close JSON panel, edit, Apply to persist.</li>
-      </ul>
-    </ModalFrame>
-  );
-}

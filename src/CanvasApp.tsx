@@ -1,4 +1,5 @@
 import { useCallback, useLayoutEffect, useRef, useState, useEffect } from "react";
+import { Modal } from "./components/Modal";
 import { logger } from "./utils/logger";
 import CanvasStage from "./canvas/CanvasStage.tsx";
 import type { LayoutSpec } from "./layout-schema.ts";
@@ -51,6 +52,7 @@ export default function CanvasApp() {
   const [tool, setTool] = useState<string>("select");
   const [canvasRef, canvasSize] = useElementSize<HTMLDivElement>();
   const [helpOpen, setHelpOpen] = useState(false);
+  const [fileOpen, setFileOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [cheatOpen, setCheatOpen] = useState(false);
   const appVersion = (import.meta as any).env?.VITE_APP_VERSION || '0.0.0';
@@ -90,49 +92,95 @@ export default function CanvasApp() {
   const stageWidth = Math.max(0, canvasSize.width);
   const stageHeight = Math.max(0, canvasSize.height);
 
+  // Close menus on global ESC
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setHelpOpen(false);
+        setFileOpen(false);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  // Outside click for menus
+  const headerRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const onDoc = (e: MouseEvent) => {
+      if (!headerRef.current) return;
+      if (!headerRef.current.contains(e.target as Node)) {
+        setHelpOpen(false);
+        setFileOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, []);
+
   return (
     <div className="h-screen w-screen overflow-hidden bg-gray-100 text-gray-900 flex flex-col">
       {/* Header */}
-      <header className="flex items-center justify-between h-12 px-4 border-b border-gray-300 bg-white shadow-sm select-none">
+      <header ref={headerRef} className="flex items-center justify-between h-12 px-4 border-b border-gray-300 bg-white shadow-sm select-none">
         <div className="flex items-center gap-6">
-          <h1 className="text-sm font-semibold tracking-wide">Visual Flow Canvas</h1>
-          <div className="relative group">
-            <button className="text-sm px-2 py-1 rounded hover:bg-gray-100">File ▾</button>
-            <div className="absolute left-0 mt-1 w-40 rounded border border-gray-200 bg-white shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition">
-              {[
-                ["New", "new"],
-                ["Open…", "open"],
-                ["Save", "save"],
-                ["Save As…", "saveAs"],
-              ].map(([label, act]) => (
-                <button
-                  key={act}
-                  onClick={() => fileAction(act)}
-                  className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-100"
-                >{label}</button>
-              ))}
+            <h1 className="text-sm font-semibold tracking-wide">Visual Flow Canvas</h1>
+            {/* File menu */}
+            <div className="relative">
+              <button
+                onClick={() => setFileOpen(o => !o)}
+                className={`text-sm px-2 py-1 rounded hover:bg-gray-100 ${fileOpen ? 'bg-gray-100' : ''}`}
+                aria-haspopup="true"
+                aria-expanded={fileOpen}
+              >File ▾</button>
+              {fileOpen && (
+                <div className="absolute left-0 mt-1 w-44 rounded-md border border-gray-200 bg-white shadow-lg z-30 p-1 flex flex-col">
+                  {[
+                    ["New", "new"],
+                    ["Open…", "open"],
+                    ["Save", "save"],
+                    ["Save As…", "saveAs"],
+                  ].map(([label, act]) => (
+                    <button
+                      key={act}
+                      onClick={() => { fileAction(act); setFileOpen(false); }}
+                      className="w-full text-left px-3 py-1.5 text-xs rounded hover:bg-gray-100"
+                    >{label}</button>
+                  ))}
+                </div>
+              )}
             </div>
-          </div>
-          <div className="relative">
-            <button onClick={() => setHelpOpen(o => !o)} className="text-sm px-2 py-1 rounded hover:bg-gray-100">Help ▾</button>
-            {helpOpen && (
-              <div className="absolute left-0 mt-1 w-48 rounded border border-gray-200 bg-white shadow-lg z-20 text-xs">
-                <button onClick={() => { setAboutOpen(true); setHelpOpen(false); }} className="w-full text-left px-3 py-2 hover:bg-gray-100">About</button>
-                <button onClick={() => { setCheatOpen(true); setHelpOpen(false); }} className="w-full text-left px-3 py-2 hover:bg-gray-100">Cheatsheet</button>
-              </div>
-            )}
-          </div>
+            {/* Help menu */}
+            <div className="relative">
+              <button
+                onClick={() => setHelpOpen(o => !o)}
+                className={`text-sm px-2 py-1 rounded hover:bg-gray-100 ${helpOpen ? 'bg-gray-100' : ''}`}
+                aria-haspopup="true"
+                aria-expanded={helpOpen}
+              >Help ▾</button>
+              {helpOpen && (
+                <div className="absolute left-0 mt-1 w-52 rounded-md border border-gray-200 bg-white shadow-lg z-30 p-1 flex flex-col text-xs">
+                  <button
+                    onClick={() => { setAboutOpen(true); setHelpOpen(false); }}
+                    className="w-full text-left px-3 py-2 rounded hover:bg-gray-100"
+                  >About</button>
+                  <button
+                    onClick={() => { setCheatOpen(true); setHelpOpen(false); }}
+                    className="w-full text-left px-3 py-2 rounded hover:bg-gray-100"
+                  >Cheatsheet</button>
+                </div>
+              )}
+            </div>
         </div>
         <div className="text-xs font-mono text-gray-500">Tool: {tool}</div>
       </header>
       {/* Modals */}
-      <ModalFrame open={aboutOpen} onClose={() => setAboutOpen(false)} title="About Visual Flow">
-        <p className="text-xs"><strong>visual-flow</strong> version <code>{appVersion}</code></p>
-        <p className="text-xs mt-2">Experimental canvas + layout editor. Transforms are baked to schema on release.</p>
-        <p className="text-[10px] mt-4 opacity-60">© {new Date().getFullYear()} visual-flow</p>
-      </ModalFrame>
-      <ModalFrame open={cheatOpen} onClose={() => setCheatOpen(false)} title="Interaction Cheatsheet">
-        <ul className="text-xs space-y-1 list-disc pl-4 pr-1 max-h-72 overflow-auto">
+      <Modal open={aboutOpen} onClose={() => setAboutOpen(false)} title="About Visual Flow" size="sm" variant="light">
+        <p><strong>visual-flow</strong> version <code>{appVersion}</code></p>
+        <p className="mt-2">Experimental canvas + layout editor. Transforms are baked to schema on release.</p>
+        <p className="mt-4 opacity-70 text-[10px]">© {new Date().getFullYear()} visual-flow</p>
+      </Modal>
+      <Modal open={cheatOpen} onClose={() => setCheatOpen(false)} title="Interaction Cheatsheet" size="sm" variant="light">
+        <ul className="space-y-1 list-disc pl-4 pr-1 max-h-72 overflow-auto text-xs">
           <li>Select: Click; Shift/Ctrl multi; marquee drag empty space.</li>
           <li>Pan: Space+Drag / Middle / Alt+Drag.</li>
           <li>Zoom: Wheel (cursor focus).</li>
@@ -143,7 +191,7 @@ export default function CanvasApp() {
           <li>Duplicate: Ctrl/Cmd+D. Delete: Del/Backspace.</li>
           <li>Nudge: Arrows (1px) / Shift+Arrows (10px).</li>
         </ul>
-      </ModalFrame>
+      </Modal>
       {/* Body layout */}
       <div className="flex flex-1 min-h-0">
         {/* Left toolbar */}
@@ -181,27 +229,6 @@ export default function CanvasApp() {
             <p>Nodes: {spec.root.children.length}</p>
           </div>
         </aside>
-      </div>
-    </div>
-  );
-}
-
-function ModalFrame({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: React.ReactNode }) {
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-24">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative w-full max-w-sm rounded-md border border-gray-300 bg-white shadow-lg p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-600">{title}</h2>
-          <button onClick={onClose} className="text-xs text-gray-500 hover:text-gray-700">✕</button>
-        </div>
-        <div>
-          {children}
-        </div>
-        <div className="flex justify-end">
-          <button onClick={onClose} className="px-2 py-1 rounded border border-gray-300 bg-gray-100 text-xs hover:bg-gray-200">Close</button>
-        </div>
       </div>
     </div>
   );
