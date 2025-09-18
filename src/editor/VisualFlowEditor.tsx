@@ -52,6 +52,10 @@ export function VisualFlowEditor({ initial }: EditorProps) {
   const [jsonOpen, setJsonOpen] = useState(false);
   const [jsonText, setJsonText] = useState<string>(JSON.stringify(initial, null, 2));
   const [jsonError, setJsonError] = useState<string | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
+  const [cheatOpen, setCheatOpen] = useState(false);
+  const appVersion = (import.meta as any).env?.VITE_APP_VERSION || '0.0.0';
 
   const onSelectNode = (path: string, node: NodeSpec) => setSelected({ path, node });
 
@@ -337,8 +341,20 @@ export function VisualFlowEditor({ initial }: EditorProps) {
             <button className="px-3 py-1 rounded border border-slate-600 bg-slate-800 text-slate-100" onClick={exportJson}>Export JSON</button>
             <button className="px-3 py-1 rounded border border-slate-600 bg-slate-800 text-slate-100" onClick={importJson}>Import JSON</button>
             <button className="px-3 py-1 rounded border border-slate-600 bg-slate-800 text-slate-100" onClick={() => { setJsonText(JSON.stringify(spec, null, 2)); setJsonError(null); setJsonOpen((v) => !v); }}>{jsonOpen ? "Close JSON" : "Open JSON"}</button>
+            <div className="relative">
+              <button className="px-3 py-1 rounded border border-slate-600 bg-slate-800 text-slate-100" onClick={() => setHelpOpen(o => !o)}>Help ▾</button>
+              {helpOpen && (
+                <div className="absolute right-0 mt-1 w-48 rounded border border-slate-600 bg-slate-900 shadow-lg z-20 text-sm">
+                  <button onClick={() => { setAboutOpen(true); setHelpOpen(false); }} className="w-full text-left px-3 py-2 hover:bg-slate-800">About</button>
+                  <button onClick={() => { setCheatOpen(true); setHelpOpen(false); }} className="w-full text-left px-3 py-2 hover:bg-slate-800">Cheatsheet</button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
+        {/* Modals */}
+        <CheatsheetModal open={cheatOpen} onClose={() => setCheatOpen(false)} />
+        <AboutModal open={aboutOpen} onClose={() => setAboutOpen(false)} version={appVersion} />
         <div className="grid grid-cols-12 gap-4">
           {/* Left Outline */}
           <div className="col-span-2">
@@ -399,5 +415,58 @@ export function VisualFlowEditor({ initial }: EditorProps) {
         )}
       </div>
     </div>
+  );
+}
+
+// Local lightweight modals
+function ModalFrame({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: React.ReactNode }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-24">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative w-full max-w-lg rounded-lg border border-slate-600 bg-slate-900 shadow-xl p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold tracking-wide uppercase opacity-80">{title}</h2>
+          <button onClick={onClose} className="text-xs opacity-70 hover:opacity-100">✕</button>
+        </div>
+        <div className="text-xs leading-relaxed max-h-[60vh] overflow-y-auto pr-1">
+          {children}
+        </div>
+        <div className="flex justify-end pt-2">
+          <button onClick={onClose} className="px-3 py-1 rounded border border-slate-600 bg-slate-800 text-slate-100 text-xs">Close</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AboutModal({ open, onClose, version }: { open: boolean; onClose: () => void; version: string }) {
+  return (
+    <ModalFrame open={open} onClose={onClose} title="About Visual Flow">
+      <p><strong>visual-flow</strong> version <code>{version}</code></p>
+      <p className="mt-2">A lightweight experimental visual layout & canvas transform playground built with React, Konva & Tailwind.</p>
+      <p className="mt-2">Transforms use a bake & reset pattern: live manipulations are applied via Konva, then persisted to a schema on release.</p>
+      <p className="mt-4 opacity-70">© {new Date().getFullYear()} visual-flow (experimental)</p>
+    </ModalFrame>
+  );
+}
+
+function CheatsheetModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  return (
+    <ModalFrame open={open} onClose={onClose} title="Interaction Cheatsheet">
+      <ul className="space-y-2 list-disc pl-4">
+        <li><strong>Select:</strong> Click. Shift/Ctrl+Click to multi-select. Drag empty space for marquee.</li>
+        <li><strong>Pan:</strong> Middle mouse, Alt+Drag, or hold Space.</li>
+        <li><strong>Zoom:</strong> Mouse wheel (focus under cursor).</li>
+        <li><strong>Resize:</strong> Drag handles. Shift for aspect lock. Alt for centered. Shift+Alt for centered uniform.</li>
+        <li><strong>Rotate:</strong> Use rotate handle (snaps at 0/90/180/270°).</li>
+        <li><strong>Images:</strong> Non-uniform stretch disables aspect. Context menu → Re-enable Aspect to restore.</li>
+        <li><strong>Group:</strong> Ctrl/Cmd+G. Ungroup: Ctrl/Cmd+Shift+G.</li>
+        <li><strong>Duplicate:</strong> Ctrl/Cmd+D.</li>
+        <li><strong>Delete:</strong> Delete / Backspace.</li>
+        <li><strong>Nudge:</strong> Arrows (1px) or Shift+Arrows (10px).</li>
+        <li><strong>Spec JSON:</strong> Open/Close JSON panel, edit, Apply to persist.</li>
+      </ul>
+    </ModalFrame>
   );
 }
