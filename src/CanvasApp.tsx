@@ -50,6 +50,10 @@ export default function CanvasApp() {
   const [spec, setSpec] = useState<LayoutSpec>(() => buildInitialSpec());
   const [tool, setTool] = useState<string>("select");
   const [canvasRef, canvasSize] = useElementSize<HTMLDivElement>();
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
+  const [cheatOpen, setCheatOpen] = useState(false);
+  const appVersion = (import.meta as any).env?.VITE_APP_VERSION || '0.0.0';
 
   // Debug: log spec on mount
   useEffect(() => {
@@ -109,9 +113,37 @@ export default function CanvasApp() {
               ))}
             </div>
           </div>
+          <div className="relative">
+            <button onClick={() => setHelpOpen(o => !o)} className="text-sm px-2 py-1 rounded hover:bg-gray-100">Help ▾</button>
+            {helpOpen && (
+              <div className="absolute left-0 mt-1 w-48 rounded border border-gray-200 bg-white shadow-lg z-20 text-xs">
+                <button onClick={() => { setAboutOpen(true); setHelpOpen(false); }} className="w-full text-left px-3 py-2 hover:bg-gray-100">About</button>
+                <button onClick={() => { setCheatOpen(true); setHelpOpen(false); }} className="w-full text-left px-3 py-2 hover:bg-gray-100">Cheatsheet</button>
+              </div>
+            )}
+          </div>
         </div>
         <div className="text-xs font-mono text-gray-500">Tool: {tool}</div>
       </header>
+      {/* Modals */}
+      <ModalFrame open={aboutOpen} onClose={() => setAboutOpen(false)} title="About Visual Flow">
+        <p className="text-xs"><strong>visual-flow</strong> version <code>{appVersion}</code></p>
+        <p className="text-xs mt-2">Experimental canvas + layout editor. Transforms are baked to schema on release.</p>
+        <p className="text-[10px] mt-4 opacity-60">© {new Date().getFullYear()} visual-flow</p>
+      </ModalFrame>
+      <ModalFrame open={cheatOpen} onClose={() => setCheatOpen(false)} title="Interaction Cheatsheet">
+        <ul className="text-xs space-y-1 list-disc pl-4 pr-1 max-h-72 overflow-auto">
+          <li>Select: Click; Shift/Ctrl multi; marquee drag empty space.</li>
+          <li>Pan: Space+Drag / Middle / Alt+Drag.</li>
+          <li>Zoom: Wheel (cursor focus).</li>
+          <li>Resize: Drag handles; Shift=aspect; Alt=center; Shift+Alt=center+aspect.</li>
+          <li>Rotate: Handle (snaps 0/90/180/270).</li>
+          <li>Images: Non-uniform stretch disables aspect; context menu to restore.</li>
+          <li>Group: Ctrl/Cmd+G; Ungroup: Ctrl/Cmd+Shift+G.</li>
+          <li>Duplicate: Ctrl/Cmd+D. Delete: Del/Backspace.</li>
+          <li>Nudge: Arrows (1px) / Shift+Arrows (10px).</li>
+        </ul>
+      </ModalFrame>
       {/* Body layout */}
       <div className="flex flex-1 min-h-0">
         {/* Left toolbar */}
@@ -149,6 +181,27 @@ export default function CanvasApp() {
             <p>Nodes: {spec.root.children.length}</p>
           </div>
         </aside>
+      </div>
+    </div>
+  );
+}
+
+function ModalFrame({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: React.ReactNode }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-24">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative w-full max-w-sm rounded-md border border-gray-300 bg-white shadow-lg p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-600">{title}</h2>
+          <button onClick={onClose} className="text-xs text-gray-500 hover:text-gray-700">✕</button>
+        </div>
+        <div>
+          {children}
+        </div>
+        <div className="flex justify-end">
+          <button onClick={onClose} className="px-2 py-1 rounded border border-gray-300 bg-gray-100 text-xs hover:bg-gray-200">Close</button>
+        </div>
       </div>
     </div>
   );
