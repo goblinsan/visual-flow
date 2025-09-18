@@ -160,7 +160,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
 
     // Don't process selection if clicking on transformer handles
     if (isTransformerTarget(e.target)) {
-      console.log('MouseDown on transformer, ignoring selection logic');
+  // transformer interaction: ignore selection logic
       return;
     }
 
@@ -428,12 +428,12 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     
     // Don't clear selection if clicking on transformer handles
     if (isTransformerTarget(e.target)) {
-      console.log('Clicked on transformer, not clearing selection');
+  // clicking transformer: keep selection
       return;
     }
     
     if (e.target === stage && !dragState.hasPassedThreshold && !marqueeState.active) {
-      console.log('Clicking on empty stage, clearing selection');
+  // empty stage click: clear selection
       setSelected([]);
       setMenu(null);
     }
@@ -667,7 +667,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     const stage = tr.getStage();
     if (!stage) return;
     const targets = selected.map(id => stage.findOne(`#${CSS.escape(id)}`)).filter(Boolean) as Konva.Node[];
-    console.log('Attaching transformer to targets:', targets.length, 'selected:', selected);
+  // attach transformer to current selection
     tr.nodes(targets);
     tr.getLayer()?.batchDraw();
   }, [selected]);
@@ -736,13 +736,13 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     // For multi-selection, we need to get the transform values that were applied to all nodes
     // and apply them uniformly to our spec
     if (nodes.length > 1) {
-      console.log('Multi-selection transform - capturing collective transform');
+  // multi-selection transform bake
       // NOTE: Current implementation still naive for relative offsets; we only remove cumulative rotation bug here.
       const firstNode = nodes[0];
       const scaleX = firstNode.scaleX();
       const scaleY = firstNode.scaleY();
       const rotationDeg = firstNode.rotation(); // absolute final rotation
-      console.log('Collective transform:', { scaleX, scaleY, rotationDeg });
+  // collective transform values captured
       nodes.forEach(node => {
         const nodeId = node.id(); if (!nodeId) return;
         const currentNode = findNode(spec.root, nodeId); if (!currentNode) return;
@@ -797,7 +797,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       const scaleY = node.scaleY();
       const rotationDeg = node.rotation(); // absolute degrees
 
-      console.log('Single node transform:', { nodeId, newPos, scaleX, scaleY, rotationDeg });
+  // single node transform bake
 
       const currentNode = findNode(spec.root, nodeId);
       if (!currentNode) return;
@@ -819,7 +819,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       if (scaleX !== 1 || scaleY !== 1) {
         if (isGroup && currentNode.children) {
           // For groups: scale the group container and all children
-          console.log('Scaling group and children...');
+          // scaling group and children
           
           setSpec(prev => ({
             ...prev,
@@ -912,7 +912,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       
       // Re-attach transformer to the updated nodes
       const targets = selected.map(id => stage.findOne(`#${CSS.escape(id)}`)).filter(Boolean) as Konva.Node[];
-      console.log('Re-attaching transformer to updated targets:', targets.length);
+  // re-attaching transformer after bake
       tr.nodes(targets);
       tr.forceUpdate();
       tr.getLayer()?.batchDraw();
