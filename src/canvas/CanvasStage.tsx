@@ -59,6 +59,8 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   const [spacePan, setSpacePan] = useState(false);
   // Track shift key globally for aspect-ratio constrained resize
   const [shiftPressed, setShiftPressed] = useState(false);
+  // Track Alt/Option for centered scaling
+  const [altPressed, setAltPressed] = useState(false);
 
   // Konva refs
   const stageRef = useRef<Konva.Stage>(null);
@@ -463,10 +465,12 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     const down = (e: KeyboardEvent) => {
       if (e.code === 'Space') { setSpacePan(true); e.preventDefault(); }
       if (e.key === 'Shift') setShiftPressed(true);
+      if (e.key === 'Alt') setAltPressed(true);
     };
     const up = (e: KeyboardEvent) => {
       if (e.code === 'Space') { setSpacePan(false); }
       if (e.key === 'Shift') setShiftPressed(false);
+      if (e.key === 'Alt') setAltPressed(false);
     };
     window.addEventListener('keydown', down, { capture: true });
     window.addEventListener('keyup', up, { capture: true });
@@ -475,6 +479,14 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       window.removeEventListener('keyup', up, { capture: true } as any);
     };
   }, []);
+
+  // Reflect altPressed to transformer centeredScaling dynamically
+  useEffect(() => {
+    const tr = trRef.current; if (!tr) return;
+    tr.centeredScaling(altPressed);
+    tr.forceUpdate();
+    tr.getLayer()?.batchDraw();
+  }, [altPressed]);
 
   // Context menu (right click)
   const onWrapperContextMenu = useCallback((e: React.MouseEvent) => {
@@ -944,6 +956,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
               rotateEnabled={true} 
               resizeEnabled={true}
               keepRatio={false} // we enforce manually only while shift is held via boundBoxFunc
+              centeredScaling={altPressed}
               rotationSnaps={[0, 90, 180, 270]}
               boundBoxFunc={(oldBox, newBox) => {
                 // Prevent scaling to zero or negative size
@@ -1007,6 +1020,40 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
           >
             Ungroup
           </button>
+          {/* Re-enable aspect for stretched image(s) */}
+          {selected.length > 0 && (() => {
+            const anyStretch = selected.some(id => {
+              const node = selectionContext.nodeById[id];
+              return node?.type === 'image' && node.preserveAspect === false;
+            });
+            return anyStretch;
+          })() && (
+            <button
+              onClick={() => {
+                setSpec(prev => ({
+                  ...prev,
+                  root: mapNode(prev.root, '__bulk__', (n: any) => n) // placeholder (we'll map individually below)
+                }));
+                // Apply per node update
+                setSpec(prev => ({
+                  ...prev,
+                  root: (function mapAll(n: any): any {
+                    if (selected.includes(n.id) && n.type === 'image' && n.preserveAspect === false) {
+                      return { ...n, preserveAspect: true, objectFit: n.objectFit || 'contain' };
+                    }
+                    if (Array.isArray(n.children)) {
+                      return { ...n, children: n.children.map(mapAll) };
+                    }
+                    return n;
+                  })(prev.root)
+                }));
+                setMenu(null);
+              }}
+              className="px-3 py-1.5 w-full text-left hover:bg-gray-100"
+            >
+              Re-enable Aspect
+            </button>
+          )}
           <div className="h-px bg-gray-200 my-1" />
           <button 
             onClick={() => setMenu(null)} 
