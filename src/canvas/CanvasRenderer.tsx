@@ -15,6 +15,7 @@ function renderText(n: TextNode) {
       name={`node ${n.type}`}
       x={x}
       y={y}
+      rotation={n.rotation}
       text={n.text}
       fontSize={n.variant === "h1" ? 28 : n.variant === "h2" ? 22 : n.variant === "h3" ? 18 : 14}
       fill={n.color ?? "#0f172a"}
@@ -31,7 +32,7 @@ function renderBox(n: BoxNode) {
   const w = n.size?.width ?? 200;
   const h = n.size?.height ?? 120;
   return (
-    <Group key={n.id} id={n.id} name={`node ${n.type}`} x={x} y={y} opacity={n.opacity ?? 1}>
+    <Group key={n.id} id={n.id} name={`node ${n.type}`} x={x} y={y} rotation={n.rotation} opacity={n.opacity ?? 1}>
       <Rect
         width={w}
         height={h}
@@ -92,7 +93,7 @@ function renderStack(n: StackNode) {
     }
     return node;
   });
-  return <Group key={n.id} id={n.id} name={`node ${n.type}`} x={x} y={y} opacity={n.opacity ?? 1}>{items}</Group>;
+  return <Group key={n.id} id={n.id} name={`node ${n.type}`} x={x} y={y} rotation={n.rotation} opacity={n.opacity ?? 1}>{items}</Group>;
 }
 
 // Frame
@@ -113,7 +114,7 @@ function renderGroup(n: GroupNode) {
   const x = n.position?.x ?? 0;
   const y = n.position?.y ?? 0;
   return (
-    <Group key={n.id} id={n.id} name={`node ${n.type}`} x={x} y={y} opacity={n.opacity ?? 1}>
+    <Group key={n.id} id={n.id} name={`node ${n.type}`} x={x} y={y} rotation={n.rotation} opacity={n.opacity ?? 1}>
       {n.children.map(renderNode)}
     </Group>
   );
@@ -159,7 +160,7 @@ function renderGrid(n: GridNode) {
   }
 
   return (
-    <Group key={n.id} id={n.id} name={`node ${n.type}`} x={x} y={y} opacity={n.opacity ?? 1}>
+    <Group key={n.id} id={n.id} name={`node ${n.type}`} x={x} y={y} rotation={n.rotation} opacity={n.opacity ?? 1}>
       {n.size ? <Rect width={n.size.width} height={n.size.height} fillEnabled={false} /> : null}
       <Group x={0} y={0}>{items}</Group>
     </Group>
@@ -173,7 +174,7 @@ function renderImage(n: ImageNode) {
   const w = n.size?.width ?? 100;
   const h = n.size?.height ?? 100;
   return (
-    <Group key={n.id} id={n.id} name={`node ${n.type}`} x={x} y={y} opacity={n.opacity ?? 1}>
+    <Group key={n.id} id={n.id} name={`node ${n.type}`} x={x} y={y} rotation={n.rotation} opacity={n.opacity ?? 1}>
       <CanvasImage src={n.src} width={w} height={h} objectFit={n.objectFit} radius={n.radius}
       />
     </Group>

@@ -1,10 +1,24 @@
 import { Stage, Layer, Transformer, Rect, Group } from "react-konva";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type Konva from "konva";
-import type { LayoutSpec } from "../layout-schema.ts";
+import type { LayoutNode, LayoutSpec } from "../layout-schema.ts";
 import { renderNode } from "./CanvasRenderer.tsx";
 import { deleteNodes, duplicateNodes, nudgeNodes } from "./editing";
 import { applyPosition, applyPositionAndSize, groupNodes, ungroupNodes } from "./stage-internal";
+
+function findNode(spec: LayoutSpec, id: string): LayoutNode | null {
+  function walk(node: LayoutNode): LayoutNode | null {
+    if (node.id === id) return node;
+    if ('children' in node && Array.isArray(node.children)) {
+      for (const child of (node as any).children) {
+        const found = walk(child);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+  return walk(spec.root);
+}
 
 // Props
 interface CanvasStageProps {
@@ -57,7 +71,6 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
 
   const isSelectMode = tool === "select";
   const [spacePan, setSpacePan] = useState(false);
-  const [transforming, setTransforming] = useState(false);
 
   // Konva refs
   const stageRef = useRef<Konva.Stage>(null);
@@ -243,7 +256,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
         }
         stage.batchDraw();
         // Force re-render of selection outlines during drag
-        setTransforming(prev => !prev);
+        // setTransforming(prev => !prev);
       }
       return;
     }
@@ -618,38 +631,41 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   // Commit transform (resize)
   const onTransformEnd = useCallback(() => {
     const nodes = trRef.current?.nodes() ?? [];
-    nodes.forEach(n => {
-      const nodeId = n.id?.();
+    nodes.forEach(node => {
+      const nodeId = node.id();
       if (!nodeId) return;
-      const k = n as unknown as Konva.Node & { 
-        scaleX(): number; scaleY(): number; 
-        scaleX(v: number): void; scaleY(v: number): void; 
-        width?(): number; height?(): number; 
-        size?(): { width: number; height: number }; 
-        position(): { x: number; y: number } 
-      };
-      const sx = k.scaleX?.() ?? 1;
-      const sy = k.scaleY?.() ?? 1;
-      const base = k.size?.() ?? { width: k.width?.(), height: k.height?.() };
-      const newW = (base?.width ?? 0) * sx;
-      const newH = (base?.height ?? 0) * sy;
-      const { x: newX, y: newY } = k.position?.() ?? { x: 0, y: 0 };
-      k.scaleX?.(1); k.scaleY?.(1);
-      
+
+      const sx = node.scaleX();
+      const sy = node.scaleY();
+      const newRotation = node.rotation();
+
+      // Update spec with new dimensions and rotation
       setSpec(prev => {
-        let next = applyPositionAndSize(prev, nodeId, { x: newX, y: newY }, { width: newW, height: newH });
-        const specNode = selectionContext.nodeById[nodeId];
+        const specNode = findNode(prev, nodeId);
+        if (!specNode) return prev;
+
+        const newWidth = (specNode.size?.width ?? node.width()) * sx;
+        const newHeight = (specNode.size?.height ?? node.height()) * sy;
+
+        let next = applyPositionAndSize(prev, nodeId, node.position(), { width: newWidth, height: newHeight });
+        
+        const nodeInNext = findNode(next, nodeId);
+        if (nodeInNext) {
+          nodeInNext.rotation = newRotation;
+        }
+        
+        // Handle group resizing
         if (specNode?.type === 'group' && specNode.size && specNode.size.width && specNode.size.height && Array.isArray(specNode.children)) {
           const prevW = specNode.size.width || 1;
           const prevH = specNode.size.height || 1;
-          const sxC = prevW ? newW / prevW : 1;
-          const syC = prevH ? newH / prevH : 1;
+          const sxC = prevW ? newWidth / prevW : 1;
+          const syC = prevH ? newHeight / prevH : 1;
           
           function map(nl: any): any {
             if (nl.id === nodeId && Array.isArray(nl.children)) {
               return { 
                 ...nl, 
-                size: { width: newW, height: newH }, 
+                size: { width: newWidth, height: newHeight }, 
                 children: nl.children.map((c: any) => {
                   const cpos = c.position ?? { x: 0, y: 0 };
                   const csize = c.size ?? null;
@@ -667,9 +683,14 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
         }
         return next;
       });
+
+      // Reset node transformations
+      node.scaleX(1);
+      node.scaleY(1);
+      node.rotation(0);
     });
     trRef.current?.getLayer()?.batchDraw();
-  }, [setSpec, selectionContext]);
+  }, [setSpec]);
 
   return (
     <div ref={wrapperRef} style={{ position: 'relative', width, height }} onContextMenu={onWrapperContextMenu}>
@@ -695,8 +716,17 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
           {isSelectMode && (
             <Transformer 
               ref={trRef as unknown as React.RefObject<Konva.Transformer>} 
-              rotateEnabled={true} 
+              rotateEnabled={true}
+              resizeEnabled={true}
               keepRatio={false}
+              rotationSnaps={[0, 90, 180, 270]}
+              boundBoxFunc={(oldBox, newBox) => {
+                // Enforce a minimum size
+                if (newBox.width < 10 || newBox.height < 10) {
+                  return oldBox;
+                }
+                return newBox;
+              }}
               onTransform={onTransform}
               onTransformEnd={onTransformEnd} 
             />
