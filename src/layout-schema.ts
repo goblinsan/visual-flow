@@ -91,6 +91,8 @@ export interface ImageNode extends BaseNode, Partial<AbsoluteChild> {
   alt?: string;
   radius?: number;       // px
   objectFit?: "cover" | "contain";
+  /** If false, allow stretched (non-uniform) rendering ignoring objectFit scaling */
+  preserveAspect?: boolean;
 }
 
 /** Generic box/container that can optionally hold children. */

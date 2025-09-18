@@ -741,13 +741,32 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
               rotation: rotationDeg
             }))
         }));
-        // Scale size if present
+        // Scale size if present (with image special-case)
         if ((scaleX !== 1 || scaleY !== 1) && currentNode.size) {
           const newSize = {
             width: Math.round(currentNode.size.width * scaleX),
             height: Math.round(currentNode.size.height * scaleY)
           };
-          setSpec(prev => applyPositionAndSize(prev, nodeId, newPos, newSize));
+          // Image non-uniform handling
+          if (currentNode.type === 'image') {
+            const nonUniform = Math.abs(scaleX - scaleY) > 0.0001;
+            setSpec(prev => ({
+              ...prev,
+              root: mapNode(prev.root, nodeId, (n: any) => {
+                if (n.type !== 'image') return n;
+                return {
+                  ...n,
+                  position: { x: newPos.x, y: newPos.y },
+                  size: newSize,
+                  // If non-uniform, disable aspect preservation
+                  preserveAspect: nonUniform ? false : (n.preserveAspect !== undefined ? n.preserveAspect : true),
+                  objectFit: nonUniform ? undefined : n.objectFit
+                };
+              })
+            }));
+          } else {
+            setSpec(prev => applyPositionAndSize(prev, nodeId, newPos, newSize));
+          }
         }
         node.scaleX(1); node.scaleY(1); node.rotation(0);
       });
@@ -837,7 +856,24 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
               width: Math.round(currentNode.size.width * scaleX),
               height: Math.round(currentNode.size.height * scaleY)
             };
-            setSpec(prev => applyPositionAndSize(prev, nodeId, newPos, newSize));
+            if (currentNode.type === 'image') {
+              const nonUniform = Math.abs(scaleX - scaleY) > 0.0001;
+              setSpec(prev => ({
+                ...prev,
+                root: mapNode(prev.root, nodeId, (n: any) => {
+                  if (n.type !== 'image') return n;
+                  return {
+                    ...n,
+                    position: { x: newPos.x, y: newPos.y },
+                    size: newSize,
+                    preserveAspect: nonUniform ? false : (n.preserveAspect !== undefined ? n.preserveAspect : true),
+                    objectFit: nonUniform ? undefined : n.objectFit
+                  };
+                })
+              }));
+            } else {
+              setSpec(prev => applyPositionAndSize(prev, nodeId, newPos, newSize));
+            }
           }
         }
       }

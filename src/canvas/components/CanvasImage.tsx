@@ -4,8 +4,8 @@ import type Konva from "konva";
 
 type Fit = "cover" | "contain" | undefined;
 
-export function CanvasImage(props: { src: string; width: number; height: number; objectFit?: Fit; radius?: number }) {
-  const { src, width, height, objectFit, radius } = props;
+export function CanvasImage(props: { src: string; width: number; height: number; objectFit?: Fit; radius?: number; preserveAspect?: boolean }) {
+  const { src, width, height, objectFit, radius, preserveAspect } = props;
   const [img, setImg] = useState<HTMLImageElement | null>(null);
   useEffect(() => {
     let cancelled = false;
@@ -21,7 +21,8 @@ export function CanvasImage(props: { src: string; width: number; height: number;
   }, [src]);
   // Compute scale for objectFit
   let scaleX = 1, scaleY = 1, offsetX = 0, offsetY = 0;
-  if (img && objectFit) {
+  const allowFit = preserveAspect !== false && objectFit;
+  if (img && allowFit) {
     const iw = img.naturalWidth || img.width;
     const ih = img.naturalHeight || img.height;
     if (iw > 0 && ih > 0) {
@@ -47,11 +48,14 @@ export function CanvasImage(props: { src: string; width: number; height: number;
       ctx.arcTo(0, 0, w, 0, r);
       ctx.closePath();
     } : undefined}>
-      <KImage image={(img as unknown as CanvasImageSource) ?? undefined}
-              x={offsetX} y={offsetY}
-              width={objectFit ? undefined : width}
-              height={objectFit ? undefined : height}
-              scaleX={scaleX} scaleY={scaleY}
+      <KImage
+        image={(img as unknown as CanvasImageSource) ?? undefined}
+        x={offsetX}
+        y={offsetY}
+        width={allowFit ? undefined : width}
+        height={allowFit ? undefined : height}
+        scaleX={allowFit ? scaleX : 1}
+        scaleY={allowFit ? scaleY : 1}
       />
     </Group>
   );

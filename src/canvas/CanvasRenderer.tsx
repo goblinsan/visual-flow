@@ -175,7 +175,13 @@ function renderImage(n: ImageNode) {
   const h = n.size?.height ?? 100;
   return (
     <Group key={n.id} id={n.id} name={`node ${n.type}`} x={x} y={y} rotation={n.rotation ?? 0} opacity={n.opacity ?? 1}>
-      <CanvasImage src={n.src} width={w} height={h} objectFit={n.objectFit} radius={n.radius}
+      <CanvasImage
+        src={n.src}
+        width={w}
+        height={h}
+        objectFit={n.objectFit}
+        radius={n.radius}
+        preserveAspect={n.preserveAspect}
       />
     </Group>
   );
