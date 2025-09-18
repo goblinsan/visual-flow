@@ -735,7 +735,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     
     // For multi-selection, we need to get the transform values that were applied to all nodes
     // and apply them uniformly to our spec
-    if (nodes.length > 1) {
+  if (nodes.length > 1) {
   // multi-selection transform bake
       // NOTE: Current implementation still naive for relative offsets; we only remove cumulative rotation bug here.
       const firstNode = nodes[0];
@@ -757,31 +757,38 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
               rotation: rotationDeg
             }))
         }));
-        // Scale size if present (with image special-case)
-        if ((scaleX !== 1 || scaleY !== 1) && currentNode.size) {
-          const newSize = {
-            width: Math.round(currentNode.size.width * scaleX),
-            height: Math.round(currentNode.size.height * scaleY)
-          };
-          // Image non-uniform handling
-          if (currentNode.type === 'image') {
-            const nonUniform = Math.abs(scaleX - scaleY) > 0.0001;
+        // Scaling logic: text nodes accumulate glyph scale; others resize as before
+        if (scaleX !== 1 || scaleY !== 1) {
+          if (currentNode.type === 'text') {
+            const sx = Math.max(0.05, (currentNode.textScaleX ?? 1) * scaleX);
+            const sy = Math.max(0.05, (currentNode.textScaleY ?? 1) * scaleY);
             setSpec(prev => ({
               ...prev,
-              root: mapNode(prev.root, nodeId, (n: any) => {
-                if (n.type !== 'image') return n;
-                return {
-                  ...n,
-                  position: { x: newPos.x, y: newPos.y },
-                  size: newSize,
-                  // If non-uniform, disable aspect preservation
-                  preserveAspect: nonUniform ? false : (n.preserveAspect !== undefined ? n.preserveAspect : true),
-                  objectFit: nonUniform ? undefined : n.objectFit
-                };
-              })
+              root: mapNode(prev.root, nodeId, (n: any) => n.type === 'text' ? { ...n, textScaleX: sx, textScaleY: sy } : n)
             }));
-          } else {
-            setSpec(prev => applyPositionAndSize(prev, nodeId, newPos, newSize));
+          } else if (currentNode.size) {
+            const newSize = {
+              width: Math.round(currentNode.size.width * scaleX),
+              height: Math.round(currentNode.size.height * scaleY)
+            };
+            if (currentNode.type === 'image') {
+              const nonUniform = Math.abs(scaleX - scaleY) > 0.0001;
+              setSpec(prev => ({
+                ...prev,
+                root: mapNode(prev.root, nodeId, (n: any) => {
+                  if (n.type !== 'image') return n;
+                  return {
+                    ...n,
+                    position: { x: newPos.x, y: newPos.y },
+                    size: newSize,
+                    preserveAspect: nonUniform ? false : (n.preserveAspect !== undefined ? n.preserveAspect : true),
+                    objectFit: nonUniform ? undefined : n.objectFit
+                  };
+                })
+              }));
+            } else {
+              setSpec(prev => applyPositionAndSize(prev, nodeId, newPos, newSize));
+            }
           }
         }
         node.scaleX(1); node.scaleY(1); node.rotation(0);
@@ -865,8 +872,16 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
               };
             })
           }));
+        } else if (currentNode.type === 'text') {
+          // Accumulate glyph scales
+            const sx = Math.max(0.05, (currentNode.textScaleX ?? 1) * scaleX);
+            const sy = Math.max(0.05, (currentNode.textScaleY ?? 1) * scaleY);
+            setSpec(prev => ({
+              ...prev,
+              root: mapNode(prev.root, nodeId, (n: any) => n.type === 'text' ? { ...n, textScaleX: sx, textScaleY: sy } : n)
+            }));
         } else {
-          // For individual nodes: just scale the node itself
+          // For individual non-text nodes: scale size
           if (currentNode && currentNode.size) {
             const newSize = {
               width: Math.round(currentNode.size.width * scaleX),

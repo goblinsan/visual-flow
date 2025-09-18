@@ -8,6 +8,8 @@ import { debugOnce, logger } from "../utils/logger";
 function renderText(n: TextNode) {
   const x = n.position?.x ?? 0;
   const y = n.position?.y ?? 0;
+  const scaleX = n.textScaleX ?? 1;
+  const scaleY = n.textScaleY ?? 1;
   return (
     <Text
       key={n.id}
@@ -21,6 +23,8 @@ function renderText(n: TextNode) {
       fill={n.color ?? "#0f172a"}
       opacity={n.opacity ?? 1}
       align={n.align ?? "left"}
+      scaleX={scaleX}
+      scaleY={scaleY}
     />
   );
 }
