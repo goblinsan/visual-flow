@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useRef, useState, useEffect } from "react";
+import { useCallback, useRef, useState, useEffect } from "react";
 import { parseColor, toHex, addRecentColor } from './utils/color';
 import { findNode, updateNode } from './utils/specUtils';
 import { parseDashPattern } from './utils/dashPattern';
@@ -7,29 +7,8 @@ import { logger } from "./utils/logger";
 import CanvasStage from "./canvas/CanvasStage.tsx";
 import type { LayoutSpec } from "./layout-schema.ts";
 
-// Hook to observe element size
-function useElementSize<T extends HTMLElement>(): [React.RefObject<T | null>, { width: number; height: number }] {
-  const ref = useRef<T | null>(null);
-  const [size, setSize] = useState({ width: 0, height: 0 });
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    // Immediate measurement fallback so first render can mount Stage
-    const first = el.getBoundingClientRect();
-    if ((first.width || first.height) && (first.width !== size.width || first.height !== size.height)) {
-      setSize({ width: first.width, height: first.height });
-    }
-    const ro = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const cr = entry.contentRect;
-        setSize(prev => (prev.width === cr.width && prev.height === cr.height) ? prev : { width: cr.width, height: cr.height });
-      }
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [size.width, size.height]);
-  return [ref, size];
-}
+// Extracted hook
+import useElementSize from './hooks/useElementSize';
 
 function buildInitialSpec(): LayoutSpec {
   return {
