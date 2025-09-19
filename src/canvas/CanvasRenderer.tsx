@@ -1,6 +1,7 @@
 import { Group, Rect, Text } from "react-konva";
 import { type ReactNode } from "react";
 import { computeRectVisual } from "../renderer/rectVisual";
+import { estimateNodeHeight } from "../renderer/measurement";
 import type { LayoutNode, FrameNode, StackNode, TextNode, BoxNode, GridNode, GroupNode, ImageNode, RectNode } from "../layout-schema.ts";
 import { CanvasImage } from "./components/CanvasImage";
 import { debugOnce, logger } from "../utils/logger";
@@ -75,27 +76,7 @@ function renderRect(n: RectNode) {
 }
 
 // Basic measurements (temporary)
-function approxTextHeight(n: TextNode): number {
-  const fs = n.variant === "h1" ? 28 : n.variant === "h2" ? 22 : n.variant === "h3" ? 18 : 14;
-  return fs + 8;
-}
-
-function getApproxHeight(n: LayoutNode): number {
-  switch (n.type) {
-    case "text": return approxTextHeight(n);
-    case "image": return n.size?.height ?? 100;
-    case "box": return n.size?.height ?? 120;
-    case "frame": return n.size.height;
-    case "stack":
-      return (n as StackNode).children.reduce(
-        (h: number, c: LayoutNode) => h + getApproxHeight(c) + ((n as StackNode).gap ?? 0),
-        0
-      );
-    case "grid": return (n as GridNode).children.length > 0 ? 200 : 100;
-    case "group": return (n as GroupNode).children.length > 0 ? 200 : 100;
-    default: return 100;
-  }
-}
+// measurement logic extracted to measurement.ts
 
 // Stack: add direction support
 function renderStack(n: StackNode) {
@@ -117,7 +98,7 @@ function renderStack(n: StackNode) {
       cursorX += w;
       cursorX += gap;
     } else {
-      cursorY += getApproxHeight(child) + gap;
+  cursorY += estimateNodeHeight(child) + gap;
     }
     return node;
   });
@@ -172,7 +153,7 @@ function renderGrid(n: GridNode) {
       col = 0;
     }
     const cellX = pad + col * (baseCellWidth + gap);
-    const childH = getApproxHeight(child);
+  const childH = estimateNodeHeight(child);
     rowMaxH = Math.max(rowMaxH, childH);
     items.push(
       <Group key={child.id} x={cellX} y={rowY}>

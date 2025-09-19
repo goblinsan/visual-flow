@@ -139,3 +139,16 @@ Test Impact: Test file count +1; total tests increased from 70 to 79; all passin
 Rationale: Establish reusable paint normalization boundary before further renderer/service decomposition.
 Reversibility: Remove helper usage and inline prior logic from git history; no schema changes.
 Follow-ups (Optional): Use `dashArrayToInput` in `CanvasApp.tsx` for minor duplication elimination; consider adding reverse `inputToDashArray` delegating to existing dash parser.
+
+Phase 7 – Measurement Extraction (2025-09-19)
+Summary: Extracted inline sizing heuristics (`approxTextHeight`, `getApproxHeight`) from `CanvasRenderer.tsx` into pure module `renderer/measurement.ts` providing `fontSizeForVariant`, `approxTextHeight`, and `estimateNodeHeight`.
+Files Added:
+ - `src/renderer/measurement.ts`
+ - `src/renderer/measurement.test.ts` (5 tests)
+Files Modified:
+ - `src/canvas/CanvasRenderer.tsx` (removed inline measurement logic, now imports `estimateNodeHeight`).
+Behavior Parity: Yes. All heuristic outputs (text height = fontSize+8, stack accumulation with gap added after each child, placeholder grid/group heights 200/100) preserved.
+Tests: Added coverage for variant mapping, text height, stack aggregation, group/grid placeholders.
+Rationale: Centralizes measurement heuristics for future refinement (real text metrics, caching) without touching rendering code.
+Reversibility: Replace import with previous inline functions.
+Next Opportunities: Introduce width estimation; unify gap accumulation semantics (consider not adding gap after last child in future – would be behavior change requiring tests).
