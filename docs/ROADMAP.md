@@ -24,12 +24,14 @@ Tasks:
 3. Tests:
    - Drag: below threshold vs crossing threshold, multi-node displacement, zero-movement finalization.
    - Marquee: partial overlap inclusion, zero-size rectangle (no selection), toggle mode integration.
-4. Refactor `CanvasStage.tsx` to use helpers (no behavior change).
+4. Refactor `CanvasStage.tsx` to use helpers (no behavior change). ✅ (drag integrated in commit `feat(interaction): integrate pure drag helpers`)
 
 Exit Criteria:
-- New test files: `interaction.drag.test.ts`, `interaction.marquee.test.ts`.
-- CanvasStage diff limited to replacing inline math + branching.
-- All existing tests still green.
+- New test files: `interaction.drag.test.ts`, `interaction.marquee.test.ts`. ✅
+- CanvasStage diff limited to replacing inline math + branching (drag portion done; marquee pending). ✅ (drag) / ⏳ (marquee)
+- All existing tests still green. ✅ (105 tests passing post-integration)
+
+Progress Note (in-progress milestone): Drag helper lifecycle fully adopted; marquee logic still inline pending extraction to pure helper (`computeMarquee` placeholder exists in renderer layer). Next step: introduce `interaction/marquee` usage in `CanvasStage` and remove imperative rectangle hit-test loop.
 
 ## Milestone 2: Command Dispatch Layer
 Goal: Introduce a lightweight command abstraction powering all spec mutations (delete, duplicate, group, ungroup, transform, property change).
