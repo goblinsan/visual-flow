@@ -575,11 +575,15 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   // Track spacebar for panning mode
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
+      const tgt = e.target as HTMLElement | null;
+      if (tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA' || tgt.isContentEditable)) return;
       if (e.code === 'Space') { setSpacePan(true); e.preventDefault(); }
       if (e.key === 'Shift') setShiftPressed(true);
       if (e.key === 'Alt') setAltPressed(true);
     };
     const up = (e: KeyboardEvent) => {
+      const tgt = e.target as HTMLElement | null;
+      if (tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA' || tgt.isContentEditable)) return;
       if (e.code === 'Space') { setSpacePan(false); }
       if (e.key === 'Shift') setShiftPressed(false);
       if (e.key === 'Alt') setAltPressed(false);

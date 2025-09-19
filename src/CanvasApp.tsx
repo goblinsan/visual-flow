@@ -322,6 +322,7 @@ export default function CanvasApp() {
                         placeholder="e.g. 4 4"
                         value={rawDashInput}
                         onChange={e => { setRawDashInput(e.target.value); }}
+                        onKeyDown={e => { if (e.key === 'Enter') { updateRect({ strokeDash: parseDash(rawDashInput) }); (e.target as HTMLInputElement).blur(); } }}
                         onBlur={() => updateRect({ strokeDash: parseDash(rawDashInput) })}
                         className="border rounded px-1 py-0.5 text-[11px] font-mono"
                       />
@@ -364,6 +365,7 @@ export default function CanvasApp() {
                     placeholder="e.g. 4 4"
                     value={rawDashInput}
                     onChange={e => setRawDashInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { const trimmed = rawDashInput.trim(); if (!trimmed) { setRectDefaults(d => ({ ...d, strokeDash: undefined })); } else { const parts = trimmed.split(/[\,\s]+/).map(p => Number(p)).filter(n => !isNaN(n) && n>=1); setRectDefaults(d => ({ ...d, strokeDash: parts.length ? parts : undefined })); } (e.target as HTMLInputElement).blur(); } }}
                     onBlur={() => {
                       const trimmed = rawDashInput.trim();
                       if (!trimmed) { setRectDefaults(d => ({ ...d, strokeDash: undefined })); return; }
