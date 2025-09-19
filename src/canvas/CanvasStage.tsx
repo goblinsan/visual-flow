@@ -15,7 +15,7 @@ interface CanvasStageProps {
   tool?: string;
   onToolChange?: (tool: string) => void; // allow CanvasStage to request tool mode changes (e.g., after shape creation)
   onSelectionChange?: (ids: string[]) => void;
-  rectDefaults?: { fill: string; stroke: string; strokeWidth: number; radius: number; opacity: number; strokeDash?: number[] };
+  rectDefaults?: { fill?: string; stroke?: string; strokeWidth: number; radius: number; opacity: number; strokeDash?: number[] };
 }
 
 function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select", onToolChange, onSelectionChange, rectDefaults }: CanvasStageProps) {

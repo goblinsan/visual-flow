@@ -1,4 +1,5 @@
 import { useCallback, useLayoutEffect, useRef, useState, useEffect } from "react";
+import { parseColor, toHex, toRgba, addRecentColor } from './utils/color';
 import { Modal } from "./components/Modal";
 import { logger } from "./utils/logger";
 import CanvasStage from "./canvas/CanvasStage.tsx";
@@ -52,8 +53,13 @@ export default function CanvasApp() {
   const [tool, setTool] = useState<string>("select");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   // Rectangle default attributes (used when creating new rectangles)
-  const [rectDefaults, setRectDefaults] = useState<{ fill: string; stroke: string; strokeWidth: number; radius: number; opacity: number; strokeDash?: number[] }>({
+  const [rectDefaults, setRectDefaults] = useState<{ fill?: string; stroke?: string; strokeWidth: number; radius: number; opacity: number; strokeDash?: number[] }>({
     fill: '#ffffff', stroke: '#334155', strokeWidth: 1, radius: 0, opacity: 1, strokeDash: undefined
+  });
+  // Color UI mode and recents
+  const [colorMode, setColorMode] = useState<'hex'|'rgba'>(() => (localStorage.getItem('vf_color_mode') as 'hex'|'rgba') || 'hex');
+  const [recentColors, setRecentColors] = useState<string[]>(() => {
+    try { const j = localStorage.getItem('vf_recent_colors'); return j ? JSON.parse(j) : ['#ffffff','#000000','#ff0000','#00aaff']; } catch { return ['#ffffff','#000000']; }
   });
   // Raw dash pattern input (for both selected rect and defaults) to preserve user typing
   const [rawDashInput, setRawDashInput] = useState<string>('');
@@ -72,6 +78,28 @@ export default function CanvasApp() {
   useEffect(() => {
     logger.debug('CanvasApp size', canvasSize.width, canvasSize.height);
   }, [canvasSize.width, canvasSize.height]);
+
+  // Load persisted defaults once
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('vf_rect_defaults');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          setRectDefaults(d => ({ ...d, ...parsed }));
+        }
+      }
+    } catch {/* ignore */}
+  }, []);
+
+  // Persist defaults & recent colors (debounced minimal via effect)
+  useEffect(() => {
+    try { localStorage.setItem('vf_rect_defaults', JSON.stringify(rectDefaults)); } catch {/* ignore */}
+  }, [rectDefaults]);
+  useEffect(() => {
+    try { localStorage.setItem('vf_recent_colors', JSON.stringify(recentColors)); } catch {/* ignore */}
+  }, [recentColors]);
+  useEffect(() => { try { localStorage.setItem('vf_color_mode', colorMode); } catch {/* ignore */} }, [colorMode]);
 
   // Keep root frame sized to at least viewport to avoid gray background gaps
   useEffect(() => {
@@ -301,7 +329,7 @@ export default function CanvasApp() {
                           <input
                             type="color"
                             value={rect.fill || '#ffffff'}
-                            onChange={e => updateRect({ fill: e.target.value })}
+                            onChange={e => { updateRect({ fill: e.target.value }); setRecentColors(rc => addRecentColor(rc, e.target.value)); }}
                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                             aria-label="Rectangle fill color"
                           />
@@ -312,6 +340,10 @@ export default function CanvasApp() {
                           </div>
                           <span className="sr-only">Fill color</span>
                         </label>
+                        <div className="flex items-center gap-1 mt-1">
+                          <input type="checkbox" className="h-3 w-3" checked={rect.fill === undefined} onChange={e => updateRect({ fill: e.target.checked ? undefined : (rect.fill ?? '#ffffff') })} title="Toggle fill on/off" />
+                          <span className="text-[10px] text-gray-500">Off</span>
+                        </div>
                       </div>
                       {/* Stroke */}
                       <div className="flex flex-col items-center gap-1">
@@ -320,7 +352,7 @@ export default function CanvasApp() {
                           <input
                             type="color"
                             value={rect.stroke || '#334155'}
-                            onChange={e => updateRect({ stroke: e.target.value })}
+                            onChange={e => { updateRect({ stroke: e.target.value }); setRecentColors(rc => addRecentColor(rc, e.target.value)); }}
                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                             aria-label="Rectangle stroke color"
                           />
@@ -331,8 +363,57 @@ export default function CanvasApp() {
                           </div>
                           <span className="sr-only">Stroke color</span>
                         </label>
+                        <div className="flex items-center gap-1 mt-1">
+                          <input type="checkbox" className="h-3 w-3" checked={rect.stroke === undefined} onChange={e => updateRect({ stroke: e.target.checked ? undefined : (rect.stroke ?? '#334155') })} title="Toggle stroke on/off" />
+                          <span className="text-[10px] text-gray-500">Off</span>
+                        </div>
                       </div>
                     </div>
+                    {/* Swap + Mode */}
+                    <div className="flex items-center gap-2 mt-2">
+                      <button type="button" className="px-2 py-1 text-[10px] border rounded hover:bg-gray-100" title="Swap fill & stroke" onClick={() => {
+                        updateRect({ fill: rect.stroke, stroke: rect.fill });
+                        if (rect.fill) setRecentColors(rc => addRecentColor(rc, rect.fill!));
+                        if (rect.stroke) setRecentColors(rc => addRecentColor(rc, rect.stroke!));
+                      }}>Swap</button>
+                      <button type="button" className="px-2 py-1 text-[10px] border rounded hover:bg-gray-100" onClick={() => setColorMode(m => m==='hex' ? 'rgba' : 'hex')} title="Toggle color input format">{colorMode.toUpperCase()}</button>
+                    </div>
+                    {/* Alpha + Text Inputs */}
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <label className="flex flex-col gap-1">
+                        <span className="text-gray-500 text-[10px]">Fill Alpha</span>
+                        <input type="range" min={0} max={1} step={0.01} value={parseColor(rect.fill || '#ffffff')?.a ?? 1} onChange={e => {
+                          const p = parseColor(rect.fill || '#ffffff'); if (p) { p.a = Number(e.target.value); updateRect({ fill: colorMode==='hex' ? toHex(p, p.a!==1) : toRgba(p) }); }
+                        }} />
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        <span className="text-gray-500 text-[10px]">Stroke Alpha</span>
+                        <input type="range" min={0} max={1} step={0.01} value={parseColor(rect.stroke || '#334155')?.a ?? 1} onChange={e => {
+                          const p = parseColor(rect.stroke || '#334155'); if (p) { p.a = Number(e.target.value); updateRect({ stroke: colorMode==='hex' ? toHex(p, p.a!==1) : toRgba(p) }); }
+                        }} />
+                      </label>
+                      <label className="flex flex-col gap-1 col-span-2">
+                        <span className="text-gray-500 text-[10px]">Fill Value</span>
+                        <input type="text" className="border rounded px-1 py-0.5 text-[11px] font-mono" value={rect.fill || ''} onChange={e => updateRect({ fill: e.target.value })} />
+                      </label>
+                      <label className="flex flex-col gap-1 col-span-2">
+                        <span className="text-gray-500 text-[10px]">Stroke Value</span>
+                        <input type="text" className="border rounded px-1 py-0.5 text-[11px] font-mono" value={rect.stroke || ''} onChange={e => updateRect({ stroke: e.target.value })} />
+                      </label>
+                    </div>
+                    {/* Recent Colors */}
+                    {recentColors.length > 0 && (
+                      <div className="mt-3">
+                        <div className="text-[10px] uppercase tracking-wide text-gray-500 mb-1">Recent</div>
+                        <div className="flex flex-wrap gap-1">
+                          {recentColors.map(col => (
+                            <button key={col} type="button" title={col} onClick={() => { updateRect({ fill: col }); setRecentColors(rc => addRecentColor(rc, col)); }} className="w-5 h-5 rounded border border-gray-300 flex items-center justify-center">
+                              <span className="w-4 h-4 rounded checkerboard overflow-hidden" style={{ background: col }} />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     <div className="grid grid-cols-2 gap-2">
                       <label className="flex flex-col gap-1 col-span-1">
                         <span className="text-gray-500">Stroke W</span>
@@ -376,7 +457,7 @@ export default function CanvasApp() {
                       <input
                         type="color"
                         value={rectDefaults.fill}
-                        onChange={e => setRectDefaults(d => ({ ...d, fill: e.target.value }))}
+                        onChange={e => { setRectDefaults(d => ({ ...d, fill: e.target.value })); setRecentColors(rc => addRecentColor(rc, e.target.value)); }}
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                         aria-label="Default rectangle fill color"
                       />
@@ -387,6 +468,10 @@ export default function CanvasApp() {
                       </div>
                       <span className="sr-only">Fill color</span>
                     </label>
+                    <div className="flex items-center gap-1 mt-1">
+                      <input type="checkbox" className="h-3 w-3" checked={rectDefaults.fill === undefined} onChange={e => setRectDefaults(d => ({ ...d, fill: e.target.checked ? undefined : (d.fill ?? '#ffffff') }))} title="Toggle fill on/off" />
+                      <span className="text-[10px] text-gray-500">Off</span>
+                    </div>
                   </div>
                   {/* Stroke Default */}
                   <div className="flex flex-col items-center gap-1">
@@ -395,7 +480,7 @@ export default function CanvasApp() {
                       <input
                         type="color"
                         value={rectDefaults.stroke}
-                        onChange={e => setRectDefaults(d => ({ ...d, stroke: e.target.value }))}
+                        onChange={e => { setRectDefaults(d => ({ ...d, stroke: e.target.value })); setRecentColors(rc => addRecentColor(rc, e.target.value)); }}
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                         aria-label="Default rectangle stroke color"
                       />
@@ -406,8 +491,54 @@ export default function CanvasApp() {
                       </div>
                       <span className="sr-only">Stroke color</span>
                     </label>
+                    <div className="flex items-center gap-1 mt-1">
+                      <input type="checkbox" className="h-3 w-3" checked={rectDefaults.stroke === undefined} onChange={e => setRectDefaults(d => ({ ...d, stroke: e.target.checked ? undefined : (d.stroke ?? '#334155') }))} title="Toggle stroke on/off" />
+                      <span className="text-[10px] text-gray-500">Off</span>
+                    </div>
                   </div>
                 </div>
+                {/* Defaults: swap & mode */}
+                <div className="flex items-center gap-2 mt-2">
+                  <button type="button" className="px-2 py-1 text-[10px] border rounded hover:bg-gray-100" title="Swap default fill & stroke" onClick={() => {
+                    setRectDefaults(d => ({ ...d, fill: d.stroke, stroke: d.fill }));
+                  }}>Swap</button>
+                  <button type="button" className="px-2 py-1 text-[10px] border rounded hover:bg-gray-100" onClick={() => setColorMode(m => m==='hex' ? 'rgba' : 'hex')} title="Toggle color input format">{colorMode.toUpperCase()}</button>
+                </div>
+                {/* Defaults alpha + text */}
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <label className="flex flex-col gap-1">
+                    <span className="text-gray-500 text-[10px]">Fill Alpha</span>
+                    <input type="range" min={0} max={1} step={0.01} value={parseColor(rectDefaults.fill || '#ffffff')?.a ?? 1} onChange={e => {
+                      const p = parseColor(rectDefaults.fill || '#ffffff'); if (p) { p.a = Number(e.target.value); setRectDefaults(d => ({ ...d, fill: colorMode==='hex' ? toHex(p, p.a!==1) : toRgba(p) })); }
+                    }} />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-gray-500 text-[10px]">Stroke Alpha</span>
+                    <input type="range" min={0} max={1} step={0.01} value={parseColor(rectDefaults.stroke || '#334155')?.a ?? 1} onChange={e => {
+                      const p = parseColor(rectDefaults.stroke || '#334155'); if (p) { p.a = Number(e.target.value); setRectDefaults(d => ({ ...d, stroke: colorMode==='hex' ? toHex(p, p.a!==1) : toRgba(p) })); }
+                    }} />
+                  </label>
+                  <label className="flex flex-col gap-1 col-span-2">
+                    <span className="text-gray-500 text-[10px]">Fill Value</span>
+                    <input type="text" className="border rounded px-1 py-0.5 text-[11px] font-mono" value={rectDefaults.fill || ''} onChange={e => setRectDefaults(d => ({ ...d, fill: e.target.value }))} />
+                  </label>
+                  <label className="flex flex-col gap-1 col-span-2">
+                    <span className="text-gray-500 text-[10px]">Stroke Value</span>
+                    <input type="text" className="border rounded px-1 py-0.5 text-[11px] font-mono" value={rectDefaults.stroke || ''} onChange={e => setRectDefaults(d => ({ ...d, stroke: e.target.value }))} />
+                  </label>
+                </div>
+                {recentColors.length > 0 && (
+                  <div className="mt-3">
+                    <div className="text-[10px] uppercase tracking-wide text-gray-500 mb-1">Recent</div>
+                    <div className="flex flex-wrap gap-1">
+                      {recentColors.map(col => (
+                        <button key={col} type="button" title={col} onClick={() => setRectDefaults(d => ({ ...d, fill: col }))} className="w-5 h-5 rounded border border-gray-300 flex items-center justify-center">
+                          <span className="w-4 h-4 rounded checkerboard overflow-hidden" style={{ background: col }} />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-2">
                   <label className="flex flex-col gap-1 col-span-1">
                     <span className="text-gray-500">Stroke W</span>
