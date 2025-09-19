@@ -1,6 +1,7 @@
 /** Paint utilities consolidating normalization + stroke visual derivation.
  * Behavior parity with prior inline logic in computeRectVisual.
  */
+import { parseDashPattern } from './dashPattern';
 
 export interface StrokeVisual {
   stroke: string | undefined;
@@ -47,4 +48,13 @@ export function deriveStrokeVisual(
 export function dashArrayToInput(dash?: number[]): string {
   if (!dash || dash.length === 0) return '';
   return dash.join(' ');
+}
+
+/** Parse a user-provided dash pattern string into a normalized dash array (undefined if empty or invalid). */
+export function inputToDashArray(raw: string | undefined | null): number[] | undefined {
+  if (raw == null) return undefined;
+  const trimmed = raw.trim();
+  if (trimmed === '') return undefined;
+  const res = parseDashPattern(trimmed);
+  return res.pattern.length ? res.pattern : undefined;
 }

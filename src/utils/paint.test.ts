@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizePaint, deriveStrokeVisual, dashArrayToInput } from './paint';
+import { normalizePaint, deriveStrokeVisual, dashArrayToInput, inputToDashArray } from './paint';
 
 describe('normalizePaint', () => {
   it('returns undefined for undefined/null', () => {
@@ -52,5 +52,27 @@ describe('dashArrayToInput', () => {
   });
   it('joins numbers with spaces', () => {
     expect(dashArrayToInput([5,2,1])).toBe('5 2 1');
+  });
+});
+
+describe('inputToDashArray', () => {
+  it('returns undefined for empty/whitespace', () => {
+    expect(inputToDashArray('')).toBeUndefined();
+    expect(inputToDashArray('   ')).toBeUndefined();
+  });
+  it('parses valid pattern', () => {
+    expect(inputToDashArray('4 2 1')).toEqual([4,2,1]);
+  });
+  it('filters invalid/zero/negative tokens', () => {
+    // dashPattern parser will drop invalid & <=0 numbers; returns remaining or []
+    expect(inputToDashArray('4 -2 x 0 3')).toEqual([4,3]);
+  });
+  it('returns undefined if no valid numbers', () => {
+    expect(inputToDashArray('x -2 0')).toBeUndefined();
+  });
+  it('roundtrip matches original array (non-empty)', () => {
+    const arr = [5,1,2];
+    const str = dashArrayToInput(arr);
+    expect(inputToDashArray(str)).toEqual(arr);
   });
 });
