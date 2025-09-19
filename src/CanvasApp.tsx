@@ -98,11 +98,15 @@ export default function CanvasApp() {
       if (e.key === 'Escape') {
         setHelpOpen(false);
         setFileOpen(false);
+        if (tool !== 'select') setTool('select');
+      }
+      if (e.key.toLowerCase() === 'r' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        setTool(prev => prev === 'rect' ? 'select' : 'rect');
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [tool]);
 
   // Outside click for menus
   const headerRef = useRef<HTMLDivElement | null>(null);
@@ -187,6 +191,7 @@ export default function CanvasApp() {
           <li>Resize: Drag handles; Shift=aspect; Alt=center; Shift+Alt=center+aspect.</li>
           <li>Rotate: Handle (snaps 0/90/180/270).</li>
           <li>Images: Non-uniform stretch disables aspect; context menu to restore.</li>
+          <li>Rectangle: Press R to toggle; drag to draw; Shift=square; Alt=center-out.</li>
           <li>Group: Ctrl/Cmd+G; Ungroup: Ctrl/Cmd+Shift+G.</li>
           <li>Duplicate: Ctrl/Cmd+D. Delete: Del/Backspace.</li>
           <li>Nudge: Arrows (1px) / Shift+Arrows (10px).</li>
@@ -216,7 +221,7 @@ export default function CanvasApp() {
         <main className="flex-1 relative min-w-0">
           <div ref={canvasRef} className="absolute inset-0">
             {stageWidth > 0 && stageHeight > 0 && (
-              <CanvasStage tool={tool} spec={spec} setSpec={setSpec} width={stageWidth} height={stageHeight} />
+              <CanvasStage tool={tool} spec={spec} setSpec={setSpec} width={stageWidth} height={stageHeight} onToolChange={setTool} />
             )}
           </div>
         </main>

@@ -85,6 +85,13 @@ Transform & geometry:
 - Shift + Alt + Drag: Centered uniform scaling.
 - Rotate handle: Free rotation (snaps at 0/90/180/270°).
 
+Rectangle tool:
+- Activate: toolbar button or press `R` (toggle).
+- Draw: Click-drag on empty canvas to create rectangle.
+- Shift while dragging: Constrain to square.
+- Alt while dragging: Center-out creation (start point becomes center). Shift+Alt: centered square.
+- Release mouse to finalize; tool auto-switches back to Select; new rect is selected.
+
 Text glyph scaling:
 - Text nodes distort (squash/stretch) their glyphs when resized; the box itself does not reflow text.
 - Shift during text resize: Uniform glyph scale (maintain original distortion ratio).

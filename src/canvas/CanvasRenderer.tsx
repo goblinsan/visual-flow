@@ -1,6 +1,6 @@
 import { Group, Rect, Text } from "react-konva";
 import { type ReactNode } from "react";
-import type { LayoutNode, FrameNode, StackNode, TextNode, BoxNode, GridNode, GroupNode, ImageNode } from "../layout-schema.ts";
+import type { LayoutNode, FrameNode, StackNode, TextNode, BoxNode, GridNode, GroupNode, ImageNode, RectNode } from "../layout-schema.ts";
 import { CanvasImage } from "./components/CanvasImage";
 import { debugOnce, logger } from "../utils/logger";
 
@@ -46,6 +46,26 @@ function renderBox(n: BoxNode) {
         shadowBlur={4}
       />
       {n.children?.map(renderNode)}
+    </Group>
+  );
+}
+
+// Rect (shape)
+function renderRect(n: RectNode) {
+  const x = n.position?.x ?? 0;
+  const y = n.position?.y ?? 0;
+  const w = n.size?.width ?? 80;
+  const h = n.size?.height ?? 60;
+  return (
+    <Group key={n.id} id={n.id} name={`node ${n.type}`} x={x} y={y} rotation={n.rotation ?? 0} opacity={n.opacity ?? 1}>
+      <Rect
+        width={w}
+        height={h}
+        fill={n.fill ?? '#ffffff'}
+        stroke={n.stroke ?? '#334155'}
+        strokeWidth={n.strokeWidth ?? 1}
+        cornerRadius={n.radius ?? 0}
+      />
     </Group>
   );
 }
@@ -201,6 +221,7 @@ export function renderNode(n: LayoutNode): ReactNode {
     case "grid": return renderGrid(n as GridNode);
     case "group": return renderGroup(n as GroupNode);
     case "image": return renderImage(n as ImageNode);
+  case "rect": return renderRect(n as RectNode);
     default:
       logger.warn('Unknown node type', (n as any).type, n);
       return null;

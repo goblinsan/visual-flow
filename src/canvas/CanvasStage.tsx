@@ -13,9 +13,10 @@ interface CanvasStageProps {
   width?: number;
   height?: number;
   tool?: string;
+  onToolChange?: (tool: string) => void; // allow CanvasStage to request tool mode changes (e.g., after shape creation)
 }
 
-function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select" }: CanvasStageProps) {
+function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select", onToolChange }: CanvasStageProps) {
   // View / interaction state
   const [scale, setScale] = useState(1);
   const [pos, setPos] = useState({ x: 0, y: 0 });
@@ -56,6 +57,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   });
 
   const isSelectMode = tool === "select";
+  const isRectMode = tool === 'rect';
   const [spacePan, setSpacePan] = useState(false);
   // Track shift key globally for aspect-ratio constrained resize
   const [shiftPressed, setShiftPressed] = useState(false);
@@ -153,7 +155,25 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   }, []);
 
   // Enhanced mouse handlers with proper interaction detection
+  // Rectangle draft state
+  const [rectDraft, setRectDraft] = useState<null | {
+    start: { x: number; y: number };
+    current: { x: number; y: number };
+  }>(null);
+
   const onMouseDown = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
+    // Rectangle tool creation pathway
+    if (isRectMode) {
+      if (e.evt.button !== 0) return; // left only
+      const stage = e.target.getStage(); if (!stage) return;
+      // treat clicks on existing shapes as ignored for creation, require empty space
+      const pointer = stage.getPointerPosition(); if (!pointer) return;
+      const hit = stage.getIntersection(pointer);
+      if (hit) return; // user clicked on existing node -> ignore (could switch later to selection if desired)
+      const world = toWorld(stage, pointer);
+      setRectDraft({ start: world, current: world });
+      return;
+    }
     if (!isSelectMode) return;
     const stage = e.target.getStage();
     if (!stage) return;
@@ -250,6 +270,13 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   const onMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     const stage = e.target.getStage();
     if (!stage) return;
+    if (isRectMode) {
+      if (!rectDraft) return;
+      const pointer = stage.getPointerPosition(); if (!pointer) return;
+      const worldPos = toWorld(stage, pointer);
+      setRectDraft(prev => prev ? { ...prev, current: worldPos } : prev);
+      return;
+    }
     if (!isSelectMode) return;
 
     if (panning) {
@@ -314,6 +341,61 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   const onMouseUp = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     const stage = e.target.getStage();
     if (!stage) return;
+
+    // Finalize rectangle creation
+    if (isRectMode && rectDraft) {
+      const { start, current } = rectDraft;
+      let x1 = start.x, y1 = start.y, x2 = current.x, y2 = current.y;
+      let w = x2 - x1; let h = y2 - y1;
+      // Support reverse drags by normalizing top-left
+      const alt = altPressed; // center mode if alt held at release
+      const shift = shiftPressed; // square constraint
+      if (alt) {
+        // In center mode, start is center; compute symmetrical extents
+        w = (current.x - start.x) * 2;
+        h = (current.y - start.y) * 2;
+        if (shift) {
+          const m = Math.max(Math.abs(w), Math.abs(h));
+            w = Math.sign(w || 1) * m;
+            h = Math.sign(h || 1) * m;
+        }
+        const width = Math.abs(w); const height = Math.abs(h);
+        const topLeft = { x: start.x - width / 2, y: start.y - height / 2 };
+        const finalW = Math.max(4, width); const finalH = Math.max(4, height);
+        const id = 'rect_' + Math.random().toString(36).slice(2, 9);
+        setSpec(prev => ({
+          ...prev,
+          root: { ...prev.root, children: [...prev.root.children, { id, type: 'rect', position: topLeft, size: { width: finalW, height: finalH }, fill: '#ffffff', stroke: '#334155', strokeWidth: 1 }] }
+        }));
+        setSelected([id]);
+        onToolChange?.('select');
+        setRectDraft(null);
+        return;
+      }
+      // Non-centered path
+      if (shift) {
+        const m = Math.max(Math.abs(w), Math.abs(h));
+        w = Math.sign(w || 1) * m;
+        h = Math.sign(h || 1) * m;
+      }
+      if (w < 0) { x1 = x1 + w; w = Math.abs(w); }
+      if (h < 0) { y1 = y1 + h; h = Math.abs(h); }
+      const width = Math.max(4, w);
+      const height = Math.max(4, h);
+      // If essentially a click, fallback to default size
+      const isClick = Math.abs(width) < 4 && Math.abs(height) < 4;
+      const finalSize = isClick ? { width: 80, height: 60 } : { width, height };
+      const finalPos = { x: x1, y: y1 };
+      const id = 'rect_' + Math.random().toString(36).slice(2, 9);
+      setSpec(prev => ({
+        ...prev,
+        root: { ...prev.root, children: [...prev.root.children, { id, type: 'rect', position: finalPos, size: finalSize, fill: '#ffffff', stroke: '#334155', strokeWidth: 1 }] }
+      }));
+      setSelected([id]);
+      onToolChange?.('select');
+      setRectDraft(null);
+      return;
+    }
 
     if (panning) {
       setPanning(false);
@@ -416,7 +498,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
         initialSelection: [],
       });
     }
-  }, [panning, dragState, marqueeState, spec.root.id, getTopContainerAncestor, normalizeSelection, setSpec]);
+  }, [panning, dragState, marqueeState, spec.root.id, getTopContainerAncestor, normalizeSelection, setSpec, isRectMode, rectDraft, altPressed, shiftPressed, onToolChange]);
 
   // Single click handler for empty canvas
   const onClick = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -1013,6 +1095,42 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
             stroke={'#3b82f6'}
             dash={[4,4]}
           />
+          {/* Rectangle draft preview */}
+          {isRectMode && rectDraft && (() => {
+            const { start, current } = rectDraft;
+            let x = start.x; let y = start.y; let w = current.x - start.x; let h = current.y - start.y;
+            const alt = altPressed; const shift = shiftPressed;
+            if (alt) {
+              w = (current.x - start.x) * 2;
+              h = (current.y - start.y) * 2;
+            }
+            if (shift) {
+              const m = Math.max(Math.abs(w), Math.abs(h));
+              w = Math.sign(w || 1) * m;
+              h = Math.sign(h || 1) * m;
+            }
+            if (alt) {
+              x = start.x - Math.abs(w)/2;
+              y = start.y - Math.abs(h)/2;
+              w = Math.abs(w); h = Math.abs(h);
+            } else {
+              if (w < 0) { x = x + w; w = Math.abs(w);} 
+              if (h < 0) { y = y + h; h = Math.abs(h);} 
+            }
+            return (
+              <Rect
+                x={x}
+                y={y}
+                width={Math.max(1, w)}
+                height={Math.max(1, h)}
+                fill={'rgba(255,255,255,0.35)'}
+                stroke={'#334155'}
+                strokeWidth={1}
+                dash={[6,4]}
+                listening={false}
+              />
+            );
+          })()}
         </Layer>
       </Stage>
       
