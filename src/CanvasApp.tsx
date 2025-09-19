@@ -83,6 +83,27 @@ export default function CanvasApp() {
     });
   }, [canvasSize.width, canvasSize.height]);
 
+  // Sync raw dash input based on selection / tool changes
+  useEffect(() => {
+    // If exactly one rectangle selected, mirror its strokeDash
+    if (selectedIds.length === 1) {
+      const findNode = (n:any, id:string): any | null => { if (n.id===id) return n; if (n.children) { for (const c of n.children) { const f=findNode(c,id); if (f) return f; } } return null; };
+      const node = findNode(spec.root, selectedIds[0]);
+      if (node && node.type === 'rect') {
+        const dashStr = node.strokeDash ? node.strokeDash.join(' ') : '';
+        setRawDashInput(prev => prev === dashStr ? prev : dashStr);
+        return;
+      }
+    }
+    // If no selection and rect tool active, show defaults value
+    if (selectedIds.length === 0 && tool === 'rect') {
+      const dashStr = rectDefaults.strokeDash ? rectDefaults.strokeDash.join(' ') : '';
+      setRawDashInput(prev => prev === dashStr ? prev : dashStr);
+      return;
+    }
+    // Otherwise don't overwrite user input (e.g., multi-select or other tool)
+  }, [selectedIds, tool, rectDefaults.strokeDash, spec.root]);
+
   // File menu stub handlers
   const fileAction = useCallback((action: string) => {
     // Later: implement persistence layer
@@ -258,8 +279,6 @@ export default function CanvasApp() {
               if (!node) return <div className="text-[11px] text-gray-400">Node not found.</div>;
               if (node.type === 'rect') {
                 const rect = node as any;
-                // Sync rawDashInput when selection changes to a rect
-                useEffect(() => { setRawDashInput(rect.strokeDash ? rect.strokeDash.join(' ') : ''); }, [rect.id]);
                 const updateRect = (patch: Record<string, any>) => {
                   setSpec(prev => ({
                     ...prev,
