@@ -1,5 +1,7 @@
 import { Group, Rect, Text } from "react-konva";
 import { type ReactNode } from "react";
+import { computeRectVisual } from "../renderer/rectVisual";
+import { estimateNodeHeight } from "../renderer/measurement";
 import type { LayoutNode, FrameNode, StackNode, TextNode, BoxNode, GridNode, GroupNode, ImageNode, RectNode } from "../layout-schema.ts";
 import { CanvasImage } from "./components/CanvasImage";
 import { debugOnce, logger } from "../utils/logger";
@@ -54,53 +56,27 @@ function renderBox(n: BoxNode) {
 function renderRect(n: RectNode) {
   const x = n.position?.x ?? 0;
   const y = n.position?.y ?? 0;
-  const w = n.size?.width ?? 80;
-  const h = n.size?.height ?? 60;
-  // Allow disabling fill/stroke by setting them explicitly to undefined.
-  // (Empty string also treated as disabled to avoid Konva defaulting to black.)
-  const fillVal = (n.fill === undefined || n.fill === '') ? undefined : n.fill;
-  const strokeVal = (n.stroke === undefined || n.stroke === '') ? undefined : n.stroke;
-  const bothOff = fillVal === undefined && strokeVal === undefined;
+  const v = computeRectVisual(n);
   return (
     <Group key={n.id} id={n.id} name={`node ${n.type}`} x={x} y={y} rotation={n.rotation ?? 0} opacity={n.opacity ?? 1}>
       <Rect
-        width={w}
-        height={h}
-        fill={fillVal}
-        fillEnabled={fillVal !== undefined}
-        stroke={bothOff ? '#94a3b8' : strokeVal}
-        strokeEnabled={bothOff ? true : strokeVal !== undefined}
-        strokeWidth={bothOff ? 1 : strokeVal !== undefined ? (n.strokeWidth ?? 1) : 0}
-        opacity={bothOff ? 0.4 : undefined}
-        dash={bothOff ? [3,3] : (strokeVal !== undefined && n.strokeDash && n.strokeDash.length ? n.strokeDash : undefined)}
-        cornerRadius={n.radius ?? 0}
+        width={v.width}
+        height={v.height}
+        fill={v.fill}
+        fillEnabled={v.fillEnabled}
+        stroke={v.stroke}
+        strokeEnabled={v.strokeEnabled}
+        strokeWidth={v.strokeWidth}
+        opacity={v.opacity}
+        dash={v.dash}
+        cornerRadius={v.cornerRadius}
       />
     </Group>
   );
 }
 
 // Basic measurements (temporary)
-function approxTextHeight(n: TextNode): number {
-  const fs = n.variant === "h1" ? 28 : n.variant === "h2" ? 22 : n.variant === "h3" ? 18 : 14;
-  return fs + 8;
-}
-
-function getApproxHeight(n: LayoutNode): number {
-  switch (n.type) {
-    case "text": return approxTextHeight(n);
-    case "image": return n.size?.height ?? 100;
-    case "box": return n.size?.height ?? 120;
-    case "frame": return n.size.height;
-    case "stack":
-      return (n as StackNode).children.reduce(
-        (h: number, c: LayoutNode) => h + getApproxHeight(c) + ((n as StackNode).gap ?? 0),
-        0
-      );
-    case "grid": return (n as GridNode).children.length > 0 ? 200 : 100;
-    case "group": return (n as GroupNode).children.length > 0 ? 200 : 100;
-    default: return 100;
-  }
-}
+// measurement logic extracted to measurement.ts
 
 // Stack: add direction support
 function renderStack(n: StackNode) {
@@ -122,7 +98,7 @@ function renderStack(n: StackNode) {
       cursorX += w;
       cursorX += gap;
     } else {
-      cursorY += getApproxHeight(child) + gap;
+  cursorY += estimateNodeHeight(child) + gap;
     }
     return node;
   });
@@ -177,7 +153,7 @@ function renderGrid(n: GridNode) {
       col = 0;
     }
     const cellX = pad + col * (baseCellWidth + gap);
-    const childH = getApproxHeight(child);
+  const childH = estimateNodeHeight(child);
     rowMaxH = Math.max(rowMaxH, childH);
     items.push(
       <Group key={child.id} x={cellX} y={rowY}>
