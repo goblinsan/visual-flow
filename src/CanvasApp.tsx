@@ -85,16 +85,16 @@ export default function CanvasApp() {
   useEffect(() => {
     // If exactly one rectangle selected, mirror its strokeDash
     if (selectedIds.length === 1) {
-      const node = findNode(spec.root as any, selectedIds[0]);
+      const node = findNode(spec.root as any, selectedIds[0]) as any;
       if (node && node.type === 'rect') {
-        const dashStr = dashArrayToInput(node.strokeDash);
+        const dashStr = dashArrayToInput(node.strokeDash as number[] | undefined);
         setRawDashInput(prev => prev === dashStr ? prev : dashStr);
         return;
       }
     }
     // If no selection and rect tool active, show defaults value
     if (selectedIds.length === 0 && tool === 'rect') {
-      const dashStr = dashArrayToInput(rectDefaults.strokeDash);
+      const dashStr = dashArrayToInput(rectDefaults.strokeDash as number[] | undefined);
       setRawDashInput(prev => prev === dashStr ? prev : dashStr);
       return;
     }

@@ -30,9 +30,10 @@ function CanvasStoryWrapper() {
     },
   };
   const [spec, setSpec] = useState<LayoutSpec>(initial);
+  const [selection, setSelection] = useState<string[]>([]);
   return (
     <div className="p-3 bg-slate-900 text-slate-100">
-      <CanvasStage spec={spec} setSpec={setSpec} width={820} height={540} />
+      <CanvasStage spec={spec} setSpec={setSpec} selection={selection} setSelection={setSelection} width={820} height={540} />
     </div>
   );
 }
