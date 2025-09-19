@@ -2,7 +2,7 @@
 
 Baseline Tag: `refactor-baseline-v1`
 Date: 2025-09-19
-Status: Main branch contains extracted paint, measurement, rect visual, and selection interaction helpers. Clean slate for interaction depth + undo/redo architecture.
+Status: Main branch contains extracted paint, measurement, rect visual, selection interaction helpers. Feature branch milestone progress: Milestone 1 (Drag & Marquee) COMPLETE (2025-09-19) – proceeding to Command Dispatch Layer.
 
 ## Guiding Principles
 - Incremental, behavior-parity refactors precede capability changes.
@@ -24,12 +24,14 @@ Tasks:
 3. Tests:
    - Drag: below threshold vs crossing threshold, multi-node displacement, zero-movement finalization.
    - Marquee: partial overlap inclusion, zero-size rectangle (no selection), toggle mode integration.
-4. Refactor `CanvasStage.tsx` to use helpers (no behavior change).
+4. Refactor `CanvasStage.tsx` to use helpers (no behavior change). ✅ (drag integrated in commit `feat(interaction): integrate pure drag helpers`)
 
-Exit Criteria:
-- New test files: `interaction.drag.test.ts`, `interaction.marquee.test.ts`.
-- CanvasStage diff limited to replacing inline math + branching.
-- All existing tests still green.
+Exit Criteria (all satisfied):
+- New test files: `interaction.drag.test.ts`, `interaction.marquee.test.ts`. ✅
+- CanvasStage diff limited to replacing inline math + branching (both drag & marquee integrated). ✅
+- All existing tests still green post-integration (105 passing). ✅
+
+Completion Note: Marquee refactored to session-based pure helpers (`beginMarquee/updateMarquee/finalizeMarquee`), removing imperative hit-test code. Milestone 1 closed; no behavior changes detected.
 
 ## Milestone 2: Command Dispatch Layer
 Goal: Introduce a lightweight command abstraction powering all spec mutations (delete, duplicate, group, ungroup, transform, property change).
