@@ -368,6 +368,8 @@ export function VisualFlowEditor({ initial }: EditorProps) {
             <li><strong>Resize:</strong> Drag handles. Shift for aspect lock. Alt for centered. Shift+Alt for centered uniform.</li>
             <li><strong>Rotate:</strong> Use rotate handle (snaps at 0/90/180/270°).</li>
             <li><strong>Images:</strong> Non-uniform stretch disables aspect. Context menu → Re-enable Aspect to restore.</li>
+            <li><strong>Text Scaling:</strong> Resizing text squashes/stretches glyphs (no reflow). Shift = uniform, Alt = centered, Shift+Alt = centered uniform. Use context menu → Reset Text Scale to remove distortion.</li>
+            <li><strong>Layer Ordering:</strong> Context menu has Move Forward / Move Lower / Move To Top / Move To Bottom for z-order changes within the same parent.</li>
             <li><strong>Group:</strong> Ctrl/Cmd+G. Ungroup: Ctrl/Cmd+Shift+G.</li>
             <li><strong>Duplicate:</strong> Ctrl/Cmd+D.</li>
             <li><strong>Delete:</strong> Delete / Backspace.</li>

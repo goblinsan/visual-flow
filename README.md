@@ -85,6 +85,12 @@ Transform & geometry:
 - Shift + Alt + Drag: Centered uniform scaling.
 - Rotate handle: Free rotation (snaps at 0/90/180/270°).
 
+Text glyph scaling:
+- Text nodes distort (squash/stretch) their glyphs when resized; the box itself does not reflow text.
+- Shift during text resize: Uniform glyph scale (maintain original distortion ratio).
+- Alt: Centered glyph scaling; Shift+Alt combines both behaviors.
+- Context Menu → Reset Text Scale: Restore glyph scale to 1× (removes distortion).
+
 Images:
 - Non-uniform resize of an aspect-preserving image: Switches to stretched mode (aspect disabled).
 - Context Menu → Re-enable Aspect: Restores aspect mode (uses existing or fallback `contain` fit).
@@ -100,10 +106,17 @@ Editing:
 - Arrow Keys: Nudge 1px.
 - Shift + Arrow Keys: Nudge 10px.
 
+Layer ordering (z-order within same parent):
+- Context Menu → Move Forward: Move each selected node one step closer to front (cannot pass another selected node).
+- Context Menu → Move Lower: Move each selected node one step toward back.
+- Context Menu → Move To Top: Bring selected nodes to front (relative order preserved among them).
+- Context Menu → Move To Bottom: Send selected nodes to back (relative order preserved).
+
 Rotation & Baking:
 - Transform changes are baked on mouse release: live Konva transform is reset while persisted spec stores final position, size, rotation.
 
 Notes:
 - Aspect behavior for images is controlled by `preserveAspect` + `objectFit` (cover/contain). Stretched images have `preserveAspect=false`.
 - Any subsequent non-uniform scale of a restored aspect image will disable aspect again.
+ - Text scaling persists as `textScaleX` / `textScaleY` in the spec; resetting sets both to 1.
 

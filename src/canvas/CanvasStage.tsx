@@ -1022,6 +1022,74 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
           style={{ position: 'absolute', left: menu.x, top: menu.y, pointerEvents: 'auto' }}
           className="z-50 text-xs bg-white border border-gray-300 rounded shadow-md select-none min-w-40"
         >
+          {/* Layer ordering actions (true sibling reordering) */}
+          {selected.length > 0 && (
+            (() => {
+              // Build map parentId -> list of child ids selected
+              const parentMap: Record<string, string[]> = {};
+              for (const id of selected) {
+                const p = selectionContext.parentOf[id];
+                if (p) {
+                  parentMap[p] = parentMap[p] ? [...parentMap[p], id] : [id];
+                }
+              }
+              const applyReorder = (mode: 'forward'|'lower'|'top'|'bottom') => {
+                setSpec(prev => ({
+                  ...prev,
+                  root: (function walk(n: any): any {
+                    if (parentMap[n.id]) {
+                      const selectedChildren = new Set(parentMap[n.id]);
+                      const orig = n.children || [];
+                      let newChildren = orig.slice();
+                      if (mode === 'forward') {
+                        // iterate right-to-left swapping with next non-selected
+                        for (let i = newChildren.length - 2; i >= 0; i--) {
+                          if (selectedChildren.has(newChildren[i].id) && !selectedChildren.has(newChildren[i+1].id)) {
+                            const tmp = newChildren[i+1];
+                            newChildren[i+1] = newChildren[i];
+                            newChildren[i] = tmp;
+                          }
+                        }
+                      } else if (mode === 'lower') {
+                        // iterate left-to-right swapping with previous non-selected
+                        for (let i = 1; i < newChildren.length; i++) {
+                          if (selectedChildren.has(newChildren[i].id) && !selectedChildren.has(newChildren[i-1].id)) {
+                            const tmp = newChildren[i-1];
+                            newChildren[i-1] = newChildren[i];
+                            newChildren[i] = tmp;
+                          }
+                        }
+                      } else if (mode === 'top') {
+                        const moving = newChildren.filter((c: any) => selectedChildren.has(c.id));
+                        const staying = newChildren.filter((c: any) => !selectedChildren.has(c.id));
+                        newChildren = [...staying, ...moving];
+                      } else if (mode === 'bottom') {
+                        const moving = newChildren.filter((c: any) => selectedChildren.has(c.id));
+                        const staying = newChildren.filter((c: any) => !selectedChildren.has(c.id));
+                        newChildren = [...moving, ...staying];
+                      }
+                      n = { ...n, children: newChildren.map((c: any) => walk(c)) };
+                      return n;
+                    }
+                    if (Array.isArray(n.children)) {
+                      return { ...n, children: n.children.map((c: any) => walk(c)) };
+                    }
+                    return n;
+                  })(prev.root)
+                }));
+                setMenu(null);
+              };
+              return (
+                <>
+                  <button onClick={() => applyReorder('forward')} className="px-3 py-1.5 w-full text-left hover:bg-gray-100">Move Forward</button>
+                  <button onClick={() => applyReorder('top')} className="px-3 py-1.5 w-full text-left hover:bg-gray-100">Move To Top</button>
+                  <button onClick={() => applyReorder('lower')} className="px-3 py-1.5 w-full text-left hover:bg-gray-100">Move Lower</button>
+                  <button onClick={() => applyReorder('bottom')} className="px-3 py-1.5 w-full text-left hover:bg-gray-100">Move To Bottom</button>
+                  <div className="h-px bg-gray-200 my-1" />
+                </>
+              );
+            })()
+          )}
           <button 
             disabled={!canGroup}
             onClick={() => { if (canGroup) performGroup(); else setMenu(null); }}
@@ -1069,6 +1137,31 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
             >
               Re-enable Aspect
             </button>
+          )}
+          {/* Reset Text Scale (only if any selected text node has scale !=1) */}
+          {selected.length > 0 && (() => {
+            const anyScaled = selected.some(id => {
+              const node = selectionContext.nodeById[id];
+              return node?.type === 'text' && ((node.textScaleX && Math.abs(node.textScaleX - 1) > 0.001) || (node.textScaleY && Math.abs(node.textScaleY - 1) > 0.001));
+            });
+            return anyScaled;
+          })() && (
+            <button
+              onClick={() => {
+                setSpec(prev => ({
+                  ...prev,
+                  root: (function mapAll(n: any): any {
+                    if (selected.includes(n.id) && n.type === 'text') {
+                      return { ...n, textScaleX: 1, textScaleY: 1 };
+                    }
+                    if (Array.isArray(n.children)) return { ...n, children: n.children.map(mapAll) };
+                    return n;
+                  })(prev.root)
+                }));
+                setMenu(null);
+              }}
+              className="px-3 py-1.5 w-full text-left hover:bg-gray-100"
+            >Reset Text Scale</button>
           )}
           <div className="h-px bg-gray-200 my-1" />
           <button 
