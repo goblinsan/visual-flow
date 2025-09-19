@@ -2,13 +2,28 @@ import React from 'react';
 import ColorControls from './ColorControls';
 import { parseDashPattern } from '../utils/dashPattern';
 
+// Minimal rect node shape (avoid deep coupling / circular imports). Extend as needed.
+export interface RectNode {
+  id: string;
+  type: 'rect';
+  fill?: string;
+  stroke?: string;
+  strokeWidth?: number;
+  radius?: number;
+  opacity?: number;
+  strokeDash?: number[];
+}
+
+// Patch shape constrained to rect-relevant properties
+export type RectPatch = Partial<Pick<RectNode, 'fill' | 'stroke' | 'strokeWidth' | 'radius' | 'opacity' | 'strokeDash'>>;
+
 export interface RectAttributesPanelProps {
-  rect: any; // Rect node (typed loosely to avoid circular imports here)
+  rect: RectNode; // Rect node (local minimal typing)
   lastFillById: Record<string,string>;
   lastStrokeById: Record<string,string>;
   setLastFillById: React.Dispatch<React.SetStateAction<Record<string,string>>>;
   setLastStrokeById: React.Dispatch<React.SetStateAction<Record<string,string>>>;
-  updateRect: (patch: Record<string, any>) => void;
+  updateRect: (patch: RectPatch) => void;
   rawDashInput: string;
   setRawDashInput: (v: string) => void;
   beginRecentSession: (c?: string) => void;

@@ -19,7 +19,7 @@ import type { DragConstraints } from './DragHandler';
 import type { MarqueeOptions } from './MarqueeHandler';
 import type { ContextMenuOptions, MenuItemProvider } from './ContextMenuHandler';
 
-export interface CanvasNode {
+export interface CanvasNode<TData = unknown> {
   id: string;
   type: string;
   position: Point; // World coordinates
@@ -27,7 +27,7 @@ export interface CanvasNode {
   visible: boolean;
   selectable: boolean;
   draggable: boolean;
-  data?: any;
+  data?: TData;
 }
 
 export interface CanvasOrchestratorOptions {

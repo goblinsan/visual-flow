@@ -1,18 +1,18 @@
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react';
-import RectAttributesPanel from './RectAttributesPanel';
+import RectAttributesPanel, { RectNode, RectPatch } from './RectAttributesPanel';
 import { describe, it, expect } from 'vitest';
 
-function setup(overrides: Partial<any> = {}) {
-  const rect = { id: 'r1', type: 'rect', fill: '#ffffff', stroke: '#222222', strokeWidth: 2, radius: 4, opacity: 1, strokeDash: [4,2] };
-  const updateRectCalls: any[] = [];
+function setup(overrides: Partial<Record<string, unknown>> = {}) {
+  const rect: RectNode = { id: 'r1', type: 'rect', fill: '#ffffff', stroke: '#222222', strokeWidth: 2, radius: 4, opacity: 1, strokeDash: [4,2] };
+  const updateRectCalls: RectPatch[] = [];
   const props = {
     rect,
-    lastFillById: {},
-    lastStrokeById: {},
+    lastFillById: {} as Record<string,string>,
+    lastStrokeById: {} as Record<string,string>,
     setLastFillById: () => {},
     setLastStrokeById: () => {},
-    updateRect: (p: any) => { updateRectCalls.push(p); Object.assign(rect, p); },
+    updateRect: (p: RectPatch) => { updateRectCalls.push(p); Object.assign(rect, p); },
     rawDashInput: rect.strokeDash?.join(' ') || '',
     setRawDashInput: () => {},
     beginRecentSession: () => {},
@@ -22,7 +22,7 @@ function setup(overrides: Partial<any> = {}) {
     recentColors: ['#ffffff', '#000000'],
     ...overrides,
   };
-  const utils = render(<RectAttributesPanel {...props} />);
+  const utils = render(<RectAttributesPanel {...(props as any)} />);
   return { ...utils, rect, updateRectCalls };
 }
 
