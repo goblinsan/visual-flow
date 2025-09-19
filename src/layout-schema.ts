@@ -117,6 +117,7 @@ export interface RectNode extends BaseNode, Partial<AbsoluteChild> {
   stroke?: string;       // CSS stroke color
   strokeWidth?: number;  // px
   radius?: number;       // corner radius px
+  strokeDash?: number[]; // dash pattern e.g., [4,4]
 }
 
 export type LayoutNode =

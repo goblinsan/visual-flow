@@ -50,6 +50,7 @@ function buildInitialSpec(): LayoutSpec {
 export default function CanvasApp() {
   const [spec, setSpec] = useState<LayoutSpec>(() => buildInitialSpec());
   const [tool, setTool] = useState<string>("select");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [canvasRef, canvasSize] = useElementSize<HTMLDivElement>();
   const [helpOpen, setHelpOpen] = useState(false);
   const [fileOpen, setFileOpen] = useState(false);
@@ -221,17 +222,84 @@ export default function CanvasApp() {
         <main className="flex-1 relative min-w-0">
           <div ref={canvasRef} className="absolute inset-0">
             {stageWidth > 0 && stageHeight > 0 && (
-              <CanvasStage tool={tool} spec={spec} setSpec={setSpec} width={stageWidth} height={stageHeight} onToolChange={setTool} />
+              <CanvasStage
+                tool={tool}
+                spec={spec}
+                setSpec={setSpec}
+                width={stageWidth}
+                height={stageHeight}
+                onToolChange={setTool}
+                onSelectionChange={setSelectedIds}
+              />
             )}
           </div>
         </main>
         {/* Right attributes panel */}
         <aside className="w-64 border-l border-gray-300 bg-white flex flex-col">
           <div className="p-3 border-b text-xs font-semibold uppercase tracking-wide text-gray-600">Attributes</div>
-          <div className="p-3 text-xs text-gray-500 space-y-2 overflow-auto">
-            <p>Attribute panel stub. Future: show selected node properties, allow editing.</p>
-            <p>Current tool: <span className="font-mono font-semibold">{tool}</span></p>
-            <p>Nodes: {spec.root.children.length}</p>
+          <div className="p-3 text-xs text-gray-600 space-y-3 overflow-auto">
+            <p className="text-[11px] uppercase tracking-wide font-semibold text-gray-500">Context</p>
+            <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[11px]">
+              <span className="text-gray-400">Tool</span><span className="font-mono">{tool}</span>
+              <span className="text-gray-400">Nodes</span><span className="font-mono">{spec.root.children.length}</span>
+              <span className="text-gray-400">Selected</span><span className="font-mono">{selectedIds.length}</span>
+            </div>
+            {selectedIds.length === 1 && (() => {
+              // Find node
+              const findNode = (n:any, id:string): any | null => { if (n.id===id) return n; if (n.children) { for (const c of n.children) { const f=findNode(c,id); if (f) return f;} } return null; };
+              const node = findNode(spec.root, selectedIds[0]);
+              if (!node) return <div className="text-[11px] text-gray-400">Node not found.</div>;
+              if (node.type === 'rect') {
+                const rect = node as any;
+                const updateRect = (patch: Record<string, any>) => {
+                  setSpec(prev => ({
+                    ...prev,
+                    root: (function mapAll(n:any):any { if (n.id===rect.id) return { ...n, ...patch }; if (n.children) return { ...n, children: n.children.map(mapAll)}; return n; })(prev.root)
+                  }));
+                };
+                const parseDash = (val:string): number[] | undefined => {
+                  const trimmed = val.trim(); if (!trimmed) return undefined;
+                  const parts = trimmed.split(/[,\s]+/).map(p => Number(p)).filter(n => !isNaN(n) && n>0);
+                  return parts.length ? parts : undefined;
+                };
+                return (
+                  <div className="space-y-2">
+                    <p className="text-[11px] uppercase tracking-wide font-semibold text-gray-500">Rectangle</p>
+                    <label className="flex flex-col gap-1">
+                      <span className="text-gray-500">Fill</span>
+                      <input type="color" value={rect.fill || '#ffffff'} onChange={e => updateRect({ fill: e.target.value })} className="h-7 w-full cursor-pointer" />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className="text-gray-500">Stroke</span>
+                      <input type="color" value={rect.stroke || '#334155'} onChange={e => updateRect({ stroke: e.target.value })} className="h-7 w-full cursor-pointer" />
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className="flex flex-col gap-1 col-span-1">
+                        <span className="text-gray-500">Stroke W</span>
+                        <input type="number" min={0} value={rect.strokeWidth ?? 1} onChange={e => updateRect({ strokeWidth: Math.max(0, Number(e.target.value)||0) })} className="border rounded px-1 py-0.5 text-[11px]" />
+                      </label>
+                      <label className="flex flex-col gap-1 col-span-1">
+                        <span className="text-gray-500">Radius</span>
+                        <input type="number" min={0} value={rect.radius ?? 0} onChange={e => updateRect({ radius: Math.max(0, Number(e.target.value)||0) })} className="border rounded px-1 py-0.5 text-[11px]" />
+                      </label>
+                    </div>
+                    <label className="flex flex-col gap-1">
+                      <span className="text-gray-500">Opacity ({(rect.opacity ?? 1).toFixed(2)})</span>
+                      <input type="range" min={0} max={1} step={0.01} value={rect.opacity ?? 1} onChange={e => updateRect({ opacity: Math.min(1, Math.max(0, Number(e.target.value))) })} />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className="text-gray-500">Dash Pattern</span>
+                      <input type="text" placeholder="e.g. 4 4" value={(rect.strokeDash?.join(' ') ) || ''} onChange={e => updateRect({ strokeDash: parseDash(e.target.value) })} className="border rounded px-1 py-0.5 text-[11px] font-mono" />
+                      <span className="text-[10px] text-gray-400">Space/comma separated numbers. Empty = solid.</span>
+                    </label>
+                  </div>
+                );
+              }
+              return <div className="text-[11px] text-gray-400">No editable attributes for type: {node.type}</div>;
+            })()}
+            {selectedIds.length !== 1 && (
+              <div className="text-[11px] text-gray-400">{selectedIds.length === 0 ? 'No selection' : 'Multiple selection (attributes coming soon).'}</div>
+            )}
           </div>
         </aside>
       </div>

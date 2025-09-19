@@ -14,9 +14,10 @@ interface CanvasStageProps {
   height?: number;
   tool?: string;
   onToolChange?: (tool: string) => void; // allow CanvasStage to request tool mode changes (e.g., after shape creation)
+  onSelectionChange?: (ids: string[]) => void;
 }
 
-function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select", onToolChange }: CanvasStageProps) {
+function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select", onToolChange, onSelectionChange }: CanvasStageProps) {
   // View / interaction state
   const [scale, setScale] = useState(1);
   const [pos, setPos] = useState({ x: 0, y: 0 });
@@ -762,12 +763,18 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
 
   // Normalize selection on changes
   useEffect(() => {
-    if (selected.length === 0) return;
+    if (selected.length === 0) {
+      onSelectionChange?.([]);
+      return;
+    }
     const norm = normalizeSelection(selected);
     if (norm.length !== selected.length || norm.some((id, i) => id !== selected[i])) {
       setSelected(norm);
+      onSelectionChange?.(norm);
+    } else {
+      onSelectionChange?.(selected);
     }
-  }, [selected, normalizeSelection]);
+  }, [selected, normalizeSelection, onSelectionChange]);
 
   // Transformer target attachment
   useEffect(() => {

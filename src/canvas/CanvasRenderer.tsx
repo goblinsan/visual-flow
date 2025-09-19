@@ -64,6 +64,7 @@ function renderRect(n: RectNode) {
         fill={n.fill ?? '#ffffff'}
         stroke={n.stroke ?? '#334155'}
         strokeWidth={n.strokeWidth ?? 1}
+        dash={n.strokeDash && n.strokeDash.length ? n.strokeDash : undefined}
         cornerRadius={n.radius ?? 0}
       />
     </Group>
