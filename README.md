@@ -1,74 +1,119 @@
-# React + TypeScript + Vite
+# Visual Flow (Interactive Canvas Editor)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+An experimental visual canvas editor built with **React**, **TypeScript**, **Vite**, and **Konva**. It focuses on incremental, test‑driven refactors toward a clean interaction model and future undo/redo support.
 
-Currently, two official plugins are available:
+Current capabilities include:
+ - Multi‑selection (click, shift / ctrl, marquee, toggle marquee)
+ - Group / ungroup, duplicate, delete, layer z‑ordering
+ - Rectangle tool with centered + square creation modifiers
+ - Image aspect mode with stretch + restore flow
+ - Text glyph scaling (with reset)
+ - Attribute editing panels (color, stroke, dash, opacity, defaults, recent colors)
+ - Pure derivation seams: paint normalization, rectangle visual props, measurement heuristics, selection logic
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+Baseline Tag: `refactor-baseline-v1` (post extraction of paint, measurement, rectVisual, interaction helpers)
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+---
+## Quick Start
+```bash
+pnpm install   # or npm install / yarn
+pnpm dev       # start Vite dev server
+pnpm test      # run vitest suite
+pnpm build     # production bundle (if required later)
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Open the app, create rectangles (`R`), experiment with grouping, resizing, and context menu actions.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+---
+## Architecture Overview
 
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+| Layer | Purpose | Key Files |
+|-------|---------|-----------|
+| Spec Model | Declarative layout tree (root + children) | `layout-schema.ts` |
+| Rendering | Convert spec nodes → Konva shapes | `canvas/CanvasRenderer.tsx`, `renderer/rectVisual.ts` |
+| Interaction | Stage pointer + selection handling | `canvas/CanvasStage.tsx`, `renderer/interaction.ts` |
+| Measurement | Text + stack size heuristics | `renderer/measurement.ts` |
+| Paint / Style | Normalize fill/stroke/dash semantics | `utils/paint.ts` |
+| Persistence | Local storage for defaults + recent colors | `hooks/useDesignPersistence.ts`, `hooks/useRecentColors.ts` |
+| Attribute Panels | Editing UI (rect, colors, defaults) | `components/*Panel.tsx` |
+
+### Pure Seams (Tested)
+1. `computeRectVisual` – Consolidated rectangle visual derivation (fallback stroke, dash inclusion rules).
+2. `normalizePaint` / `deriveStrokeVisual` – Paint enable/disable + fallback semantics.
+3. `measurement` – Approximate height + font scaling heuristics separated from rendering.
+4. `interaction` – Selection state transitions (click + marquee) extracted for deterministic tests.
+
+### Planned (Roadmap)
+See `docs/ROADMAP.md` for staged work: drag extraction, command layer, undo/redo, composite batching.
+
+---
+## Directory Highlights
+```
+src/
+  canvas/            # Stage + Konva wiring
+  components/        # Attribute & control panels
+  hooks/             # Persistence, sizing, selection, defaults
+  renderer/          # Pure derivations (visuals, measurement, interaction)
+  utils/             # Paint, color editing, dash parsing, spec utilities
+  samples/           # Example spec compositions
+  editor/            # (Emerging) higher-level editor constructs
 ```
 
-## Canvas Editor Interaction Cheatsheet
+---
+## Development Workflow
+Small, behavior‑parity refactors only:
+1. Add / extend tests first.
+2. Extract pure helper or hook.
+3. Replace inline logic with helper call.
+4. Run full test suite (must stay green & count non‑decreasing).
+5. Document extraction (append to `refactor_plan.md`).
+
+Recommended scripts:
+```bash
+pnpm test              # unit tests
+pnpm test --watch      # focused iterative loop
+pnpm lint              # lint (strict: many any->TODO items remain)
+pnpm storybook         # (if enabled) interactive component/dev env
+```
+
+---
+## Testing Strategy
+| Area | Coverage |
+|------|----------|
+| Visual derivation | `rectVisual.test.ts` validates style + fallback combinations |
+| Paint logic | `paint.test.ts` (dash conversion, disabling semantics) |
+| Measurement | `measurement.test.ts` ensures font + height heuristics stable |
+| Interaction | `interaction.test.ts` click + toggle + marquee behaviors |
+| Persistence | Round‑trip, recent colors, defaults |
+| Spec invariants | Node uniqueness / structure guards |
+| Panels | Rect attribute + color picker session interactions |
+
+Emerging TODO: drag delta math, command inversion, undo stack invariants.
+
+---
+## Refactor Protocol (Condensed)
+Adapted from `.github/workflows/refactor_plan.md`:
+
+1. One conceptual change per commit (e.g. "extract measurement heuristics").
+2. No silent behavior changes – if behavior changes, label commit clearly & add tests.
+3. Every new module accompanied by a test file (or added cases).
+4. Test count never decreases; all must pass before merge.
+5. Avoid broad renames / formatting churn in refactor commits.
+6. Prefer small pure seams before architectural leaps (undo/redo, command bus).
+
+---
+## Roadmap Snapshot
+Milestones:
+1. Drag & Marquee Extraction (drag threshold, displacement calc, pure marquee hit-testing)
+2. Command Dispatch Layer (atomic + invertible commands)
+3. Undo / Redo Foundation (`useHistory`, command log, inversion tests)
+4. Batched Interaction Commits (drag grouped into single history entry)
+5. Optional: History persistence (session resilience)
+
+Details: see `docs/ROADMAP.md`.
+
+---
+## Interaction Cheatsheet
 
 Core selection & navigation:
 - Click: Select a single node.
@@ -123,7 +168,18 @@ Rotation & Baking:
 - Transform changes are baked on mouse release: live Konva transform is reset while persisted spec stores final position, size, rotation.
 
 Notes:
-- Aspect behavior for images is controlled by `preserveAspect` + `objectFit` (cover/contain). Stretched images have `preserveAspect=false`.
-- Any subsequent non-uniform scale of a restored aspect image will disable aspect again.
- - Text scaling persists as `textScaleX` / `textScaleY` in the spec; resetting sets both to 1.
+- Aspect behavior for images is controlled by `preserveAspect` + `objectFit` (`cover`/`contain`). Stretched images set `preserveAspect=false`.
+- Any subsequent non-uniform scale of a restored aspect image disables aspect again.
+- Text scaling persists as `textScaleX` / `textScaleY`; reset sets both to 1.
+
+---
+## Contributing (Internal)
+This project currently iterates via tightly scoped refactors. Follow the Refactor Protocol, update roadmap / refactor plan as you land seams, and keep commits reviewable (< ~400 touched LOC ideally).
+
+Planned external contribution guidelines (CODE_OF_CONDUCT, PR template) pending stabilization of interaction & history layers.
+
+---
+## License
+TBD (not yet specified). Add a LICENSE file before public distribution.
+
 
