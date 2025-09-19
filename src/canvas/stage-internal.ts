@@ -1,4 +1,5 @@
 import type { LayoutNode, LayoutSpec, GroupNode } from "../layout-schema";
+// Phase 1 lint: typed helpers replacing several `any` casts.
 
 function mapNode<T extends LayoutNode>(n: T, id: string, f: (n: LayoutNode) => LayoutNode): T {
   if (n.id === id) return f(n) as T;
@@ -23,7 +24,7 @@ export function groupNodes(spec: LayoutSpec, ids: Set<string>): LayoutSpec {
   if (ids.size < 2) return spec; // nothing to do
   // Walk tree to find parent containing all ids as direct children
   function visit(n: LayoutNode): LayoutNode {
-    const maybeChildren = (n as any).children as LayoutNode[] | undefined;
+    const maybeChildren = (n as unknown as { children?: LayoutNode[] }).children;
     if (!maybeChildren) return n;
     const childIds = new Set(maybeChildren.map(c => c.id));
     // Check if all ids are in this child set (only group if all share same parent)
@@ -38,8 +39,8 @@ export function groupNodes(spec: LayoutSpec, ids: Set<string>): LayoutSpec {
       if (toGroup.length < 2) return n; // safety
       // Compute bounding box (assumes each has position & size) relative to parent
       const boxes = toGroup.map(c => {
-        const pos = (c as any).position ?? { x: 0, y: 0 };
-        const size = (c as any).size ?? { width: 100, height: 100 };
+        const pos = (c as unknown as { position?: { x: number; y: number } }).position ?? { x: 0, y: 0 };
+        const size = (c as unknown as { size?: { width: number; height: number } }).size ?? { width: 100, height: 100 };
         return { x: pos.x, y: pos.y, w: size.width, h: size.height };
       });
     const minX = Math.min(...boxes.map(b => b.x));
@@ -49,7 +50,7 @@ export function groupNodes(spec: LayoutSpec, ids: Set<string>): LayoutSpec {
       const groupId = `group_${Date.now().toString(36)}`;
       // Adjust children positions to be relative to new group origin
       const adjusted = toGroup.map(c => {
-        const pos = (c as any).position ?? { x: 0, y: 0 };
+        const pos = (c as unknown as { position?: { x: number; y: number } }).position ?? { x: 0, y: 0 };
         return { ...c, position: { x: pos.x - minX, y: pos.y - minY } } as LayoutNode;
       });
       const groupNode: GroupNode = {
@@ -60,38 +61,39 @@ export function groupNodes(spec: LayoutSpec, ids: Set<string>): LayoutSpec {
         children: adjusted,
       };
       const newChildren = [...remaining, { ...groupNode }];
-      return { ...(n as any), children: newChildren } as LayoutNode;
+      return { ...(n as object), children: newChildren } as LayoutNode;
     }
     // Recurse
     const newChildren = maybeChildren.map(c => visit(c));
-    return { ...(n as any), children: newChildren } as LayoutNode;
+    return { ...(n as object), children: newChildren } as LayoutNode;
   }
-  const nextRoot = visit(spec.root) as any;
-  return { ...spec, root: nextRoot };
+  const nextRoot = visit(spec.root) as LayoutNode;
+  // Preserve original LayoutSpec shape (root expected FrameNode subtype) – rely on existing runtime discipline.
+  return { ...spec, root: nextRoot as unknown as typeof spec.root };
 }
 
 // Ungroup: replace each target group id with its children (adjust positions to parent space)
 export function ungroupNodes(spec: LayoutSpec, ids: Set<string>): LayoutSpec {
   function visit(n: LayoutNode): LayoutNode {
-    const maybeChildren = (n as any).children as LayoutNode[] | undefined;
+    const maybeChildren = (n as unknown as { children?: LayoutNode[] }).children;
     if (!maybeChildren) return n;
-    let changed = false;
+  // changed flag removed (result always reconstructed with newChildren)
     const newChildren: LayoutNode[] = [];
     for (const c of maybeChildren) {
-      if (ids.has(c.id) && (c as any).type === 'group' && Array.isArray((c as any).children)) {
+      const isGroup = (c as unknown as { type?: string }).type === 'group';
+      const groupChildren = (c as unknown as { children?: LayoutNode[] }).children;
+      if (ids.has(c.id) && isGroup && Array.isArray(groupChildren)) {
         // expand
-        const gPos = (c as any).position ?? { x: 0, y: 0 };
-        for (const gc of (c as any).children as LayoutNode[]) {
-          const childPos = (gc as any).position ?? { x: 0, y: 0 };
+        const gPos = (c as unknown as { position?: { x: number; y: number } }).position ?? { x: 0, y: 0 };
+        for (const gc of groupChildren) {
+          const childPos = (gc as unknown as { position?: { x: number; y: number } }).position ?? { x: 0, y: 0 };
             newChildren.push({ ...gc, position: { x: childPos.x + gPos.x, y: childPos.y + gPos.y } });
         }
-        changed = true;
       } else {
         newChildren.push(visit(c));
       }
     }
-    if (!changed) return { ...(n as any), children: newChildren } as LayoutNode;
-    return { ...(n as any), children: newChildren } as LayoutNode;
+    return { ...(n as object), children: newChildren } as LayoutNode;
   }
-  return { ...spec, root: visit(spec.root) as any };
+  return { ...spec, root: visit(spec.root) as unknown as typeof spec.root };
 }
