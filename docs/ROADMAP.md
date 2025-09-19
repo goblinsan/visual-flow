@@ -2,7 +2,7 @@
 
 Baseline Tag: `refactor-baseline-v1`
 Date: 2025-09-19
-Status: Main branch contains extracted paint, measurement, rect visual, and selection interaction helpers. Clean slate for interaction depth + undo/redo architecture.
+Status: Main branch contains extracted paint, measurement, rect visual, selection interaction helpers. Feature branch milestone progress: Milestone 1 (Drag & Marquee) COMPLETE (2025-09-19) – proceeding to Command Dispatch Layer.
 
 ## Guiding Principles
 - Incremental, behavior-parity refactors precede capability changes.
@@ -26,12 +26,12 @@ Tasks:
    - Marquee: partial overlap inclusion, zero-size rectangle (no selection), toggle mode integration.
 4. Refactor `CanvasStage.tsx` to use helpers (no behavior change). ✅ (drag integrated in commit `feat(interaction): integrate pure drag helpers`)
 
-Exit Criteria:
+Exit Criteria (all satisfied):
 - New test files: `interaction.drag.test.ts`, `interaction.marquee.test.ts`. ✅
-- CanvasStage diff limited to replacing inline math + branching (drag portion done; marquee pending). ✅ (drag) / ⏳ (marquee)
-- All existing tests still green. ✅ (105 tests passing post-integration)
+- CanvasStage diff limited to replacing inline math + branching (both drag & marquee integrated). ✅
+- All existing tests still green post-integration (105 passing). ✅
 
-Progress Note (in-progress milestone): Drag helper lifecycle fully adopted; marquee logic still inline pending extraction to pure helper (`computeMarquee` placeholder exists in renderer layer). Next step: introduce `interaction/marquee` usage in `CanvasStage` and remove imperative rectangle hit-test loop.
+Completion Note: Marquee refactored to session-based pure helpers (`beginMarquee/updateMarquee/finalizeMarquee`), removing imperative hit-test code. Milestone 1 closed; no behavior changes detected.
 
 ## Milestone 2: Command Dispatch Layer
 Goal: Introduce a lightweight command abstraction powering all spec mutations (delete, duplicate, group, ungroup, transform, property change).
