@@ -126,3 +126,16 @@ Tests: Added 5 cases covering: basic pass-through, empty string disabling, both 
 Rationale: Establishes first pure seam between spec node and Konva props; enables future consolidation of shape logic & easier unit testing without Konva.
 Reversibility: Single helper; revert by inlining function body back into `renderRect`.
 Next Candidate: Similar extraction for Text metrics or grouping shape property derivations into a `shapeVisual.ts` module.
+
+Phase 6 – Paint Logic Consolidation (2025-09-19)
+Summary: Introduced `utils/paint.ts` with `normalizePaint`, `deriveStrokeVisual`, and `dashArrayToInput` to unify fill/stroke disable + dash fallback / inclusion rules previously embedded only in `computeRectVisual`.
+Files Added:
+ - `src/utils/paint.ts`
+ - `src/utils/paint.test.ts` (9 tests)
+Files Modified:
+ - `src/renderer/rectVisual.ts` (delegates to new utilities)
+Behavior Parity: Yes. All prior rectangle visual derivation semantics preserved (fallback stroke #94a3b8, width 1, opacity 0.4, dash [3,3] when both disabled; dash only when stroke present & non-empty).
+Test Impact: Test file count +1; total tests increased from 70 to 79; all passing.
+Rationale: Establish reusable paint normalization boundary before further renderer/service decomposition.
+Reversibility: Remove helper usage and inline prior logic from git history; no schema changes.
+Follow-ups (Optional): Use `dashArrayToInput` in `CanvasApp.tsx` for minor duplication elimination; consider adding reverse `inputToDashArray` delegating to existing dash parser.
