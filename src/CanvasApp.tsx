@@ -293,40 +293,44 @@ export default function CanvasApp() {
                 return (
                   <div className="space-y-2">
                     <p className="text-[11px] uppercase tracking-wide font-semibold text-gray-500">Rectangle</p>
-                    <div className="flex items-center gap-3">
-                      <div className="flex flex-col gap-1 flex-1">
-                        <span className="text-gray-500">Colors</span>
-                        <div className="flex items-center gap-3">
-                          {/* Fill Swatch */}
-                          <label className="relative group">
-                            <input
-                              type="color"
-                              value={rect.fill || '#ffffff'}
-                              onChange={e => updateRect({ fill: e.target.value })}
-                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                              aria-label="Rectangle fill color"
-                            />
-                            <div className="w-8 h-8 rounded border border-gray-300 shadow-sm flex items-center justify-center relative cursor-pointer">
-                              <div className="w-6 h-6 rounded" style={{ background: rect.fill || '#ffffff' }} />
+                    <div className="flex items-start gap-4">
+                      {/* Fill */}
+                      <div className="flex flex-col items-center gap-1">
+                        <span className="text-[10px] uppercase tracking-wide text-gray-500">Fill</span>
+                        <label className="relative group" title="Fill color">
+                          <input
+                            type="color"
+                            value={rect.fill || '#ffffff'}
+                            onChange={e => updateRect({ fill: e.target.value })}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                            aria-label="Rectangle fill color"
+                          />
+                          <div className="w-9 h-9 rounded border border-gray-300 shadow-sm flex items-center justify-center relative cursor-pointer focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-1 focus-within:ring-offset-white">
+                            <div className="w-7 h-7 rounded checkerboard overflow-hidden">
+                              <div className="w-full h-full" style={{ background: rect.fill || '#ffffff' }} />
                             </div>
-                            <span className="sr-only">Fill color</span>
-                          </label>
-                          {/* Stroke Swatch */}
-                          <label className="relative group">
-                            <input
-                              type="color"
-                              value={rect.stroke || '#334155'}
-                              onChange={e => updateRect({ stroke: e.target.value })}
-                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                              aria-label="Rectangle stroke color"
-                            />
-                            <div className="w-8 h-8 rounded border border-gray-300 shadow-sm flex items-center justify-center cursor-pointer relative">
-                              <div className="w-6 h-6 rounded border border-white" style={{ background: rect.stroke || '#334155' }} />
-                              <div className="pointer-events-none absolute -bottom-3 w-full text-[9px] text-center text-gray-400">F / S</div>
+                          </div>
+                          <span className="sr-only">Fill color</span>
+                        </label>
+                      </div>
+                      {/* Stroke */}
+                      <div className="flex flex-col items-center gap-1">
+                        <span className="text-[10px] uppercase tracking-wide text-gray-500">Stroke</span>
+                        <label className="relative group" title="Stroke color">
+                          <input
+                            type="color"
+                            value={rect.stroke || '#334155'}
+                            onChange={e => updateRect({ stroke: e.target.value })}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                            aria-label="Rectangle stroke color"
+                          />
+                          <div className="w-9 h-9 rounded border border-gray-300 shadow-sm flex items-center justify-center relative cursor-pointer focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-1 focus-within:ring-offset-white">
+                            <div className="w-7 h-7 rounded checkerboard overflow-hidden flex items-center justify-center">
+                              <div className="w-full h-full rounded" style={{ background: rect.stroke || '#334155' }} />
                             </div>
-                            <span className="sr-only">Stroke color</span>
-                          </label>
-                        </div>
+                          </div>
+                          <span className="sr-only">Stroke color</span>
+                        </label>
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
@@ -364,40 +368,44 @@ export default function CanvasApp() {
             {selectedIds.length !== 1 && tool==='rect' && selectedIds.length===0 && (
               <div className="space-y-2">
                 <p className="text-[11px] uppercase tracking-wide font-semibold text-gray-500">Rectangle Defaults</p>
-                <div className="flex items-center gap-3">
-                  <div className="flex flex-col gap-1 flex-1">
-                    <span className="text-gray-500">Colors</span>
-                    <div className="flex items-center gap-3">
-                      {/* Fill Swatch */}
-                      <label className="relative group">
-                        <input
-                          type="color"
-                          value={rectDefaults.fill}
-                          onChange={e => setRectDefaults(d => ({ ...d, fill: e.target.value }))}
-                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                          aria-label="Default rectangle fill color"
-                        />
-                        <div className="w-8 h-8 rounded border border-gray-300 shadow-sm flex items-center justify-center relative cursor-pointer">
-                          <div className="w-6 h-6 rounded" style={{ background: rectDefaults.fill }} />
+                <div className="flex items-start gap-4">
+                  {/* Fill Default */}
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="text-[10px] uppercase tracking-wide text-gray-500">Fill</span>
+                    <label className="relative group" title="Default fill color">
+                      <input
+                        type="color"
+                        value={rectDefaults.fill}
+                        onChange={e => setRectDefaults(d => ({ ...d, fill: e.target.value }))}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        aria-label="Default rectangle fill color"
+                      />
+                      <div className="w-9 h-9 rounded border border-gray-300 shadow-sm flex items-center justify-center relative cursor-pointer focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-1 focus-within:ring-offset-white">
+                        <div className="w-7 h-7 rounded checkerboard overflow-hidden">
+                          <div className="w-full h-full" style={{ background: rectDefaults.fill }} />
                         </div>
-                        <span className="sr-only">Fill color</span>
-                      </label>
-                      {/* Stroke Swatch */}
-                      <label className="relative group">
-                        <input
-                          type="color"
-                          value={rectDefaults.stroke}
-                          onChange={e => setRectDefaults(d => ({ ...d, stroke: e.target.value }))}
-                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                          aria-label="Default rectangle stroke color"
-                        />
-                        <div className="w-8 h-8 rounded border border-gray-300 shadow-sm flex items-center justify-center cursor-pointer relative">
-                          <div className="w-6 h-6 rounded border border-white" style={{ background: rectDefaults.stroke }} />
-                          <div className="pointer-events-none absolute -bottom-3 w-full text-[9px] text-center text-gray-400">F / S</div>
+                      </div>
+                      <span className="sr-only">Fill color</span>
+                    </label>
+                  </div>
+                  {/* Stroke Default */}
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="text-[10px] uppercase tracking-wide text-gray-500">Stroke</span>
+                    <label className="relative group" title="Default stroke color">
+                      <input
+                        type="color"
+                        value={rectDefaults.stroke}
+                        onChange={e => setRectDefaults(d => ({ ...d, stroke: e.target.value }))}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        aria-label="Default rectangle stroke color"
+                      />
+                      <div className="w-9 h-9 rounded border border-gray-300 shadow-sm flex items-center justify-center relative cursor-pointer focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-1 focus-within:ring-offset-white">
+                        <div className="w-7 h-7 rounded checkerboard overflow-hidden flex items-center justify-center">
+                          <div className="w-full h-full rounded" style={{ background: rectDefaults.stroke }} />
                         </div>
-                        <span className="sr-only">Stroke color</span>
-                      </label>
-                    </div>
+                      </div>
+                      <span className="sr-only">Stroke color</span>
+                    </label>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
