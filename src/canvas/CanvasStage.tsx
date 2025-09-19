@@ -4,6 +4,8 @@ import type Konva from "konva";
 import type { LayoutSpec } from "../layout-schema.ts";
 import { renderNode } from "./CanvasRenderer.tsx";
 import { computeClickSelection, computeMarqueeSelection } from "../renderer/interaction";
+import { beginDrag, updateDrag, finalizeDrag } from "../interaction/drag";
+import type { DragSession } from "../interaction/types";
 import { deleteNodes, duplicateNodes, nudgeNodes } from "./editing";
 import { applyPosition, applyPositionAndSize, groupNodes, ungroupNodes } from "./stage-internal";
 
@@ -29,21 +31,8 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   const [menu, setMenu] = useState<null | { x: number; y: number }>(null);
   
   // Interaction state
-  const [dragState, setDragState] = useState<{
-    active: boolean;
-    startPoint: { x: number; y: number } | null;
-    threshold: number;
-    hasPassedThreshold: boolean;
-    nodeIds: string[];
-    initialPositions: Record<string, { x: number; y: number }>;
-  }>({
-    active: false,
-    startPoint: null,
-    threshold: 3,
-    hasPassedThreshold: false,
-    nodeIds: [],
-    initialPositions: {},
-  });
+  // Drag interaction session (Milestone 1 pure helper integration)
+  const [dragSession, setDragSession] = useState<DragSession | null>(null);
 
   // Marquee state
   const [marqueeState, setMarqueeState] = useState<{
@@ -273,14 +262,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
           }
         }
         
-        setDragState({
-          active: true,
-          startPoint: worldPos,
-          threshold: 3,
-          hasPassedThreshold: false,
-          nodeIds: nodesToDrag,
-          initialPositions,
-        });
+        setDragSession(beginDrag(nodesToDrag, worldPos, initialPositions));
         
         setMenu(null);
         return;
@@ -325,32 +307,21 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     if (!pointer) return;
     const worldPos = toWorld(stage, pointer);
 
-    // Handle drag movement
-    if (dragState.active && dragState.startPoint) {
-      const dx = worldPos.x - dragState.startPoint.x;
-      const dy = worldPos.y - dragState.startPoint.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      
-      if (!dragState.hasPassedThreshold && distance >= dragState.threshold) {
-        setDragState(prev => ({ ...prev, hasPassedThreshold: true }));
-      }
-      
-      if (dragState.hasPassedThreshold) {
-        // Update node positions
-        for (const nodeId of dragState.nodeIds) {
-          const node = stage.findOne(`#${CSS.escape(nodeId)}`);
-          const initialPos = dragState.initialPositions[nodeId];
-          if (node && initialPos) {
-            node.position({
-              x: initialPos.x + dx,
-              y: initialPos.y + dy,
-            });
-          }
+    // Handle drag movement via pure helper
+    if (dragSession) {
+      const session = dragSession; // mutate in place via helper
+      const update = updateDrag(session, worldPos);
+      if (update.passedThreshold) {
+        for (const movedNode of update.moved) {
+          const node = stage.findOne(`#${CSS.escape(movedNode.id)}`);
+            if (node) {
+              node.position({ x: movedNode.x, y: movedNode.y });
+            }
         }
-        // Force re-render of selection outlines during drag
-        // A bit of a hack, but it works for now
         trRef.current?.forceUpdate();
       }
+      // Force state update so dependent callbacks (e.g. click clearing) see threshold transition
+      setDragSession({ ...session });
       return;
     }
 
@@ -373,7 +344,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
         rect.getLayer()?.batchDraw();
       }
     }
-  }, [isSelectMode, panning, toWorld, dragState, marqueeState]);
+  }, [isSelectMode, panning, toWorld, dragSession, marqueeState]);
 
   const onMouseUp = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     const stage = e.target.getStage();
@@ -387,30 +358,19 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       return;
     }
 
-    // Handle drag completion
-    if (dragState.active) {
-      if (dragState.hasPassedThreshold) {
-        // Commit drag changes to spec
+    // Handle drag completion via pure helper
+    if (dragSession) {
+      const summary = finalizeDrag(dragSession);
+      if (summary.moved.length > 0) {
         setSpec(prev => {
           let next = prev;
-          for (const nodeId of dragState.nodeIds) {
-            const node = stage.findOne(`#${CSS.escape(nodeId)}`);
-            if (node) {
-              next = applyPosition(next, nodeId, { x: node.x(), y: node.y() });
-            }
+          for (const mv of summary.moved) {
+            next = applyPosition(next, mv.id, { x: mv.to.x, y: mv.to.y });
           }
           return next;
         });
       }
-      
-      setDragState({
-        active: false,
-        startPoint: null,
-        threshold: 3,
-        hasPassedThreshold: false,
-        nodeIds: [],
-        initialPositions: {},
-      });
+      setDragSession(null);
     }
 
     // Handle marquee completion
@@ -468,7 +428,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
         initialSelection: [],
       });
     }
-  }, [panning, dragState, marqueeState, spec.root.id, getTopContainerAncestor, normalizeSelection, setSpec, isRectMode, rectDraft, finalizeRect]);
+  }, [panning, dragSession, marqueeState, spec.root.id, getTopContainerAncestor, normalizeSelection, setSpec, isRectMode, rectDraft, finalizeRect]);
 
   // Global listeners for rectangle draft (supports dragging outside stage bounds)
   useEffect(() => {
@@ -516,12 +476,12 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       return;
     }
     
-    if (e.target === stage && !dragState.hasPassedThreshold && !marqueeState.active) {
+  if (e.target === stage && !(dragSession?.passedThreshold) && !marqueeState.active) {
   // empty stage click: clear selection
   setSelection([]);
       setMenu(null);
     }
-  }, [isSelectMode, dragState.hasPassedThreshold, marqueeState.active, isTransformerTarget]);
+  }, [isSelectMode, dragSession, marqueeState.active, isTransformerTarget]);
 
   // Wheel zoom
   const onWheel = useCallback((e: Konva.KonvaEventObject<WheelEvent>) => {
