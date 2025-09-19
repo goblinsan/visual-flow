@@ -15,9 +15,10 @@ interface CanvasStageProps {
   tool?: string;
   onToolChange?: (tool: string) => void; // allow CanvasStage to request tool mode changes (e.g., after shape creation)
   onSelectionChange?: (ids: string[]) => void;
+  rectDefaults?: { fill: string; stroke: string; strokeWidth: number; radius: number; opacity: number; strokeDash?: number[] };
 }
 
-function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select", onToolChange, onSelectionChange }: CanvasStageProps) {
+function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select", onToolChange, onSelectionChange, rectDefaults }: CanvasStageProps) {
   // View / interaction state
   const [scale, setScale] = useState(1);
   const [pos, setPos] = useState({ x: 0, y: 0 });
@@ -170,7 +171,8 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     let w = x2 - x1; let h = y2 - y1;
     const alt = altPressed;
     const shift = shiftPressed;
-    if (alt) {
+  const defaults = rectDefaults || { fill: '#ffffff', stroke: '#334155', strokeWidth: 1, radius: 0, opacity: 1, strokeDash: undefined };
+  if (alt) {
       w = (current.x - start.x) * 2;
       h = (current.y - start.y) * 2;
       if (shift) {
@@ -185,7 +187,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       const id = 'rect_' + Math.random().toString(36).slice(2, 9);
       setSpec(prev => ({
         ...prev,
-        root: { ...prev.root, children: [...prev.root.children, { id, type: 'rect', position: topLeft, size: sizeFinal, fill: '#ffffff', stroke: '#334155', strokeWidth: 1 }] }
+        root: { ...prev.root, children: [...prev.root.children, { id, type: 'rect', position: topLeft, size: sizeFinal, fill: defaults.fill, stroke: defaults.stroke, strokeWidth: defaults.strokeWidth, radius: defaults.radius, opacity: defaults.opacity, strokeDash: defaults.strokeDash }] }
       }));
       setSelected([id]);
       onToolChange?.('select');
@@ -204,7 +206,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     const id = 'rect_' + Math.random().toString(36).slice(2, 9);
     setSpec(prev => ({
       ...prev,
-      root: { ...prev.root, children: [...prev.root.children, { id, type: 'rect', position: { x: x1, y: y1 }, size: finalSize, fill: '#ffffff', stroke: '#334155', strokeWidth: 1 }] }
+      root: { ...prev.root, children: [...prev.root.children, { id, type: 'rect', position: { x: x1, y: y1 }, size: finalSize, fill: defaults.fill, stroke: defaults.stroke, strokeWidth: defaults.strokeWidth, radius: defaults.radius, opacity: defaults.opacity, strokeDash: defaults.strokeDash }] }
     }));
     setSelected([id]);
     onToolChange?.('select');

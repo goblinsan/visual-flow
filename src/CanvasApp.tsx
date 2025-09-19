@@ -51,6 +51,12 @@ export default function CanvasApp() {
   const [spec, setSpec] = useState<LayoutSpec>(() => buildInitialSpec());
   const [tool, setTool] = useState<string>("select");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  // Rectangle default attributes (used when creating new rectangles)
+  const [rectDefaults, setRectDefaults] = useState<{ fill: string; stroke: string; strokeWidth: number; radius: number; opacity: number; strokeDash?: number[] }>({
+    fill: '#ffffff', stroke: '#334155', strokeWidth: 1, radius: 0, opacity: 1, strokeDash: undefined
+  });
+  // Raw dash pattern input (for both selected rect and defaults) to preserve user typing
+  const [rawDashInput, setRawDashInput] = useState<string>('');
   const [canvasRef, canvasSize] = useElementSize<HTMLDivElement>();
   const [helpOpen, setHelpOpen] = useState(false);
   const [fileOpen, setFileOpen] = useState(false);
@@ -230,6 +236,7 @@ export default function CanvasApp() {
                 height={stageHeight}
                 onToolChange={setTool}
                 onSelectionChange={setSelectedIds}
+                rectDefaults={rectDefaults}
               />
             )}
           </div>
@@ -251,6 +258,8 @@ export default function CanvasApp() {
               if (!node) return <div className="text-[11px] text-gray-400">Node not found.</div>;
               if (node.type === 'rect') {
                 const rect = node as any;
+                // Sync rawDashInput when selection changes to a rect
+                useEffect(() => { setRawDashInput(rect.strokeDash ? rect.strokeDash.join(' ') : ''); }, [rect.id]);
                 const updateRect = (patch: Record<string, any>) => {
                   setSpec(prev => ({
                     ...prev,
@@ -259,7 +268,7 @@ export default function CanvasApp() {
                 };
                 const parseDash = (val:string): number[] | undefined => {
                   const trimmed = val.trim(); if (!trimmed) return undefined;
-                  const parts = trimmed.split(/[,\s]+/).map(p => Number(p)).filter(n => !isNaN(n) && n>0);
+                  const parts = trimmed.split(/[\,\s]+/).map(p => Number(p)).filter(n => !isNaN(n) && n>=1);
                   return parts.length ? parts : undefined;
                 };
                 return (
@@ -289,7 +298,14 @@ export default function CanvasApp() {
                     </label>
                     <label className="flex flex-col gap-1">
                       <span className="text-gray-500">Dash Pattern</span>
-                      <input type="text" placeholder="e.g. 4 4" value={(rect.strokeDash?.join(' ') ) || ''} onChange={e => updateRect({ strokeDash: parseDash(e.target.value) })} className="border rounded px-1 py-0.5 text-[11px] font-mono" />
+                      <input
+                        type="text"
+                        placeholder="e.g. 4 4"
+                        value={rawDashInput}
+                        onChange={e => { setRawDashInput(e.target.value); }}
+                        onBlur={() => updateRect({ strokeDash: parseDash(rawDashInput) })}
+                        className="border rounded px-1 py-0.5 text-[11px] font-mono"
+                      />
                       <span className="text-[10px] text-gray-400">Space/comma separated numbers. Empty = solid.</span>
                     </label>
                   </div>
@@ -297,7 +313,51 @@ export default function CanvasApp() {
               }
               return <div className="text-[11px] text-gray-400">No editable attributes for type: {node.type}</div>;
             })()}
-            {selectedIds.length !== 1 && (
+            {selectedIds.length !== 1 && tool==='rect' && selectedIds.length===0 && (
+              <div className="space-y-2">
+                <p className="text-[11px] uppercase tracking-wide font-semibold text-gray-500">Rectangle Defaults</p>
+                <label className="flex flex-col gap-1">
+                  <span className="text-gray-500">Fill</span>
+                  <input type="color" value={rectDefaults.fill} onChange={e => setRectDefaults(d => ({ ...d, fill: e.target.value }))} className="h-7 w-full cursor-pointer" />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-gray-500">Stroke</span>
+                  <input type="color" value={rectDefaults.stroke} onChange={e => setRectDefaults(d => ({ ...d, stroke: e.target.value }))} className="h-7 w-full cursor-pointer" />
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="flex flex-col gap-1 col-span-1">
+                    <span className="text-gray-500">Stroke W</span>
+                    <input type="number" min={0} value={rectDefaults.strokeWidth} onChange={e => setRectDefaults(d => ({ ...d, strokeWidth: Math.max(0, Number(e.target.value)||0) }))} className="border rounded px-1 py-0.5 text-[11px]" />
+                  </label>
+                  <label className="flex flex-col gap-1 col-span-1">
+                    <span className="text-gray-500">Radius</span>
+                    <input type="number" min={0} value={rectDefaults.radius} onChange={e => setRectDefaults(d => ({ ...d, radius: Math.max(0, Number(e.target.value)||0) }))} className="border rounded px-1 py-0.5 text-[11px]" />
+                  </label>
+                </div>
+                <label className="flex flex-col gap-1">
+                  <span className="text-gray-500">Opacity ({rectDefaults.opacity.toFixed(2)})</span>
+                  <input type="range" min={0} max={1} step={0.01} value={rectDefaults.opacity} onChange={e => setRectDefaults(d => ({ ...d, opacity: Math.min(1, Math.max(0, Number(e.target.value))) }))} />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-gray-500">Dash Pattern</span>
+                  <input
+                    type="text"
+                    placeholder="e.g. 4 4"
+                    value={rawDashInput}
+                    onChange={e => setRawDashInput(e.target.value)}
+                    onBlur={() => {
+                      const trimmed = rawDashInput.trim();
+                      if (!trimmed) { setRectDefaults(d => ({ ...d, strokeDash: undefined })); return; }
+                      const parts = trimmed.split(/[\,\s]+/).map(p => Number(p)).filter(n => !isNaN(n) && n>=1);
+                      setRectDefaults(d => ({ ...d, strokeDash: parts.length ? parts : undefined }));
+                    }}
+                    className="border rounded px-1 py-0.5 text-[11px] font-mono"
+                  />
+                  <span className="text-[10px] text-gray-400">Will apply to next rectangle.</span>
+                </label>
+              </div>
+            )}
+            {selectedIds.length !== 1 && !(tool==='rect' && selectedIds.length===0) && (
               <div className="text-[11px] text-gray-400">{selectedIds.length === 0 ? 'No selection' : 'Multiple selection (attributes coming soon).'}</div>
             )}
           </div>
