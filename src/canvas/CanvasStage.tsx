@@ -13,9 +13,12 @@ interface CanvasStageProps {
   width?: number;
   height?: number;
   tool?: string;
+  onToolChange?: (tool: string) => void; // allow CanvasStage to request tool mode changes (e.g., after shape creation)
+  onSelectionChange?: (ids: string[]) => void;
+  rectDefaults?: { fill?: string; stroke?: string; strokeWidth: number; radius: number; opacity: number; strokeDash?: number[] };
 }
 
-function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select" }: CanvasStageProps) {
+function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select", onToolChange, onSelectionChange, rectDefaults }: CanvasStageProps) {
   // View / interaction state
   const [scale, setScale] = useState(1);
   const [pos, setPos] = useState({ x: 0, y: 0 });
@@ -56,6 +59,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   });
 
   const isSelectMode = tool === "select";
+  const isRectMode = tool === 'rect';
   const [spacePan, setSpacePan] = useState(false);
   // Track shift key globally for aspect-ratio constrained resize
   const [shiftPressed, setShiftPressed] = useState(false);
@@ -153,7 +157,73 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   }, []);
 
   // Enhanced mouse handlers with proper interaction detection
+  // Rectangle draft state
+  const [rectDraft, setRectDraft] = useState<null | {
+    start: { x: number; y: number };
+    current: { x: number; y: number };
+  }>(null);
+
+  // Helper: finalize rectangle (called on mouseup or via global listener)
+  const finalizeRect = useCallback(() => {
+    if (!isRectMode || !rectDraft) return;
+    const { start, current } = rectDraft;
+    let x1 = start.x, y1 = start.y, x2 = current.x, y2 = current.y;
+    let w = x2 - x1; let h = y2 - y1;
+    const alt = altPressed;
+    const shift = shiftPressed;
+  const defaults = rectDefaults || { fill: '#ffffff', stroke: '#334155', strokeWidth: 1, radius: 0, opacity: 1, strokeDash: undefined };
+  if (alt) {
+      w = (current.x - start.x) * 2;
+      h = (current.y - start.y) * 2;
+      if (shift) {
+        const m = Math.max(Math.abs(w), Math.abs(h));
+        w = Math.sign(w || 1) * m; h = Math.sign(h || 1) * m;
+      }
+      const widthF = Math.max(4, Math.abs(w));
+      const heightF = Math.max(4, Math.abs(h));
+      const topLeft = { x: start.x - widthF / 2, y: start.y - heightF / 2 };
+      const isClick = Math.abs(widthF) < 4 && Math.abs(heightF) < 4;
+      const sizeFinal = isClick ? { width: 80, height: 60 } : { width: widthF, height: heightF };
+      const id = 'rect_' + Math.random().toString(36).slice(2, 9);
+      setSpec(prev => ({
+        ...prev,
+        root: { ...prev.root, children: [...prev.root.children, { id, type: 'rect', position: topLeft, size: sizeFinal, fill: defaults.fill, stroke: defaults.stroke, strokeWidth: defaults.strokeWidth, radius: defaults.radius, opacity: defaults.opacity, strokeDash: defaults.strokeDash }] }
+      }));
+      setSelected([id]);
+      onToolChange?.('select');
+      setRectDraft(null);
+      return;
+    }
+    if (shift) {
+      const m = Math.max(Math.abs(w), Math.abs(h));
+      w = Math.sign(w || 1) * m; h = Math.sign(h || 1) * m;
+    }
+    if (w < 0) { x1 = x1 + w; w = Math.abs(w); }
+    if (h < 0) { y1 = y1 + h; h = Math.abs(h); }
+    const widthF = Math.max(4, w); const heightF = Math.max(4, h);
+    const isClick = Math.abs(widthF) < 4 && Math.abs(heightF) < 4;
+    const finalSize = isClick ? { width: 80, height: 60 } : { width: widthF, height: heightF };
+    const id = 'rect_' + Math.random().toString(36).slice(2, 9);
+    setSpec(prev => ({
+      ...prev,
+      root: { ...prev.root, children: [...prev.root.children, { id, type: 'rect', position: { x: x1, y: y1 }, size: finalSize, fill: defaults.fill, stroke: defaults.stroke, strokeWidth: defaults.strokeWidth, radius: defaults.radius, opacity: defaults.opacity, strokeDash: defaults.strokeDash }] }
+    }));
+    setSelected([id]);
+    onToolChange?.('select');
+    setRectDraft(null);
+  }, [isRectMode, rectDraft, altPressed, shiftPressed, setSpec, onToolChange]);
+
   const onMouseDown = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
+    // Rectangle tool creation pathway
+    if (isRectMode) {
+      if (e.evt.button !== 0) return; // left only
+      const stage = e.target.getStage(); if (!stage) return;
+      // Allow starting a rectangle even if over an existing shape (common UX in design tools)
+      const pointer = stage.getPointerPosition(); if (!pointer) return;
+      const world = toWorld(stage, pointer);
+      setRectDraft({ start: world, current: world });
+      return;
+    }
     if (!isSelectMode) return;
     const stage = e.target.getStage();
     if (!stage) return;
@@ -250,6 +320,13 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   const onMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     const stage = e.target.getStage();
     if (!stage) return;
+    if (isRectMode) {
+      if (!rectDraft) return;
+      const pointer = stage.getPointerPosition(); if (!pointer) return;
+      const worldPos = toWorld(stage, pointer);
+      setRectDraft(prev => prev ? { ...prev, current: worldPos } : prev);
+      return;
+    }
     if (!isSelectMode) return;
 
     if (panning) {
@@ -314,6 +391,9 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   const onMouseUp = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     const stage = e.target.getStage();
     if (!stage) return;
+
+    // Finalize rectangle creation
+    if (isRectMode && rectDraft) { finalizeRect(); return; }
 
     if (panning) {
       setPanning(false);
@@ -416,7 +496,39 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
         initialSelection: [],
       });
     }
-  }, [panning, dragState, marqueeState, spec.root.id, getTopContainerAncestor, normalizeSelection, setSpec]);
+  }, [panning, dragState, marqueeState, spec.root.id, getTopContainerAncestor, normalizeSelection, setSpec, isRectMode, rectDraft, finalizeRect]);
+
+  // Global listeners for rectangle draft (supports dragging outside stage bounds)
+  useEffect(() => {
+    if (!isRectMode || !rectDraft) return;
+    const stage = stageRef.current; if (!stage) return;
+    const onMove = (ev: MouseEvent) => {
+      // Use raw client coords relative to stage container
+      const rect = stage.container().getBoundingClientRect();
+      const px = ev.clientX - rect.left;
+      const py = ev.clientY - rect.top;
+      // Ignore if outside container (optional: still extend)
+      const world = { x: (px - stage.x()) / stage.scaleX(), y: (py - stage.y()) / stage.scaleY() };
+      setRectDraft(prev => prev ? { ...prev, current: world } : prev);
+    };
+    const onUp = () => { finalizeRect(); };
+    window.addEventListener('mousemove', onMove, true);
+    window.addEventListener('mouseup', onUp, true);
+    return () => {
+      window.removeEventListener('mousemove', onMove, true);
+      window.removeEventListener('mouseup', onUp, true);
+    };
+  }, [isRectMode, rectDraft, finalizeRect]);
+
+  // Cancel rectangle draft with Escape
+  useEffect(() => {
+    if (!isRectMode || !rectDraft) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setRectDraft(null); }
+    };
+    window.addEventListener('keydown', onKey, { capture: true });
+    return () => window.removeEventListener('keydown', onKey, { capture: true } as any);
+  }, [isRectMode, rectDraft]);
 
   // Single click handler for empty canvas
   const onClick = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -463,11 +575,15 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   // Track spacebar for panning mode
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
+      const tgt = e.target as HTMLElement | null;
+      if (tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA' || tgt.isContentEditable)) return;
       if (e.code === 'Space') { setSpacePan(true); e.preventDefault(); }
       if (e.key === 'Shift') setShiftPressed(true);
       if (e.key === 'Alt') setAltPressed(true);
     };
     const up = (e: KeyboardEvent) => {
+      const tgt = e.target as HTMLElement | null;
+      if (tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA' || tgt.isContentEditable)) return;
       if (e.code === 'Space') { setSpacePan(false); }
       if (e.key === 'Shift') setShiftPressed(false);
       if (e.key === 'Alt') setAltPressed(false);
@@ -653,12 +769,18 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
 
   // Normalize selection on changes
   useEffect(() => {
-    if (selected.length === 0) return;
+    if (selected.length === 0) {
+      onSelectionChange?.([]);
+      return;
+    }
     const norm = normalizeSelection(selected);
     if (norm.length !== selected.length || norm.some((id, i) => id !== selected[i])) {
       setSelected(norm);
+      onSelectionChange?.(norm);
+    } else {
+      onSelectionChange?.(selected);
     }
-  }, [selected, normalizeSelection]);
+  }, [selected, normalizeSelection, onSelectionChange]);
 
   // Transformer target attachment
   useEffect(() => {
@@ -946,7 +1068,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   };
 
   return (
-    <div ref={wrapperRef} style={{ position: 'relative', width, height }} onContextMenu={onWrapperContextMenu}>
+  <div ref={wrapperRef} style={{ position: 'relative', width, height, cursor: isRectMode ? 'crosshair' : undefined }} onContextMenu={onWrapperContextMenu}>
       <Stage 
         ref={stageRef} 
         width={width} 
@@ -1013,6 +1135,42 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
             stroke={'#3b82f6'}
             dash={[4,4]}
           />
+          {/* Rectangle draft preview */}
+          {isRectMode && rectDraft && (() => {
+            const { start, current } = rectDraft;
+            let x = start.x; let y = start.y; let w = current.x - start.x; let h = current.y - start.y;
+            const alt = altPressed; const shift = shiftPressed;
+            if (alt) {
+              w = (current.x - start.x) * 2;
+              h = (current.y - start.y) * 2;
+            }
+            if (shift) {
+              const m = Math.max(Math.abs(w), Math.abs(h));
+              w = Math.sign(w || 1) * m;
+              h = Math.sign(h || 1) * m;
+            }
+            if (alt) {
+              x = start.x - Math.abs(w)/2;
+              y = start.y - Math.abs(h)/2;
+              w = Math.abs(w); h = Math.abs(h);
+            } else {
+              if (w < 0) { x = x + w; w = Math.abs(w);} 
+              if (h < 0) { y = y + h; h = Math.abs(h);} 
+            }
+            return (
+              <Rect
+                x={x}
+                y={y}
+                width={Math.max(1, w)}
+                height={Math.max(1, h)}
+                fill={'rgba(255,255,255,0.35)'}
+                stroke={'#334155'}
+                strokeWidth={1}
+                dash={[6,4]}
+                listening={false}
+              />
+            );
+          })()}
         </Layer>
       </Stage>
       
@@ -1162,6 +1320,17 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
               }}
               className="px-3 py-1.5 w-full text-left hover:bg-gray-100"
             >Reset Text Scale</button>
+          )}
+          {/* Delete */}
+          {selected.length > 0 && (
+            <button
+              onClick={() => {
+                setSpec(prev => deleteNodes(prev, new Set(selected)));
+                setSelected([]);
+                setMenu(null);
+              }}
+              className="px-3 py-1.5 w-full text-left hover:bg-red-50 text-red-600"
+            >Delete</button>
           )}
           <div className="h-px bg-gray-200 my-1" />
           <button 

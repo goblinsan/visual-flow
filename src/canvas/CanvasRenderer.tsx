@@ -1,6 +1,6 @@
 import { Group, Rect, Text } from "react-konva";
 import { type ReactNode } from "react";
-import type { LayoutNode, FrameNode, StackNode, TextNode, BoxNode, GridNode, GroupNode, ImageNode } from "../layout-schema.ts";
+import type { LayoutNode, FrameNode, StackNode, TextNode, BoxNode, GridNode, GroupNode, ImageNode, RectNode } from "../layout-schema.ts";
 import { CanvasImage } from "./components/CanvasImage";
 import { debugOnce, logger } from "../utils/logger";
 
@@ -46,6 +46,35 @@ function renderBox(n: BoxNode) {
         shadowBlur={4}
       />
       {n.children?.map(renderNode)}
+    </Group>
+  );
+}
+
+// Rect (shape)
+function renderRect(n: RectNode) {
+  const x = n.position?.x ?? 0;
+  const y = n.position?.y ?? 0;
+  const w = n.size?.width ?? 80;
+  const h = n.size?.height ?? 60;
+  // Allow disabling fill/stroke by setting them explicitly to undefined.
+  // (Empty string also treated as disabled to avoid Konva defaulting to black.)
+  const fillVal = (n.fill === undefined || n.fill === '') ? undefined : n.fill;
+  const strokeVal = (n.stroke === undefined || n.stroke === '') ? undefined : n.stroke;
+  const bothOff = fillVal === undefined && strokeVal === undefined;
+  return (
+    <Group key={n.id} id={n.id} name={`node ${n.type}`} x={x} y={y} rotation={n.rotation ?? 0} opacity={n.opacity ?? 1}>
+      <Rect
+        width={w}
+        height={h}
+        fill={fillVal}
+        fillEnabled={fillVal !== undefined}
+        stroke={bothOff ? '#94a3b8' : strokeVal}
+        strokeEnabled={bothOff ? true : strokeVal !== undefined}
+        strokeWidth={bothOff ? 1 : strokeVal !== undefined ? (n.strokeWidth ?? 1) : 0}
+        opacity={bothOff ? 0.4 : undefined}
+        dash={bothOff ? [3,3] : (strokeVal !== undefined && n.strokeDash && n.strokeDash.length ? n.strokeDash : undefined)}
+        cornerRadius={n.radius ?? 0}
+      />
     </Group>
   );
 }
@@ -201,6 +230,7 @@ export function renderNode(n: LayoutNode): ReactNode {
     case "grid": return renderGrid(n as GridNode);
     case "group": return renderGroup(n as GroupNode);
     case "image": return renderImage(n as ImageNode);
+  case "rect": return renderRect(n as RectNode);
     default:
       logger.warn('Unknown node type', (n as any).type, n);
       return null;

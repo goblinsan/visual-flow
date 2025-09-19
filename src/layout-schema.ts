@@ -7,6 +7,7 @@ export type NodeType =
   | "text"
   | "image"
   | "box"
+  | "rect"
   | "group";
 
 export interface BaseNode {
@@ -109,6 +110,16 @@ export interface BoxNode extends BaseNode, Partial<AbsoluteChild> {
   children?: LayoutNode[];
 }
 
+/** Simple rectangle shape node (no children). */
+export interface RectNode extends BaseNode, Partial<AbsoluteChild> {
+  type: "rect";
+  fill?: string;         // CSS fill color
+  stroke?: string;       // CSS stroke color
+  strokeWidth?: number;  // px
+  radius?: number;       // corner radius px
+  strokeDash?: number[]; // dash pattern e.g., [4,4]
+}
+
 export type LayoutNode =
   | FrameNode
   | GroupNode
@@ -116,7 +127,8 @@ export type LayoutNode =
   | GridNode
   | TextNode
   | ImageNode
-  | BoxNode;
+  | BoxNode
+  | RectNode;
 
 export interface LayoutSpec {
   root: FrameNode;

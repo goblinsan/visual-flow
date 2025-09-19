@@ -9,7 +9,6 @@
 - Toolbar: Save, Save As, Export to Roblox.
 
 ## Guardrails
- - Keep Schema v2 authoritative; write migrations for old files.
  - Avoid breaking exports: add tests for React/Roblox exporters.
  - Use react-konva for canvas; keep renderer pure.
  - Don’t mutate .github/workflows/* except to add new tests for exporters.
