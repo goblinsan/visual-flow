@@ -1,5 +1,6 @@
 import { useCallback, useLayoutEffect, useRef, useState, useEffect } from "react";
 import { parseColor, toHex, addRecentColor } from './utils/color';
+import { findNode, updateNode } from './utils/specUtils';
 import { Modal } from "./components/Modal";
 import { logger } from "./utils/logger";
 import CanvasStage from "./canvas/CanvasStage.tsx";
@@ -118,8 +119,7 @@ export default function CanvasApp() {
   useEffect(() => {
     // If exactly one rectangle selected, mirror its strokeDash
     if (selectedIds.length === 1) {
-      const findNode = (n:any, id:string): any | null => { if (n.id===id) return n; if (n.children) { for (const c of n.children) { const f=findNode(c,id); if (f) return f; } } return null; };
-      const node = findNode(spec.root, selectedIds[0]);
+      const node = findNode(spec.root as any, selectedIds[0]);
       if (node && node.type === 'rect') {
         const dashStr = node.strokeDash ? node.strokeDash.join(' ') : '';
         setRawDashInput(prev => prev === dashStr ? prev : dashStr);
@@ -305,16 +305,12 @@ export default function CanvasApp() {
             </div>
             {selectedIds.length === 1 && (() => {
               // Find node
-              const findNode = (n:any, id:string): any | null => { if (n.id===id) return n; if (n.children) { for (const c of n.children) { const f=findNode(c,id); if (f) return f;} } return null; };
-              const node = findNode(spec.root, selectedIds[0]);
+              const node = findNode(spec.root as any, selectedIds[0]);
               if (!node) return <div className="text-[11px] text-gray-400">Node not found.</div>;
               if (node.type === 'rect') {
                 const rect = node as any;
                 const updateRect = (patch: Record<string, any>) => {
-                  setSpec(prev => ({
-                    ...prev,
-                    root: (function mapAll(n:any):any { if (n.id===rect.id) return { ...n, ...patch }; if (n.children) return { ...n, children: n.children.map(mapAll)}; return n; })(prev.root)
-                  }));
+                  setSpec(prev => ({ ...prev, root: updateNode(prev.root as any, rect.id, patch) as any }));
                 };
                 const parseDash = (val:string): number[] | undefined => {
                   const trimmed = val.trim(); if (!trimmed) return undefined;
