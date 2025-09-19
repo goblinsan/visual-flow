@@ -57,13 +57,26 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
 
   const isSelectMode = tool === "select";
   const [spacePan, setSpacePan] = useState(false);
-  const [transforming, setTransforming] = useState(false);
+  // Track shift key globally for aspect-ratio constrained resize
+  const [shiftPressed, setShiftPressed] = useState(false);
+  // Track Alt/Option for centered scaling
+  const [altPressed, setAltPressed] = useState(false);
 
   // Konva refs
   const stageRef = useRef<Konva.Stage>(null);
   const trRef = useRef<Konva.Transformer>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const marqueeRectRef = useRef<Konva.Rect>(null);
+
+  // Transform session snapshot (captured at first transform frame)
+  const [transformSession, setTransformSession] = useState<null | {
+    nodes: Record<string, {
+      topLeft: { x: number; y: number };
+      size: { width: number; height: number };
+      center: { x: number; y: number };
+    }>;
+    selectionBox?: { x: number; y: number; width: number; height: number; center: { x: number; y: number } };
+  }>(null);
 
   // Utility: world coordinate conversion
   const toWorld = useCallback((stage: Konva.Stage, p: { x: number; y: number }) => ({
@@ -116,11 +129,40 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     return out;
   }, [getTopContainerAncestor, spec.root.id]);
 
+  // Helper to check if target is transformer-related
+  const isTransformerTarget = useCallback((target: any): boolean => {
+    if (!target) return false;
+    
+    // Direct transformer check
+    if (target.getClassName && target.getClassName() === 'Transformer') {
+      return true;
+    }
+    
+    // Check ancestors
+    let current = target;
+    while (current && current.getStage) {
+      if (current.getClassName && current.getClassName() === 'Transformer') {
+        return true;
+      }
+      const parent = current.getParent();
+      if (!parent || parent === current.getStage()) break;
+      current = parent;
+    }
+    
+    return false;
+  }, []);
+
   // Enhanced mouse handlers with proper interaction detection
   const onMouseDown = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     if (!isSelectMode) return;
     const stage = e.target.getStage();
     if (!stage) return;
+
+    // Don't process selection if clicking on transformer handles
+    if (isTransformerTarget(e.target)) {
+  // transformer interaction: ignore selection logic
+      return;
+    }
 
     // Handle panning
     if (e.evt.button === 1 || (e.evt.button === 0 && (e.evt.altKey || spacePan))) {
@@ -203,7 +245,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     }
     
     setMenu(null);
-  }, [isSelectMode, spacePan, spec.root.id, toWorld, selected, getTopContainerAncestor, normalizeSelection]);
+  }, [isSelectMode, spacePan, spec.root.id, toWorld, selected, getTopContainerAncestor, normalizeSelection, isTransformerTarget]);
 
   const onMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     const stage = e.target.getStage();
@@ -241,9 +283,9 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
             });
           }
         }
-        stage.batchDraw();
         // Force re-render of selection outlines during drag
-        setTransforming(prev => !prev);
+        // A bit of a hack, but it works for now
+        trRef.current?.forceUpdate();
       }
       return;
     }
@@ -384,11 +426,18 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     const stage = e.target.getStage();
     if (!stage) return;
     
+    // Don't clear selection if clicking on transformer handles
+    if (isTransformerTarget(e.target)) {
+  // clicking transformer: keep selection
+      return;
+    }
+    
     if (e.target === stage && !dragState.hasPassedThreshold && !marqueeState.active) {
+  // empty stage click: clear selection
       setSelected([]);
       setMenu(null);
     }
-  }, [isSelectMode, dragState.hasPassedThreshold, marqueeState.active]);
+  }, [isSelectMode, dragState.hasPassedThreshold, marqueeState.active, isTransformerTarget]);
 
   // Wheel zoom
   const onWheel = useCallback((e: Konva.KonvaEventObject<WheelEvent>) => {
@@ -415,9 +464,13 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.code === 'Space') { setSpacePan(true); e.preventDefault(); }
+      if (e.key === 'Shift') setShiftPressed(true);
+      if (e.key === 'Alt') setAltPressed(true);
     };
     const up = (e: KeyboardEvent) => {
       if (e.code === 'Space') { setSpacePan(false); }
+      if (e.key === 'Shift') setShiftPressed(false);
+      if (e.key === 'Alt') setAltPressed(false);
     };
     window.addEventListener('keydown', down, { capture: true });
     window.addEventListener('keyup', up, { capture: true });
@@ -426,6 +479,14 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       window.removeEventListener('keyup', up, { capture: true } as any);
     };
   }, []);
+
+  // Reflect altPressed to transformer centeredScaling dynamically
+  useEffect(() => {
+    const tr = trRef.current; if (!tr) return;
+    tr.centeredScaling(altPressed);
+    tr.forceUpdate();
+    tr.getLayer()?.batchDraw();
+  }, [altPressed]);
 
   // Context menu (right click)
   const onWrapperContextMenu = useCallback((e: React.MouseEvent) => {
@@ -606,70 +667,283 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     const stage = tr.getStage();
     if (!stage) return;
     const targets = selected.map(id => stage.findOne(`#${CSS.escape(id)}`)).filter(Boolean) as Konva.Node[];
+  // attach transformer to current selection
     tr.nodes(targets);
     tr.getLayer()?.batchDraw();
   }, [selected]);
 
   // Handle ongoing transform (during drag/resize)
   const onTransform = useCallback(() => {
-    setTransforming(prev => !prev); // Toggle to force re-render
+    // Initialize transform session snapshot once per gesture.
+    if (transformSession) return; // already captured
+    const tr = trRef.current; if (!tr) return;
+    const stage = tr.getStage(); if (!stage) return;
+    const nodes = tr.nodes(); if (!nodes.length) return;
+
+    const snapshot: {
+      nodes: Record<string, { topLeft: {x:number;y:number}; size:{width:number;height:number}; center:{x:number;y:number} }>;
+      selectionBox?: { x:number; y:number; width:number; height:number; center:{x:number;y:number} };
+    } = { nodes: {} };
+
+    let minX = Number.POSITIVE_INFINITY, minY = Number.POSITIVE_INFINITY;
+    let maxX = Number.NEGATIVE_INFINITY, maxY = Number.NEGATIVE_INFINITY;
+
+    nodes.forEach(n => {
+      const id = n.id(); if (!id) return;
+      // Derive untransformed size from spec (source of truth)
+      const specNode = (function find(node:any, id:string):any|null { if (node.id===id) return node; if (node.children) { for (const c of node.children) { const f=find(c,id); if (f) return f; } } return null; })(spec.root, id);
+      let width = 0, height = 0;
+      if (specNode?.size) { width = specNode.size.width; height = specNode.size.height; }
+      else {
+        // Fallback to Konva bounding box (approx for text/etc.)
+        const bb = n.getClientRect({ relativeTo: stage });
+        width = bb.width; height = bb.height;
+      }
+      const topLeft = { x: n.x(), y: n.y() };
+      const center = { x: topLeft.x + width / 2, y: topLeft.y + height / 2 };
+      snapshot.nodes[id] = { topLeft, size: { width, height }, center };
+      minX = Math.min(minX, center.x); minY = Math.min(minY, center.y);
+      maxX = Math.max(maxX, center.x); maxY = Math.max(maxY, center.y);
+    });
+
+    if (nodes.length > 1 && isFinite(minX) && isFinite(minY) && isFinite(maxX) && isFinite(maxY)) {
+      const selW = maxX - minX;
+      const selH = maxY - minY;
+      snapshot.selectionBox = { x: minX, y: minY, width: selW, height: selH, center: { x: minX + selW/2, y: minY + selH/2 } };
+    }
+
+    setTransformSession(snapshot);
   }, []);
 
-  // Commit transform (resize)
+  // Find a node in the spec by its ID
+  const findNode = (node: any, id: string): any | null => {
+    if (node.id === id) return node;
+    if (node.children) {
+      for (const child of node.children) {
+        const found = findNode(child, id);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+
+  // Commit transform (resize, scale, rotate)
   const onTransformEnd = useCallback(() => {
     const nodes = trRef.current?.nodes() ?? [];
-    nodes.forEach(n => {
-      const nodeId = n.id?.();
-      if (!nodeId) return;
-      const k = n as unknown as Konva.Node & { 
-        scaleX(): number; scaleY(): number; 
-        scaleX(v: number): void; scaleY(v: number): void; 
-        width?(): number; height?(): number; 
-        size?(): { width: number; height: number }; 
-        position(): { x: number; y: number } 
-      };
-      const sx = k.scaleX?.() ?? 1;
-      const sy = k.scaleY?.() ?? 1;
-      const base = k.size?.() ?? { width: k.width?.(), height: k.height?.() };
-      const newW = (base?.width ?? 0) * sx;
-      const newH = (base?.height ?? 0) * sy;
-      const { x: newX, y: newY } = k.position?.() ?? { x: 0, y: 0 };
-      k.scaleX?.(1); k.scaleY?.(1);
-      
-      setSpec(prev => {
-        let next = applyPositionAndSize(prev, nodeId, { x: newX, y: newY }, { width: newW, height: newH });
-        const specNode = selectionContext.nodeById[nodeId];
-        if (specNode?.type === 'group' && specNode.size && specNode.size.width && specNode.size.height && Array.isArray(specNode.children)) {
-          const prevW = specNode.size.width || 1;
-          const prevH = specNode.size.height || 1;
-          const sxC = prevW ? newW / prevW : 1;
-          const syC = prevH ? newH / prevH : 1;
-          
-          function map(nl: any): any {
-            if (nl.id === nodeId && Array.isArray(nl.children)) {
-              return { 
-                ...nl, 
-                size: { width: newW, height: newH }, 
-                children: nl.children.map((c: any) => {
-                  const cpos = c.position ?? { x: 0, y: 0 };
-                  const csize = c.size ?? null;
-                  const newPos = { x: cpos.x * sxC, y: cpos.y * syC };
-                  let newSize = csize;
-                  if (csize) newSize = { width: csize.width * sxC, height: csize.height * syC };
-                  return { ...c, position: newPos, size: newSize ?? c.size };
-                }) 
-              };
+    if (nodes.length === 0) return;
+  // const session = transformSession; // snapshot no longer used in current simplified bake
+    
+    // For multi-selection, we need to get the transform values that were applied to all nodes
+    // and apply them uniformly to our spec
+  if (nodes.length > 1) {
+  // multi-selection transform bake
+      // NOTE: Current implementation still naive for relative offsets; we only remove cumulative rotation bug here.
+      const firstNode = nodes[0];
+      const scaleX = firstNode.scaleX();
+      const scaleY = firstNode.scaleY();
+      const rotationDeg = firstNode.rotation(); // absolute final rotation
+  // collective transform values captured
+      nodes.forEach(node => {
+        const nodeId = node.id(); if (!nodeId) return;
+        const currentNode = findNode(spec.root, nodeId); if (!currentNode) return;
+        const newPos = { x: node.x(), y: node.y() }; // Konva final top-left already adjusted for center-rotation illusion
+        // Store position directly (remove prior inverse compensation)
+        setSpec(prev => applyPosition(prev, nodeId, newPos));
+        // Store absolute rotation (no cumulative addition)
+        setSpec(prev => ({
+          ...prev,
+            root: mapNode(prev.root, nodeId, (n: any) => ({
+              ...n,
+              rotation: rotationDeg
+            }))
+        }));
+        // Scaling logic: text nodes accumulate glyph scale; others resize as before
+        if (scaleX !== 1 || scaleY !== 1) {
+          if (currentNode.type === 'text') {
+            // For text nodes in multi-selection, Konva node.scaleX()/scaleY() already represent absolute glyph scale.
+            const absX = Math.max(0.05, node.scaleX());
+            const absY = Math.max(0.05, node.scaleY());
+            setSpec(prev => ({
+              ...prev,
+              root: mapNode(prev.root, nodeId, (n: any) => n.type === 'text' ? { ...n, textScaleX: absX, textScaleY: absY } : n)
+            }));
+          } else if (currentNode.size) {
+            const newSize = {
+              width: Math.round(currentNode.size.width * scaleX),
+              height: Math.round(currentNode.size.height * scaleY)
+            };
+            if (currentNode.type === 'image') {
+              const nonUniform = Math.abs(scaleX - scaleY) > 0.0001;
+              setSpec(prev => ({
+                ...prev,
+                root: mapNode(prev.root, nodeId, (n: any) => {
+                  if (n.type !== 'image') return n;
+                  return {
+                    ...n,
+                    position: { x: newPos.x, y: newPos.y },
+                    size: newSize,
+                    preserveAspect: nonUniform ? false : (n.preserveAspect !== undefined ? n.preserveAspect : true),
+                    objectFit: nonUniform ? undefined : n.objectFit
+                  };
+                })
+              }));
+            } else {
+              setSpec(prev => applyPositionAndSize(prev, nodeId, newPos, newSize));
             }
-            if (Array.isArray(nl.children)) return { ...nl, children: nl.children.map(map) };
-            return nl;
           }
-          next = { ...next, root: map(next.root) };
         }
-        return next;
+        node.scaleX(1); node.scaleY(1); node.rotation(0);
       });
-    });
-    trRef.current?.getLayer()?.batchDraw();
-  }, [setSpec, selectionContext]);
+    } else {
+      // Single node transform
+      const node = nodes[0];
+      const nodeId = node.id();
+      if (!nodeId) return;
+
+      const newPos = { x: node.x(), y: node.y() };
+      const scaleX = node.scaleX();
+      const scaleY = node.scaleY();
+      const rotationDeg = node.rotation(); // absolute degrees
+
+  // single node transform bake
+
+      const currentNode = findNode(spec.root, nodeId);
+      if (!currentNode) return;
+      
+      const isGroup = currentNode?.type === 'group';
+
+      // Store the position exactly as provided by Konva (already adjusted for center-rotation illusion)
+      setSpec(prev => applyPosition(prev, nodeId, newPos));
+      // Set absolute rotation (no cumulative add)
+      setSpec(prev => ({
+        ...prev,
+        root: mapNode(prev.root, nodeId, (n: any) => ({
+          ...n,
+          rotation: rotationDeg
+        }))
+      }));
+      
+      // Handle scaling
+      if (scaleX !== 1 || scaleY !== 1) {
+        if (isGroup && currentNode.children) {
+          // For groups: scale the group container and all children
+          // scaling group and children
+          
+          setSpec(prev => ({
+            ...prev,
+            root: mapNode(prev.root, nodeId, (groupNode: any) => {
+              if (groupNode.type !== 'group') return groupNode;
+              
+              // Scale the group's size if it has one
+              let newGroupSize = groupNode.size;
+              if (groupNode.size) {
+                newGroupSize = {
+                  width: Math.round(groupNode.size.width * scaleX),
+                  height: Math.round(groupNode.size.height * scaleY)
+                };
+              }
+              
+              // Scale all children positions and sizes
+              const scaledChildren = groupNode.children.map((child: any) => {
+                const scaledChild = { ...child };
+                
+                // Scale position
+                if (child.position) {
+                  scaledChild.position = {
+                    x: Math.round(child.position.x * scaleX),
+                    y: Math.round(child.position.y * scaleY)
+                  };
+                }
+                
+                // Scale size
+                if (child.size) {
+                  scaledChild.size = {
+                    width: Math.round(child.size.width * scaleX),
+                    height: Math.round(child.size.height * scaleY)
+                  };
+                }
+                
+                return scaledChild;
+              });
+              
+              return {
+                ...groupNode,
+                size: newGroupSize,
+                children: scaledChildren
+              };
+            })
+          }));
+        } else if (currentNode.type === 'text') {
+          // Persist absolute Konva scale as glyph scale
+          const absX = Math.max(0.05, node.scaleX());
+          const absY = Math.max(0.05, node.scaleY());
+          setSpec(prev => ({
+            ...prev,
+            root: mapNode(prev.root, nodeId, (n: any) => n.type === 'text' ? { ...n, textScaleX: absX, textScaleY: absY } : n)
+          }));
+        } else {
+          // For individual non-text nodes: scale size
+          if (currentNode && currentNode.size) {
+            const newSize = {
+              width: Math.round(currentNode.size.width * scaleX),
+              height: Math.round(currentNode.size.height * scaleY)
+            };
+            if (currentNode.type === 'image') {
+              const nonUniform = Math.abs(scaleX - scaleY) > 0.0001;
+              setSpec(prev => ({
+                ...prev,
+                root: mapNode(prev.root, nodeId, (n: any) => {
+                  if (n.type !== 'image') return n;
+                  return {
+                    ...n,
+                    position: { x: newPos.x, y: newPos.y },
+                    size: newSize,
+                    preserveAspect: nonUniform ? false : (n.preserveAspect !== undefined ? n.preserveAspect : true),
+                    objectFit: nonUniform ? undefined : n.objectFit
+                  };
+                })
+              }));
+            } else {
+              setSpec(prev => applyPositionAndSize(prev, nodeId, newPos, newSize));
+            }
+          }
+        }
+      }
+
+      // Reset the node's transform properties
+      node.scaleX(1);
+      node.scaleY(1);
+      node.rotation(0);
+    }
+
+    // Clear transform session after bake
+    setTransformSession(null);
+
+    // Force transformer to update its targets after React re-renders
+    setTimeout(() => {
+      const tr = trRef.current;
+      if (!tr) return;
+      const stage = tr.getStage();
+      if (!stage) return;
+      
+      // Re-attach transformer to the updated nodes
+      const targets = selected.map(id => stage.findOne(`#${CSS.escape(id)}`)).filter(Boolean) as Konva.Node[];
+  // re-attaching transformer after bake
+      tr.nodes(targets);
+      tr.forceUpdate();
+      tr.getLayer()?.batchDraw();
+    }, 0);
+  }, [setSpec, spec.root, selected, transformSession]);
+
+  // Helper function to map nodes (from stage-internal.ts pattern)
+  const mapNode = (n: any, id: string, f: (n: any) => any): any => {
+    if (n.id === id) return f(n);
+    if (n.children && Array.isArray(n.children)) {
+      const children = n.children.map((c: any) => mapNode(c, id, f));
+      return { ...n, children };
+    }
+    return n;
+  };
 
   return (
     <div ref={wrapperRef} style={{ position: 'relative', width, height }} onContextMenu={onWrapperContextMenu}>
@@ -696,7 +970,31 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
             <Transformer 
               ref={trRef as unknown as React.RefObject<Konva.Transformer>} 
               rotateEnabled={true} 
-              keepRatio={false}
+              resizeEnabled={true}
+              keepRatio={false} // we enforce manually only while shift is held via boundBoxFunc
+              centeredScaling={altPressed}
+              rotationSnaps={[0, 90, 180, 270]}
+              boundBoxFunc={(oldBox, newBox) => {
+                // Prevent scaling to zero or negative size
+                if (newBox.width < 10 || newBox.height < 10) {
+                  return oldBox;
+                }
+                if (!shiftPressed) return newBox;
+                // Constrain proportionally relative to old box when shift held.
+                const aspect = oldBox.width / (oldBox.height || 1);
+                // Determine which dimension changed more in relative terms
+                const dw = Math.abs(newBox.width - oldBox.width);
+                const dh = Math.abs(newBox.height - oldBox.height);
+                if (dw > dh) {
+                  // Width is driver -> derive height
+                  const constrainedHeight = newBox.width / aspect;
+                  return { ...newBox, height: constrainedHeight };
+                } else {
+                  // Height driver -> derive width
+                  const constrainedWidth = newBox.height * aspect;
+                  return { ...newBox, width: constrainedWidth };
+                }
+              }}
               onTransform={onTransform}
               onTransformEnd={onTransformEnd} 
             />
@@ -724,6 +1022,74 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
           style={{ position: 'absolute', left: menu.x, top: menu.y, pointerEvents: 'auto' }}
           className="z-50 text-xs bg-white border border-gray-300 rounded shadow-md select-none min-w-40"
         >
+          {/* Layer ordering actions (true sibling reordering) */}
+          {selected.length > 0 && (
+            (() => {
+              // Build map parentId -> list of child ids selected
+              const parentMap: Record<string, string[]> = {};
+              for (const id of selected) {
+                const p = selectionContext.parentOf[id];
+                if (p) {
+                  parentMap[p] = parentMap[p] ? [...parentMap[p], id] : [id];
+                }
+              }
+              const applyReorder = (mode: 'forward'|'lower'|'top'|'bottom') => {
+                setSpec(prev => ({
+                  ...prev,
+                  root: (function walk(n: any): any {
+                    if (parentMap[n.id]) {
+                      const selectedChildren = new Set(parentMap[n.id]);
+                      const orig = n.children || [];
+                      let newChildren = orig.slice();
+                      if (mode === 'forward') {
+                        // iterate right-to-left swapping with next non-selected
+                        for (let i = newChildren.length - 2; i >= 0; i--) {
+                          if (selectedChildren.has(newChildren[i].id) && !selectedChildren.has(newChildren[i+1].id)) {
+                            const tmp = newChildren[i+1];
+                            newChildren[i+1] = newChildren[i];
+                            newChildren[i] = tmp;
+                          }
+                        }
+                      } else if (mode === 'lower') {
+                        // iterate left-to-right swapping with previous non-selected
+                        for (let i = 1; i < newChildren.length; i++) {
+                          if (selectedChildren.has(newChildren[i].id) && !selectedChildren.has(newChildren[i-1].id)) {
+                            const tmp = newChildren[i-1];
+                            newChildren[i-1] = newChildren[i];
+                            newChildren[i] = tmp;
+                          }
+                        }
+                      } else if (mode === 'top') {
+                        const moving = newChildren.filter((c: any) => selectedChildren.has(c.id));
+                        const staying = newChildren.filter((c: any) => !selectedChildren.has(c.id));
+                        newChildren = [...staying, ...moving];
+                      } else if (mode === 'bottom') {
+                        const moving = newChildren.filter((c: any) => selectedChildren.has(c.id));
+                        const staying = newChildren.filter((c: any) => !selectedChildren.has(c.id));
+                        newChildren = [...moving, ...staying];
+                      }
+                      n = { ...n, children: newChildren.map((c: any) => walk(c)) };
+                      return n;
+                    }
+                    if (Array.isArray(n.children)) {
+                      return { ...n, children: n.children.map((c: any) => walk(c)) };
+                    }
+                    return n;
+                  })(prev.root)
+                }));
+                setMenu(null);
+              };
+              return (
+                <>
+                  <button onClick={() => applyReorder('forward')} className="px-3 py-1.5 w-full text-left hover:bg-gray-100">Move Forward</button>
+                  <button onClick={() => applyReorder('top')} className="px-3 py-1.5 w-full text-left hover:bg-gray-100">Move To Top</button>
+                  <button onClick={() => applyReorder('lower')} className="px-3 py-1.5 w-full text-left hover:bg-gray-100">Move Lower</button>
+                  <button onClick={() => applyReorder('bottom')} className="px-3 py-1.5 w-full text-left hover:bg-gray-100">Move To Bottom</button>
+                  <div className="h-px bg-gray-200 my-1" />
+                </>
+              );
+            })()
+          )}
           <button 
             disabled={!canGroup}
             onClick={() => { if (canGroup) performGroup(); else setMenu(null); }}
@@ -738,6 +1104,65 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
           >
             Ungroup
           </button>
+          {/* Re-enable aspect for stretched image(s) */}
+          {selected.length > 0 && (() => {
+            const anyStretch = selected.some(id => {
+              const node = selectionContext.nodeById[id];
+              return node?.type === 'image' && node.preserveAspect === false;
+            });
+            return anyStretch;
+          })() && (
+            <button
+              onClick={() => {
+                setSpec(prev => ({
+                  ...prev,
+                  root: mapNode(prev.root, '__bulk__', (n: any) => n) // placeholder (we'll map individually below)
+                }));
+                // Apply per node update
+                setSpec(prev => ({
+                  ...prev,
+                  root: (function mapAll(n: any): any {
+                    if (selected.includes(n.id) && n.type === 'image' && n.preserveAspect === false) {
+                      return { ...n, preserveAspect: true, objectFit: n.objectFit || 'contain' };
+                    }
+                    if (Array.isArray(n.children)) {
+                      return { ...n, children: n.children.map(mapAll) };
+                    }
+                    return n;
+                  })(prev.root)
+                }));
+                setMenu(null);
+              }}
+              className="px-3 py-1.5 w-full text-left hover:bg-gray-100"
+            >
+              Re-enable Aspect
+            </button>
+          )}
+          {/* Reset Text Scale (only if any selected text node has scale !=1) */}
+          {selected.length > 0 && (() => {
+            const anyScaled = selected.some(id => {
+              const node = selectionContext.nodeById[id];
+              return node?.type === 'text' && ((node.textScaleX && Math.abs(node.textScaleX - 1) > 0.001) || (node.textScaleY && Math.abs(node.textScaleY - 1) > 0.001));
+            });
+            return anyScaled;
+          })() && (
+            <button
+              onClick={() => {
+                setSpec(prev => ({
+                  ...prev,
+                  root: (function mapAll(n: any): any {
+                    if (selected.includes(n.id) && n.type === 'text') {
+                      return { ...n, textScaleX: 1, textScaleY: 1 };
+                    }
+                    if (Array.isArray(n.children)) return { ...n, children: n.children.map(mapAll) };
+                    return n;
+                  })(prev.root)
+                }));
+                setMenu(null);
+              }}
+              className="px-3 py-1.5 w-full text-left hover:bg-gray-100"
+            >Reset Text Scale</button>
+          )}
           <div className="h-px bg-gray-200 my-1" />
           <button 
             onClick={() => setMenu(null)} 

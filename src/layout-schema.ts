@@ -82,6 +82,10 @@ export interface TextNode extends BaseNode, Partial<AbsoluteChild> {
   variant?: "h1" | "h2" | "h3" | "body" | "caption";
   color?: string;        // CSS color
   align?: "left" | "center" | "right";
+  /** Persistent horizontal glyph scale (1 = original). */
+  textScaleX?: number;
+  /** Persistent vertical glyph scale (1 = original). */
+  textScaleY?: number;
 }
 
 /** Image leaf node. */
@@ -91,6 +95,8 @@ export interface ImageNode extends BaseNode, Partial<AbsoluteChild> {
   alt?: string;
   radius?: number;       // px
   objectFit?: "cover" | "contain";
+  /** If false, allow stretched (non-uniform) rendering ignoring objectFit scaling */
+  preserveAspect?: boolean;
 }
 
 /** Generic box/container that can optionally hold children. */
