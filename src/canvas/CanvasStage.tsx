@@ -760,11 +760,12 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
         // Scaling logic: text nodes accumulate glyph scale; others resize as before
         if (scaleX !== 1 || scaleY !== 1) {
           if (currentNode.type === 'text') {
-            const sx = Math.max(0.05, (currentNode.textScaleX ?? 1) * scaleX);
-            const sy = Math.max(0.05, (currentNode.textScaleY ?? 1) * scaleY);
+            // For text nodes in multi-selection, Konva node.scaleX()/scaleY() already represent absolute glyph scale.
+            const absX = Math.max(0.05, node.scaleX());
+            const absY = Math.max(0.05, node.scaleY());
             setSpec(prev => ({
               ...prev,
-              root: mapNode(prev.root, nodeId, (n: any) => n.type === 'text' ? { ...n, textScaleX: sx, textScaleY: sy } : n)
+              root: mapNode(prev.root, nodeId, (n: any) => n.type === 'text' ? { ...n, textScaleX: absX, textScaleY: absY } : n)
             }));
           } else if (currentNode.size) {
             const newSize = {
@@ -873,13 +874,13 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
             })
           }));
         } else if (currentNode.type === 'text') {
-          // Accumulate glyph scales
-            const sx = Math.max(0.05, (currentNode.textScaleX ?? 1) * scaleX);
-            const sy = Math.max(0.05, (currentNode.textScaleY ?? 1) * scaleY);
-            setSpec(prev => ({
-              ...prev,
-              root: mapNode(prev.root, nodeId, (n: any) => n.type === 'text' ? { ...n, textScaleX: sx, textScaleY: sy } : n)
-            }));
+          // Persist absolute Konva scale as glyph scale
+          const absX = Math.max(0.05, node.scaleX());
+          const absY = Math.max(0.05, node.scaleY());
+          setSpec(prev => ({
+            ...prev,
+            root: mapNode(prev.root, nodeId, (n: any) => n.type === 'text' ? { ...n, textScaleX: absX, textScaleY: absY } : n)
+          }));
         } else {
           // For individual non-text nodes: scale size
           if (currentNode && currentNode.size) {
