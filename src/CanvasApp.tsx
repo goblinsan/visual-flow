@@ -1,6 +1,7 @@
 import { useCallback, useLayoutEffect, useRef, useState, useEffect } from "react";
 import { parseColor, toHex, addRecentColor } from './utils/color';
 import { findNode, updateNode } from './utils/specUtils';
+import { parseDashPattern } from './utils/dashPattern';
 import { Modal } from "./components/Modal";
 import { logger } from "./utils/logger";
 import CanvasStage from "./canvas/CanvasStage.tsx";
@@ -309,13 +310,19 @@ export default function CanvasApp() {
               if (!node) return <div className="text-[11px] text-gray-400">Node not found.</div>;
               if (node.type === 'rect') {
                 const rect = node as any;
+                const dashLogEnabled = (() => {
+                  try {
+                    if (typeof window !== 'undefined') {
+                      const urlFlag = new URLSearchParams(window.location.search).has('debugUpdates');
+                      const lsFlag = localStorage.getItem('vf_debug_updates') === '1';
+                      return urlFlag || lsFlag;
+                    }
+                  } catch { /* ignore */ }
+                  return false;
+                })();
                 const updateRect = (patch: Record<string, any>) => {
+                  if (dashLogEnabled) logger.debug('updateNode(rect)', rect.id, patch);
                   setSpec(prev => ({ ...prev, root: updateNode(prev.root as any, rect.id, patch) as any }));
-                };
-                const parseDash = (val:string): number[] | undefined => {
-                  const trimmed = val.trim(); if (!trimmed) return undefined;
-                  const parts = trimmed.split(/[\,\s]+/).map(p => Number(p)).filter(n => !isNaN(n) && n>=1);
-                  return parts.length ? parts : undefined;
                 };
                 return (
                   <div className="space-y-2">
@@ -473,8 +480,8 @@ export default function CanvasApp() {
                         placeholder="e.g. 4 4"
                         value={rawDashInput}
                         onChange={e => { setRawDashInput(e.target.value); }}
-                        onKeyDown={e => { if (e.key === 'Enter') { updateRect({ strokeDash: parseDash(rawDashInput) }); (e.target as HTMLInputElement).blur(); } }}
-                        onBlur={() => updateRect({ strokeDash: parseDash(rawDashInput) })}
+                        onKeyDown={e => { if (e.key === 'Enter') { const { pattern } = parseDashPattern(rawDashInput); updateRect({ strokeDash: pattern.length ? pattern : undefined }); (e.target as HTMLInputElement).blur(); } }}
+                        onBlur={() => { const { pattern } = parseDashPattern(rawDashInput); updateRect({ strokeDash: pattern.length ? pattern : undefined }); }}
                         className="border rounded px-1 py-0.5 text-[11px] font-mono"
                       />
                       <span className="text-[10px] text-gray-400">Space/comma separated numbers. Empty = solid.</span>
@@ -635,13 +642,8 @@ export default function CanvasApp() {
                     placeholder="e.g. 4 4"
                     value={rawDashInput}
                     onChange={e => setRawDashInput(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') { const trimmed = rawDashInput.trim(); if (!trimmed) { setRectDefaults(d => ({ ...d, strokeDash: undefined })); } else { const parts = trimmed.split(/[\,\s]+/).map(p => Number(p)).filter(n => !isNaN(n) && n>=1); setRectDefaults(d => ({ ...d, strokeDash: parts.length ? parts : undefined })); } (e.target as HTMLInputElement).blur(); } }}
-                    onBlur={() => {
-                      const trimmed = rawDashInput.trim();
-                      if (!trimmed) { setRectDefaults(d => ({ ...d, strokeDash: undefined })); return; }
-                      const parts = trimmed.split(/[\,\s]+/).map(p => Number(p)).filter(n => !isNaN(n) && n>=1);
-                      setRectDefaults(d => ({ ...d, strokeDash: parts.length ? parts : undefined }));
-                    }}
+                    onKeyDown={e => { if (e.key === 'Enter') { const { pattern } = parseDashPattern(rawDashInput); setRectDefaults(d => ({ ...d, strokeDash: pattern.length ? pattern : undefined })); (e.target as HTMLInputElement).blur(); } }}
+                    onBlur={() => { const { pattern } = parseDashPattern(rawDashInput); setRectDefaults(d => ({ ...d, strokeDash: pattern.length ? pattern : undefined })); }}
                     className="border rounded px-1 py-0.5 text-[11px] font-mono"
                   />
                   <span className="text-[10px] text-gray-400">Will apply to next rectangle.</span>
