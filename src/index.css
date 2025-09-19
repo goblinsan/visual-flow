@@ -70,6 +70,9 @@ button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
 
+/* Override padding for compact color swatch buttons (recent colors) */
+button.w-6.h-6.p-0, .recent-color-btn { padding: 0 !important; }
+
 @media (prefers-color-scheme: light) {
   :root {
     color: #213547;

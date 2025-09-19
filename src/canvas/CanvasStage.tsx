@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type Konva from "konva";
 import type { LayoutSpec } from "../layout-schema.ts";
 import { renderNode } from "./CanvasRenderer.tsx";
+import { computeClickSelection, computeMarqueeSelection } from "../renderer/interaction";
 import { deleteNodes, duplicateNodes, nudgeNodes } from "./editing";
 import { applyPosition, applyPositionAndSize, groupNodes, ungroupNodes } from "./stage-internal";
 
@@ -14,16 +15,17 @@ interface CanvasStageProps {
   height?: number;
   tool?: string;
   onToolChange?: (tool: string) => void; // allow CanvasStage to request tool mode changes (e.g., after shape creation)
-  onSelectionChange?: (ids: string[]) => void;
   rectDefaults?: { fill?: string; stroke?: string; strokeWidth: number; radius: number; opacity: number; strokeDash?: number[] };
+  selection: string[];
+  setSelection: (ids: string[]) => void;
 }
 
-function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select", onToolChange, onSelectionChange, rectDefaults }: CanvasStageProps) {
+function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select", onToolChange, rectDefaults, selection, setSelection }: CanvasStageProps) {
   // View / interaction state
   const [scale, setScale] = useState(1);
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const [panning, setPanning] = useState(false);
-  const [selected, setSelected] = useState<string[]>([]);
+  const selected = selection;
   const [menu, setMenu] = useState<null | { x: number; y: number }>(null);
   
   // Interaction state
@@ -189,7 +191,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
         ...prev,
         root: { ...prev.root, children: [...prev.root.children, { id, type: 'rect', position: topLeft, size: sizeFinal, fill: defaults.fill, stroke: defaults.stroke, strokeWidth: defaults.strokeWidth, radius: defaults.radius, opacity: defaults.opacity, strokeDash: defaults.strokeDash }] }
       }));
-      setSelected([id]);
+  setSelection([id]);
       onToolChange?.('select');
       setRectDraft(null);
       return;
@@ -208,7 +210,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       ...prev,
       root: { ...prev.root, children: [...prev.root.children, { id, type: 'rect', position: { x: x1, y: y1 }, size: finalSize, fill: defaults.fill, stroke: defaults.stroke, strokeWidth: defaults.strokeWidth, radius: defaults.radius, opacity: defaults.opacity, strokeDash: defaults.strokeDash }] }
     }));
-    setSelected([id]);
+  setSelection([id]);
     onToolChange?.('select');
     setRectDraft(null);
   }, [isRectMode, rectDraft, altPressed, shiftPressed, setSpec, onToolChange]);
@@ -257,23 +259,8 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
         const nodeId = getTopContainerAncestor(stage, rawId);
         const isShiftClick = e.evt.shiftKey || e.evt.ctrlKey;
         
-        let newSelection = selected;
-        
-        if (isShiftClick) {
-          // Multi-select logic
-          if (selected.includes(nodeId)) {
-            newSelection = selected.filter(id => id !== nodeId);
-          } else {
-            newSelection = [...selected, nodeId];
-          }
-        } else {
-          // Single select logic
-          if (!selected.includes(nodeId)) {
-            newSelection = [nodeId];
-          }
-        }
-        
-        setSelected(normalizeSelection(newSelection));
+        const newSelection = computeClickSelection({ current: selected, clickedId: nodeId, isMultiModifier: isShiftClick });
+        setSelection(normalizeSelection(newSelection));
         
         // Prepare for potential drag
         const nodesToDrag = newSelection.includes(nodeId) ? newSelection : [nodeId];
@@ -311,7 +298,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     
     // Clear selection if not using shift
     if (!e.evt.shiftKey && !e.evt.ctrlKey) {
-      setSelected([]);
+  setSelection([]);
     }
     
     setMenu(null);
@@ -463,23 +450,8 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
         }
         
         // Update selection based on marquee
-        let newSelection: string[];
-        if (marqueeState.isShiftModifier) {
-          // Toggle selection
-          const baseSelection = new Set(marqueeState.initialSelection);
-          for (const nodeId of intersectingNodes) {
-            if (baseSelection.has(nodeId)) {
-              baseSelection.delete(nodeId);
-            } else {
-              baseSelection.add(nodeId);
-            }
-          }
-          newSelection = Array.from(baseSelection);
-        } else {
-          newSelection = intersectingNodes;
-        }
-        
-        setSelected(normalizeSelection(newSelection));
+        const newSelection = computeMarqueeSelection({ base: marqueeState.initialSelection, hits: intersectingNodes, isToggleModifier: marqueeState.isShiftModifier });
+        setSelection(normalizeSelection(newSelection));
       }
       
       // Hide marquee
@@ -546,7 +518,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     
     if (e.target === stage && !dragState.hasPassedThreshold && !marqueeState.active) {
   // empty stage click: clear selection
-      setSelected([]);
+  setSelection([]);
       setMenu(null);
     }
   }, [isSelectMode, dragState.hasPassedThreshold, marqueeState.active, isTransformerTarget]);
@@ -623,7 +595,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
         const id = getTopContainerAncestor(stage, rawId);
         // Only change selection if right-clicking on an unselected item
         if (!selected.includes(id)) {
-          setSelected(normalizeSelection([id]));
+          setSelection(normalizeSelection([id]));
         }
       }
     }
@@ -677,7 +649,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   }, [selected, selectionContext]);
 
   const performGroup = useCallback(() => {
-    if (!canGroup) { setMenu(null); return; }
+  if (!canGroup) { setMenu(null); return; }
     setMenu(null);
     const before = new Set(selected);
     const next = groupNodes(spec, before);
@@ -692,7 +664,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       if (Array.isArray(n.children)) n.children.forEach(scan);
     })(next.root);
     setSpec(next);
-    if (newGroup) setSelected([newGroup]);
+  if (newGroup) setSelection([newGroup]);
   }, [canGroup, selected, spec, setSpec]);
 
   const performUngroup = useCallback(() => {
@@ -713,7 +685,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     let next = ungroupNodes(spec, new Set([gId]));
     childAbs.forEach(cr => { next = applyPosition(next, cr.id, cr.abs); });
     setSpec(next);
-    setSelected(childAbs.map(c => c.id));
+  setSelection(childAbs.map(c => c.id));
   }, [canUngroup, selected, spec, setSpec]);
 
   // Keyboard shortcuts
@@ -739,7 +711,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
         setSpec(prev => deleteNodes(prev, new Set(selected)));
-        setSelected([]);
+  setSelection([]);
         return;
       }
       
@@ -770,17 +742,14 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   // Normalize selection on changes
   useEffect(() => {
     if (selected.length === 0) {
-      onSelectionChange?.([]);
+      // parent controls selection; nothing to do if empty
       return;
     }
     const norm = normalizeSelection(selected);
     if (norm.length !== selected.length || norm.some((id, i) => id !== selected[i])) {
-      setSelected(norm);
-      onSelectionChange?.(norm);
-    } else {
-      onSelectionChange?.(selected);
+      setSelection(norm);
     }
-  }, [selected, normalizeSelection, onSelectionChange]);
+  }, [selected, normalizeSelection, setSelection]);
 
   // Transformer target attachment
   useEffect(() => {
@@ -1326,7 +1295,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
             <button
               onClick={() => {
                 setSpec(prev => deleteNodes(prev, new Set(selected)));
-                setSelected([]);
+                setSelection([]);
                 setMenu(null);
               }}
               className="px-3 py-1.5 w-full text-left hover:bg-red-50 text-red-600"

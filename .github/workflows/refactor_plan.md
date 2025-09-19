@@ -152,3 +152,24 @@ Tests: Added coverage for variant mapping, text height, stack aggregation, group
 Rationale: Centralizes measurement heuristics for future refinement (real text metrics, caching) without touching rendering code.
 Reversibility: Replace import with previous inline functions.
 Next Opportunities: Introduce width estimation; unify gap accumulation semantics (consider not adding gap after last child in future – would be behavior change requiring tests).
+
+Phase 8 – Selection Interaction Extraction (2025-09-19)
+Summary: Extracted the minimal, pure selection logic (single click selection + marquee toggle/replace semantics) from `CanvasStage.tsx` into `renderer/interaction.ts` to reduce imperative branching in the stage component and enable focused unit testing of selection behavior.
+Files Added:
+ - `src/renderer/interaction.ts`
+ - `src/renderer/interaction.test.ts` (9 tests)
+Files Modified:
+ - `src/canvas/CanvasStage.tsx` (replaced inline click + marquee selection branches with calls to helpers)
+Behavior Parity: Yes. Verified that:
+ - Plain click on already-selected node preserves full multi-selection.
+ - Shift/Ctrl (multi-modifier) toggles membership.
+ - Marquee without modifier replaces selection with intersecting promoted ids.
+ - Marquee with modifier toggles each intersecting id relative to selection at marquee start.
+Tests: Added explicit coverage for single add, toggle remove, multi-add, mixed toggle, marquee union vs toggle. Full suite now 22 files / 98 tests (all passing at extraction commit).
+Rationale: Establishes first interaction seam; lowers risk for forthcoming extraction of drag movement, marquee hit-testing, and keyboard command logic by isolating pure state transition rules early.
+Reversibility: Delete helper imports and inline prior logic (single file diff) – no schema or event contract changes.
+Follow-ups (not yet executed):
+ - Extract drag threshold + position delta application into pure helper (returns new positions + pass-threshold flag).
+ - Extract marquee hit-test to operate on a precomputed array of node bounds (preparation for spatial index / perf improvements).
+ - Consolidate keyboard shortcut behaviors (group, ungroup, nudge, duplicate, delete) into a command dispatcher for future undo/redo integration.
+ - Add integration tests chaining click → marquee → click to validate multi-path coherence.
