@@ -2,7 +2,7 @@
 
 Baseline Tag: `refactor-baseline-v1`
 Date: 2025-09-19
-Status: Main branch contains extracted paint, measurement, rect visual, selection interaction helpers. Feature branch milestone progress: Milestone 1 (Drag & Marquee) COMPLETE (2025-09-19) – proceeding to Command Dispatch Layer.
+Status: Main branch contains extracted paint, measurement, rect visual, selection interaction helpers. Feature branch milestone progress: Milestone 1 (Drag & Marquee) COMPLETE (2025-09-19). Milestone 2 (Command Dispatch Layer) IN PROGRESS (first command `UpdateNodeProps` implemented & tested, inversion semantics validated; next: remaining atomic commands + executor integration).
 
 ## Guiding Principles
 - Incremental, behavior-parity refactors precede capability changes.
