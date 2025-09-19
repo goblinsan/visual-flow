@@ -3,12 +3,15 @@
  * Phase 1 extraction: no behavior change vs inline functions previously embedded in components.
  */
 
-export interface SpecNode {
+export interface SpecNodeBase {
   id: string;
   type: string;
   children?: SpecNode[];
-  [key: string]: any; // allow extra properties
+  // Flexible additional properties retained, but typed as unknown to avoid opaque any.
+  [key: string]: unknown;
 }
+
+export type SpecNode = SpecNodeBase; // Future: discriminate by type
 
 export interface RootLike { root: SpecNode; }
 
@@ -28,7 +31,9 @@ export function findNode(root: SpecNode, id: string): SpecNode | null {
  * Immutable update: returns new root tree with patch merged into node of matching id.
  * If id not found, original root reference is returned.
  */
-export function updateNode(root: SpecNode, id: string, patch: Record<string, any>): SpecNode {
+export type SpecPatch = Record<string, unknown>;
+
+export function updateNode(root: SpecNode, id: string, patch: SpecPatch): SpecNode {
   let changed = false;
   function walk(n: SpecNode): SpecNode {
     if (n.id === id) {
