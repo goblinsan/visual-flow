@@ -56,15 +56,23 @@ function renderRect(n: RectNode) {
   const y = n.position?.y ?? 0;
   const w = n.size?.width ?? 80;
   const h = n.size?.height ?? 60;
+  // Allow disabling fill/stroke by setting them explicitly to undefined.
+  // (Empty string also treated as disabled to avoid Konva defaulting to black.)
+  const fillVal = (n.fill === undefined || n.fill === '') ? undefined : n.fill;
+  const strokeVal = (n.stroke === undefined || n.stroke === '') ? undefined : n.stroke;
+  const bothOff = fillVal === undefined && strokeVal === undefined;
   return (
     <Group key={n.id} id={n.id} name={`node ${n.type}`} x={x} y={y} rotation={n.rotation ?? 0} opacity={n.opacity ?? 1}>
       <Rect
         width={w}
         height={h}
-        fill={n.fill ?? '#ffffff'}
-        stroke={n.stroke ?? '#334155'}
-        strokeWidth={n.strokeWidth ?? 1}
-        dash={n.strokeDash && n.strokeDash.length ? n.strokeDash : undefined}
+        fill={fillVal}
+        fillEnabled={fillVal !== undefined}
+        stroke={bothOff ? '#94a3b8' : strokeVal}
+        strokeEnabled={bothOff ? true : strokeVal !== undefined}
+        strokeWidth={bothOff ? 1 : strokeVal !== undefined ? (n.strokeWidth ?? 1) : 0}
+        opacity={bothOff ? 0.4 : undefined}
+        dash={bothOff ? [3,3] : (strokeVal !== undefined && n.strokeDash && n.strokeDash.length ? n.strokeDash : undefined)}
         cornerRadius={n.radius ?? 0}
       />
     </Group>
