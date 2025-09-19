@@ -30,5 +30,6 @@ export function ImageCanvas() {
     },
   };
   const [spec, setSpec] = useState<LayoutSpec>(initial);
-  return <CanvasStage spec={spec} setSpec={setSpec} width={640} height={480} />;
+  const [selection, setSelection] = useState<string[]>([]);
+  return <CanvasStage spec={spec} setSpec={setSpec} selection={selection} setSelection={setSelection} width={640} height={480} />;
 }
