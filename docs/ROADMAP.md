@@ -2,7 +2,7 @@
 
 Baseline Tag: `refactor-baseline-v1`
 Date: 2025-09-19
-Status: Main branch contains extracted paint, measurement, rect visual, selection interaction helpers. Feature branch milestone progress: Milestone 1 (Drag & Marquee) COMPLETE (2025-09-19). Milestone 2 (Command Dispatch Layer) IN PROGRESS (first command `UpdateNodeProps` implemented & tested, inversion semantics validated; next: remaining atomic commands + executor integration).
+Status: Main branch contains extracted paint, measurement, rect visual, selection interaction helpers. Feature branch milestone progress: Milestone 1 (Drag & Marquee) COMPLETE (2025-09-19). Milestone 2 (Command Dispatch Layer) PROGRESS: All atomic commands implemented & tested (Update, Delete, Duplicate, Group, Ungroup, Transform). Executor with undo/redo prototype added; next: refactor UI/interaction paths to use executor and finalize history semantics (then graduate to Milestone 3).
 
 ## Guiding Principles
 - Incremental, behavior-parity refactors precede capability changes.
@@ -48,11 +48,13 @@ Tasks:
    - `UngroupNodeCommand(id)`
    - `TransformNodesCommand(updates: {id, position?, size?, rotation?, textScale?}[])`
 3. Tests for each command (apply + invert parity).
-4. Integrate into CanvasApp or a new `useCommandExecutor` hook (still without history stack, direct apply only).
+4. Integrate into CanvasApp or a new `useCommandExecutor` hook (prototype executor with simple undo/redo now implemented).
 
-Exit Criteria:
-- Commands reused in existing keyboard/menu pathways.
-- No change in user-visible behavior.
+Exit Criteria (UPDATED - partially met):
+- (DONE) Atomic commands implemented with tests.
+- (PARTIAL) Executor/hook created; pending wiring of existing mutation pathways.
+- (PENDING) All keyboard/menu paths dispatch commands.
+- No change in user-visible behavior during refactor.
 
 ## Milestone 3: Undo/Redo Foundation
 Goal: Provide reversible history of applied commands with bounded memory.
