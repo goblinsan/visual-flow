@@ -1,5 +1,6 @@
 import { Stage, Layer, Transformer, Rect, Group } from "react-konva";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from 'react-dom';
 import type Konva from "konva";
 import type { LayoutSpec } from "../layout-schema.ts";
 import { renderNode } from "./CanvasRenderer.tsx";
@@ -7,12 +8,15 @@ import { computeClickSelection, computeMarqueeSelection } from "../renderer/inte
 import { beginDrag, updateDrag, finalizeDrag } from "../interaction/drag";
 import type { DragSession } from "../interaction/types";
 import { beginMarquee, updateMarquee, finalizeMarquee, type MarqueeSession } from "../interaction/marquee";
-import { deleteNodes, duplicateNodes, nudgeNodes } from "./editing"; // legacy helpers (will be replaced)
+// Removed legacy editing helpers (deleteNodes, duplicateNodes, nudgeNodes) in favor of command execution
 import { createDeleteNodesCommand } from '../commands/deleteNodes';
 import { createDuplicateNodesCommand } from '../commands/duplicateNodes';
 import { createInsertRectCommand } from '../commands/insertRect';
+import { createTransformNodesCommand } from '../commands/transformNodes';
 import { computeRectDraft } from './rectDraft';
-import { applyPosition, applyPositionAndSize, groupNodes, ungroupNodes } from "./stage-internal";
+// stage-internal legacy helpers no longer required for command-based mutations (group/ungroup handled via commands)
+import { createGroupNodesCommand } from '../commands/groupNodes';
+import { createUngroupNodeCommand } from '../commands/ungroupNode';
 
 // Props
 interface CanvasStageProps {
@@ -26,9 +30,22 @@ interface CanvasStageProps {
   setSelection: (ids: string[]) => void;
   executeCommand?: (cmd: any) => void; // executor integration (optional until full migration)
   setSpec?: (spec: LayoutSpec | ((prev: LayoutSpec) => LayoutSpec)) => void; // temporary for legacy paths
+  /**
+   * Test-only hook: when provided, CanvasStage will call this once with an API surface
+   * allowing tests to imperatively access the Konva stage, transformer, and trigger
+   * transform end neutralization logic. Intentionally undocumented for production usage.
+   */
+  exposeApi?: (api: {
+    getStage: () => Konva.Stage | null;
+    getTransformer: () => Konva.Transformer | null;
+    forceTransformEnd: () => void;
+    getMarqueeRect?: () => Konva.Rect | null;
+    rotateNode?: (id: string, deg: number) => void;
+    getNodeClientRect?: (id: string) => { x: number; y: number; width: number; height: number } | null;
+  }) => void;
 }
 
-function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select", onToolChange, rectDefaults, selection, setSelection, executeCommand }: CanvasStageProps) {
+function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select", onToolChange, rectDefaults, selection, setSelection, executeCommand, exposeApi }: CanvasStageProps) {
   // View / interaction state
   const [scale, setScale] = useState(1);
   const [pos, setPos] = useState({ x: 0, y: 0 });
@@ -42,6 +59,20 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
 
   // Marquee session (pure helper based)
   const [marqueeSession, setMarqueeSession] = useState<MarqueeSession | null>(null);
+
+  // Centralized marquee cleanup utility (placed right after marqueeSession definition so callbacks below can depend on it)
+  const clearMarqueeRef = useRef<() => void>(() => {});
+  const clearMarquee = useCallback(() => {
+    setMarqueeSession(null);
+    const rect = marqueeRectRef.current;
+    if (rect) {
+      rect.visible(false);
+      rect.size({ width: 0, height: 0 });
+      rect.position({ x: 0, y: 0 });
+      rect.getLayer()?.batchDraw();
+    }
+  }, []);
+  clearMarqueeRef.current = clearMarquee;
 
   const isSelectMode = tool === "select";
   const isRectMode = tool === 'rect';
@@ -58,6 +89,8 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   const marqueeRectRef = useRef<Konva.Rect>(null);
   // Flag to suppress immediate deselect from post-creation click
   const justCreatedRef = useRef(false);
+  // Internal: control initial transformer visibility to avoid flicker on freshly created groups
+  const [transformerReady, setTransformerReady] = useState(true);
 
   // Transform session snapshot (captured at first transform frame)
   const [transformSession, setTransformSession] = useState<null | {
@@ -144,83 +177,89 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   }, []);
 
   // Enhanced mouse handlers with proper interaction detection
-  // Rectangle draft state
-  const [rectDraft, setRectDraft] = useState<null | {
-    start: { x: number; y: number };
-    current: { x: number; y: number };
-  }>(null);
+  // Rectangle draft state (optimized: ref + rAF for smoother preview)
+  const [rectDraft, setRectDraft] = useState<null | { start: { x: number; y: number }; current: { x: number; y: number } }>(null);
+  const rectDraftRef = useRef<null | { start: { x: number; y: number }; current: { x: number; y: number } }>(null);
+  const rafRef = useRef<number | null>(null);
+  const scheduleDraftRender = useCallback(() => {
+    if (rafRef.current != null) return;
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null;
+      if (rectDraftRef.current) {
+        // shallow clone to trigger React update without allocating each mousemove beyond rAF cadence
+        setRectDraft({ start: rectDraftRef.current.start, current: rectDraftRef.current.current });
+      }
+    });
+  }, []);
 
   // Helper: finalize rectangle (called on mouseup or via global listener)
   const finalizeRect = useCallback(() => {
-    if (!isRectMode || !rectDraft) return;
-  const { start, current } = rectDraft;
-  const alt = altPressed;
-  const shift = shiftPressed;
-  const defaults = rectDefaults || { fill: '#ffffff', stroke: '#334155', strokeWidth: 1, radius: 0, opacity: 1, strokeDash: undefined };
-  if (alt) {
-      const draft = computeRectDraft({ start, current, alt, shift, minSize: 4, clickDefault: { width: 80, height: 60 } });
-      const id = 'rect_' + Math.random().toString(36).slice(2, 9);
-      if (executeCommand) {
-        executeCommand(createInsertRectCommand({
-          parentId: spec.root.id,
-          id,
-          position: draft.position,
-          size: draft.size,
-          fill: defaults.fill,
-          stroke: defaults.stroke,
-          strokeWidth: defaults.strokeWidth,
-          radius: defaults.radius,
-          opacity: defaults.opacity,
-          strokeDash: defaults.strokeDash,
-        }));
-      } else {
-        setSpec?.(prev => ({
-          ...prev,
-          root: { ...prev.root, children: [...prev.root.children, { id, type: 'rect', position: draft.position, size: draft.size, fill: defaults.fill, stroke: defaults.stroke, strokeWidth: defaults.strokeWidth, radius: defaults.radius, opacity: defaults.opacity, strokeDash: defaults.strokeDash }] }
-        }));
-      }
-  setSelection([id]);
-      onToolChange?.('select');
-      justCreatedRef.current = true;
+    if (!isRectMode || !rectDraftRef.current) return;
+    const { start, current } = rectDraftRef.current;
+    const defaults = rectDefaults || { fill: '#ffffff', stroke: '#334155', strokeWidth: 1, radius: 0, opacity: 1, strokeDash: undefined };
+    // Compute draft (alt controls center-out, shift for aspect)
+    const draft = computeRectDraft({
+      start,
+      current,
+      alt: altPressed,
+      shift: shiftPressed,
+      minSize: 4,
+      clickDefault: { width: 80, height: 60 }
+    });
+    const id = 'rect_' + Math.random().toString(36).slice(2, 9);
+    if (!executeCommand) {
+      // Hard fail loudly during refactor if executor wiring missing.
+      // (Previously we had a legacy setSpec fallback; intentionally removed to enforce command flow.)
+      // eslint-disable-next-line no-console
+      console.error('[CanvasStage] Missing executeCommand for rectangle insertion. Command executor not provided.');
+      rectDraftRef.current = null;
       setRectDraft(null);
       return;
     }
-    const draft = computeRectDraft({ start, current, alt: false, shift, minSize: 4, clickDefault: { width: 80, height: 60 } });
-    const id = 'rect_' + Math.random().toString(36).slice(2, 9);
-    if (executeCommand) {
-      executeCommand(createInsertRectCommand({
-        parentId: spec.root.id,
-        id,
-        position: draft.position,
-        size: draft.size,
-        fill: defaults.fill,
-        stroke: defaults.stroke,
-        strokeWidth: defaults.strokeWidth,
-        radius: defaults.radius,
-        opacity: defaults.opacity,
-        strokeDash: defaults.strokeDash,
-      }));
-    } else {
-      setSpec?.(prev => ({
-        ...prev,
-        root: { ...prev.root, children: [...prev.root.children, { id, type: 'rect', position: draft.position, size: draft.size, fill: defaults.fill, stroke: defaults.stroke, strokeWidth: defaults.strokeWidth, radius: defaults.radius, opacity: defaults.opacity, strokeDash: defaults.strokeDash }] }
-      }));
-    }
-  setSelection([id]);
+    executeCommand(createInsertRectCommand({
+      parentId: spec.root.id,
+      id,
+      position: draft.position,
+      size: draft.size,
+      fill: defaults.fill,
+      stroke: defaults.stroke,
+      strokeWidth: defaults.strokeWidth,
+      radius: defaults.radius,
+      opacity: defaults.opacity,
+      strokeDash: defaults.strokeDash,
+    }));
+    setSelection([id]);
     onToolChange?.('select');
     justCreatedRef.current = true;
+    rectDraftRef.current = null;
     setRectDraft(null);
-  }, [isRectMode, rectDraft, altPressed, shiftPressed, setSpec, onToolChange, executeCommand, spec.root.id, rectDefaults]);
+  }, [isRectMode, altPressed, shiftPressed, executeCommand, spec.root.id, rectDefaults, onToolChange, setSelection]);
 
   const onMouseDown = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     // Rectangle tool creation pathway
     if (isRectMode) {
+      // Defensive: ensure any stale marquee is cleared before starting rect draft
+      if (marqueeSession) {
+        const rect = marqueeRectRef.current;
+        if (rect && rect.visible()) {
+          rect.visible(false); rect.size({ width:0, height:0 }); rect.position({ x:0, y:0 }); rect.getLayer()?.batchDraw();
+        }
+      }
       if (e.evt.button !== 0) return; // left only
       const stage = e.target.getStage(); if (!stage) return;
       // Allow starting a rectangle even if over an existing shape (common UX in design tools)
       const pointer = stage.getPointerPosition(); if (!pointer) return;
       const world = toWorld(stage, pointer);
-      setRectDraft({ start: world, current: world });
+      const draft = { start: world, current: world };
+      rectDraftRef.current = draft;
+      setRectDraft(draft); // initial synchronous render
+      // Edge case: very rapid click (down+up) before effect hook installs global listeners.
+      // Install a one-shot mouseup listener synchronously to catch that case.
+      const oneShot = () => {
+        window.removeEventListener('mouseup', oneShot, true);
+        finalizeRect();
+      };
+      window.addEventListener('mouseup', oneShot, true);
       return;
     }
     if (!isSelectMode) return;
@@ -287,11 +326,21 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   const onMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     const stage = e.target.getStage();
     if (!stage) return;
+    // If tool switched away from select while a marquee session existed, hard-clear (mid-drag tool switch)
+    if (!isSelectMode && marqueeSession) {
+      const rect = marqueeRectRef.current;
+      if (rect && rect.visible()) {
+        rect.visible(false); rect.size({ width:0, height:0 }); rect.position({ x:0, y:0 }); rect.getLayer()?.batchDraw();
+      }
+    }
     if (isRectMode) {
-      if (!rectDraft) return;
+      if (!rectDraftRef.current) return;
       const pointer = stage.getPointerPosition(); if (!pointer) return;
       const worldPos = toWorld(stage, pointer);
-      setRectDraft(prev => prev ? { ...prev, current: worldPos } : prev);
+      if (rectDraftRef.current) {
+        rectDraftRef.current.current = worldPos;
+        scheduleDraftRender();
+      }
       return;
     }
     if (!isSelectMode) return;
@@ -352,14 +401,9 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     // Handle drag completion via pure helper
     if (dragSession) {
       const summary = finalizeDrag(dragSession);
-      if (summary.moved.length > 0) {
-  setSpec?.(prev => {
-          let next = prev;
-          for (const mv of summary.moved) {
-            next = applyPosition(next, mv.id, { x: mv.to.x, y: mv.to.y });
-          }
-          return next;
-        });
+      if (summary.moved.length > 0 && executeCommand) {
+        const updates = summary.moved.map(mv => ({ id: mv.id, position: { x: mv.to.x, y: mv.to.y } }));
+        executeCommand(createTransformNodesCommand({ updates }));
       }
       setDragSession(null);
     }
@@ -378,43 +422,54 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
         const newSelection = computeMarqueeSelection({ base: marqueeSession.baseSelection, hits: summary.hits, isToggleModifier: marqueeSession.isToggle });
         setSelection(normalizeSelection(newSelection));
       }
-      const rect = marqueeRectRef.current;
-      if (rect) { rect.visible(false); rect.getLayer()?.batchDraw(); }
-      setMarqueeSession(null);
+      clearMarquee();
     }
-  }, [panning, dragSession, marqueeSession, spec.root.id, getTopContainerAncestor, normalizeSelection, setSpec, isRectMode, rectDraft, finalizeRect]);
+  }, [panning, dragSession, marqueeSession, spec.root.id, getTopContainerAncestor, normalizeSelection, setSpec, isRectMode, finalizeRect, clearMarquee]);
 
   // Global listeners for rectangle draft (supports dragging outside stage bounds)
   useEffect(() => {
-    if (!isRectMode || !rectDraft) return;
+    // Attach global listeners only while actively drafting a rectangle
+    if (!rectDraftRef.current || !isRectMode) return;
     const stage = stageRef.current; if (!stage) return;
+
     const onMove = (ev: MouseEvent) => {
-      // Use raw client coords relative to stage container
       const rect = stage.container().getBoundingClientRect();
       const px = ev.clientX - rect.left;
       const py = ev.clientY - rect.top;
-      // Ignore if outside container (optional: still extend)
       const world = { x: (px - stage.x()) / stage.scaleX(), y: (py - stage.y()) / stage.scaleY() };
-      setRectDraft(prev => prev ? { ...prev, current: world } : prev);
+      if (rectDraftRef.current) {
+        rectDraftRef.current.current = world;
+        scheduleDraftRender();
+      }
     };
-    const onUp = () => { finalizeRect(); };
+    const onUp = () => {
+      // Ensure React state (tool auto-switch) is flushed synchronously for tests
+      flushSync(() => { finalizeRect(); });
+    };
+
+    // Redundantly listen on window AND document (capture + bubble) to satisfy jsdom/test quirks
     window.addEventListener('mousemove', onMove, true);
     window.addEventListener('mouseup', onUp, true);
+    document.addEventListener('mouseup', onUp, true);
+    document.addEventListener('mouseup', onUp); // bubble phase fallback
+
     return () => {
       window.removeEventListener('mousemove', onMove, true);
       window.removeEventListener('mouseup', onUp, true);
+      document.removeEventListener('mouseup', onUp, true);
+      document.removeEventListener('mouseup', onUp);
     };
-  }, [isRectMode, rectDraft, finalizeRect]);
+  }, [isRectMode, rectDraft, finalizeRect, scheduleDraftRender]);
 
   // Cancel rectangle draft with Escape
   useEffect(() => {
-    if (!isRectMode || !rectDraft) return;
+    if (!isRectMode || !rectDraftRef.current) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { setRectDraft(null); }
     };
     window.addEventListener('keydown', onKey, { capture: true });
     return () => window.removeEventListener('keydown', onKey, { capture: true } as any);
-  }, [isRectMode, rectDraft]);
+  }, [isRectMode]);
 
   // Single click handler for empty canvas
   const onClick = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -441,6 +496,13 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       setMenu(null);
     }
   }, [isSelectMode, dragSession, marqueeSession, isTransformerTarget]);
+  // Clear any active marquee visuals/state when leaving select mode (e.g., switching to rect tool)
+  useEffect(() => {
+    if (isSelectMode) return; // only act on transitions away from select
+    if (marqueeSession) {
+      clearMarquee();
+    }
+  }, [isSelectMode, marqueeSession, clearMarquee]);
 
   // Wheel zoom
   const onWheel = useCallback((e: Konva.KonvaEventObject<WheelEvent>) => {
@@ -568,44 +630,35 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   }, [selected, selectionContext]);
 
   const performGroup = useCallback(() => {
-  if (!canGroup) { setMenu(null); return; }
+    if (!canGroup) { setMenu(null); return; }
     setMenu(null);
-    const before = new Set(selected);
-    const next = groupNodes(spec, before);
-    let newGroup: string | null = null;
-    (function scan(n: any) {
-      if (newGroup) return;
-      if (n.type === 'group' && Array.isArray(n.children)) {
-        const childIds = n.children.map((c: any) => c.id);
-        const matches = [...before].every(id => childIds.includes(id)) && !before.has(n.id);
-        if (matches) newGroup = n.id;
-      }
-      if (Array.isArray(n.children)) n.children.forEach(scan);
-    })(next.root);
-  setSpec?.(next);
-  if (newGroup) setSelection([newGroup]);
-  }, [canGroup, selected, spec, setSpec]);
+    if (!executeCommand) {
+      console.error('[CanvasStage] executeCommand missing: group action skipped');
+      return;
+    }
+    const cmd: any = createGroupNodesCommand({ ids: selected });
+    executeCommand(cmd);
+    // Auto-select the created group on next frame so transformer attaches directly to it
+    const createdId = cmd._createdGroupId;
+    if (createdId) {
+      // Defer two frames to allow Konva to construct new group node & children before transformer attaches
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setSelection([createdId]);
+        });
+      });
+    }
+  }, [canGroup, selected, executeCommand]);
 
   const performUngroup = useCallback(() => {
     if (!canUngroup) { setMenu(null); return; }
     setMenu(null);
-    const stage = stageRef.current;
-    if (!stage) return;
-    const gId = selected[0];
-    const gNode = stage.findOne(`#${CSS.escape(gId)}`) as Konva.Group | null;
-    const childAbs: { id: string; abs: { x: number; y: number } }[] = [];
-    if (gNode) {
-      const gPos = gNode.position();
-      gNode.getChildren((n: Konva.Node) => Boolean(n.id())).forEach((c: Konva.Node) => {
-        const cp = (c as any).position ? (c as any).position() : { x: (c as any).x?.() ?? 0, y: (c as any).y?.() ?? 0 };
-        childAbs.push({ id: c.id(), abs: { x: gPos.x + cp.x, y: gPos.y + cp.y } });
-      });
+    if (!executeCommand) {
+      console.error('[CanvasStage] executeCommand missing: ungroup action skipped');
+      return;
     }
-    let next = ungroupNodes(spec, new Set([gId]));
-    childAbs.forEach(cr => { next = applyPosition(next, cr.id, cr.abs); });
-  setSpec?.(next);
-  setSelection(childAbs.map(c => c.id));
-  }, [canUngroup, selected, spec, setSpec]);
+    executeCommand(createUngroupNodeCommand({ id: selected[0] }));
+  }, [canUngroup, selected, executeCommand]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -629,23 +682,17 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       // Delete
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
-        if (executeCommand) {
-          executeCommand(createDeleteNodesCommand({ ids: selected }));
-        } else if (setSpec) {
-          setSpec?.(prev => deleteNodes(prev, new Set(selected)));
-        }
+        if (!executeCommand) console.error('[CanvasStage] executeCommand missing: delete skipped');
+        else executeCommand(createDeleteNodesCommand({ ids: selected }));
         setSelection([]);
         return;
       }
-      
+
       // Duplicate
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
         e.preventDefault();
-        if (executeCommand) {
-          executeCommand(createDuplicateNodesCommand({ ids: selected }));
-        } else {
-          setSpec?.(prev => duplicateNodes(prev, new Set(selected)));
-        }
+        if (!executeCommand) console.error('[CanvasStage] executeCommand missing: duplicate skipped');
+        else executeCommand(createDuplicateNodesCommand({ ids: selected }));
         return;
       }
       
@@ -659,12 +706,21 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       
       if (dx || dy) {
         e.preventDefault();
-  setSpec?.(prev => nudgeNodes(prev, new Set(selected), dx, dy));
+        if (!executeCommand) {
+          console.error('[CanvasStage] executeCommand missing: nudge skipped');
+        } else {
+          const updates = selected.map(id => {
+            const node = selectionContext.nodeById[id];
+            if (!node || !node.position) return null;
+            return { id, position: { x: node.position.x + dx, y: node.position.y + dy } };
+          }).filter(Boolean) as { id: string; position: { x:number; y:number } }[];
+          if (updates.length) executeCommand(createTransformNodesCommand({ updates }));
+        }
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [isSelectMode, canGroup, canUngroup, selected, performGroup, performUngroup, setSpec]);
+  }, [isSelectMode, canGroup, canUngroup, selected, performGroup, performUngroup, executeCommand, selectionContext, setSelection]);
 
   // Normalize selection on changes
   useEffect(() => {
@@ -678,17 +734,69 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     }
   }, [selected, normalizeSelection, setSelection]);
 
-  // Transformer target attachment
+  // Transformer target attachment with flicker suppression for newly created groups
   useEffect(() => {
-    const tr = trRef.current;
-    if (!tr) return;
-    const stage = tr.getStage();
-    if (!stage) return;
+    const tr = trRef.current; if (!tr) return;
+    const stage = tr.getStage(); if (!stage) return;
     const targets = selected.map(id => stage.findOne(`#${CSS.escape(id)}`)).filter(Boolean) as Konva.Node[];
-  // attach transformer to current selection
     tr.nodes(targets);
     tr.getLayer()?.batchDraw();
-  }, [selected]);
+
+  // Default: transformer visible unless we need to stabilize a fresh group measurement
+    setTransformerReady(true);
+
+    if (selected.length === 1) {
+      const selId = selected[0];
+      const specNode = selectionContext.nodeById[selId];
+      if (specNode && specNode.type === 'group' && Array.isArray(specNode.children) && specNode.children.length) {
+        // Compute expected union from spec
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const child of specNode.children) {
+          if (!child.position || !child.size) continue;
+          const x0 = child.position.x;
+          const y0 = child.position.y;
+          const x1 = x0 + child.size.width;
+          const y1 = y0 + child.size.height;
+          if (x0 < minX) minX = x0;
+          if (y0 < minY) minY = y0;
+          if (x1 > maxX) maxX = x1;
+          if (y1 > maxY) maxY = y1;
+        }
+        if (isFinite(minX) && isFinite(minY) && isFinite(maxX) && isFinite(maxY)) {
+          const expectedWidth = maxX - minX;
+          const expectedHeight = maxY - minY;
+          // Use the group node's own rect (not transformer) as ground truth
+          const groupNode = targets[0];
+          if (groupNode) {
+            const bb = groupNode.getClientRect();
+            const epsilon = 0.75;
+            const widthMismatch = Math.abs(bb.width - expectedWidth) > epsilon;
+            const heightMismatch = Math.abs(bb.height - expectedHeight) > epsilon;
+            // If mismatch (likely due to async mount) hide transformer until stable
+            if (widthMismatch || heightMismatch || bb.width < 2 || bb.height < 2) {
+              setTransformerReady(false);
+              let attempts = 0;
+              const maxAttempts = 4;
+              const poll = () => {
+                attempts++;
+                const n = groupNode.getClientRect();
+                const wOk = Math.abs(n.width - expectedWidth) <= epsilon && n.width >= 2;
+                const hOk = Math.abs(n.height - expectedHeight) <= epsilon && n.height >= 2;
+                if (wOk && hOk) {
+                  setTransformerReady(true);
+                  tr.forceUpdate();
+                  tr.getLayer()?.batchDraw();
+                  return;
+                }
+                if (attempts < maxAttempts) requestAnimationFrame(poll); else setTransformerReady(true); // fail-safe
+              };
+              requestAnimationFrame(poll);
+            }
+          }
+        }
+      }
+    }
+  }, [selected, selectionContext]);
 
   // Handle ongoing transform (during drag/resize)
   const onTransform = useCallback(() => {
@@ -749,209 +857,111 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   const onTransformEnd = useCallback(() => {
     const nodes = trRef.current?.nodes() ?? [];
     if (nodes.length === 0) return;
-  // const session = transformSession; // snapshot no longer used in current simplified bake
-    
-    // For multi-selection, we need to get the transform values that were applied to all nodes
-    // and apply them uniformly to our spec
-  if (nodes.length > 1) {
-  // multi-selection transform bake
-      // NOTE: Current implementation still naive for relative offsets; we only remove cumulative rotation bug here.
-      const firstNode = nodes[0];
-      const scaleX = firstNode.scaleX();
-      const scaleY = firstNode.scaleY();
-      const rotationDeg = firstNode.rotation(); // absolute final rotation
-  // collective transform values captured
-      nodes.forEach(node => {
-        const nodeId = node.id(); if (!nodeId) return;
-        const currentNode = findNode(spec.root, nodeId); if (!currentNode) return;
-        const newPos = { x: node.x(), y: node.y() }; // Konva final top-left already adjusted for center-rotation illusion
-        // Store position directly (remove prior inverse compensation)
-  setSpec?.(prev => applyPosition(prev, nodeId, newPos));
-        // Store absolute rotation (no cumulative addition)
-  setSpec?.(prev => ({
-          ...prev,
-            root: mapNode(prev.root, nodeId, (n: any) => ({
-              ...n,
-              rotation: rotationDeg
-            }))
-        }));
-        // Scaling logic: text nodes accumulate glyph scale; others resize as before
-        if (scaleX !== 1 || scaleY !== 1) {
-          if (currentNode.type === 'text') {
-            // For text nodes in multi-selection, Konva node.scaleX()/scaleY() already represent absolute glyph scale.
-            const absX = Math.max(0.05, node.scaleX());
-            const absY = Math.max(0.05, node.scaleY());
-            setSpec?.(prev => ({
-              ...prev,
-              root: mapNode(prev.root, nodeId, (n: any) => n.type === 'text' ? { ...n, textScaleX: absX, textScaleY: absY } : n)
-            }));
-          } else if (currentNode.size) {
-            const newSize = {
-              width: Math.round(currentNode.size.width * scaleX),
-              height: Math.round(currentNode.size.height * scaleY)
-            };
-            if (currentNode.type === 'image') {
-              const nonUniform = Math.abs(scaleX - scaleY) > 0.0001;
-              setSpec?.(prev => ({
-                ...prev,
-                root: mapNode(prev.root, nodeId, (n: any) => {
-                  if (n.type !== 'image') return n;
-                  return {
-                    ...n,
-                    position: { x: newPos.x, y: newPos.y },
-                    size: newSize,
-                    preserveAspect: nonUniform ? false : (n.preserveAspect !== undefined ? n.preserveAspect : true),
-                    objectFit: nonUniform ? undefined : n.objectFit
-                  };
-                })
-              }));
-            } else {
-              setSpec?.(prev => applyPositionAndSize(prev, nodeId, newPos, newSize));
-            }
-          }
-        }
-        node.scaleX(1); node.scaleY(1); node.rotation(0);
-      });
-    } else {
-      // Single node transform
-      const node = nodes[0];
-      const nodeId = node.id();
-      if (!nodeId) return;
+    const neutralizeLater: (() => void)[] = [];
 
-      const newPos = { x: node.x(), y: node.y() };
+    // Build a mapping from id -> spec node for quick lookups
+    const specFind = (id: string) => (function walk(n:any):any|null { if (n.id===id) return n; if (n.children) { for (const c of n.children) { const f = walk(c); if (f) return f; } } return null; })(spec.root);
+
+    // If multi-selection, use first node's scale/rotation as applied transform baseline (Konva's behavior)
+    const first = nodes[0];
+    const commonScaleX = first.scaleX();
+    const commonScaleY = first.scaleY();
+    const commonRotation = first.rotation();
+    const isMulti = nodes.length > 1;
+    const updates: any[] = [];
+
+    const pushOrMerge = (upd: any) => {
+      const existing = updates.find(u => u.id === upd.id);
+      if (existing) Object.assign(existing, upd); else updates.push(upd);
+    };
+
+    nodes.forEach(node => {
+      const id = node.id(); if (!id) return;
+      const specNode = specFind(id); if (!specNode) return;
       const scaleX = node.scaleX();
       const scaleY = node.scaleY();
-      const rotationDeg = node.rotation(); // absolute degrees
+      const rotationDeg = node.rotation();
+      const applyScaleX = isMulti ? commonScaleX : scaleX;
+      const applyScaleY = isMulti ? commonScaleY : scaleY;
+      const applyRot = isMulti ? commonRotation : rotationDeg;
+      const baseUpdate: any = { id, position: { x: node.x(), y: node.y() }, rotation: applyRot };
 
-  // single node transform bake
-
-      const currentNode = findNode(spec.root, nodeId);
-      if (!currentNode) return;
-      
-      const isGroup = currentNode?.type === 'group';
-
-      // Store the position exactly as provided by Konva (already adjusted for center-rotation illusion)
-  setSpec?.(prev => applyPosition(prev, nodeId, newPos));
-      // Set absolute rotation (no cumulative add)
-  setSpec?.(prev => ({
-        ...prev,
-        root: mapNode(prev.root, nodeId, (n: any) => ({
-          ...n,
-          rotation: rotationDeg
-        }))
-      }));
-      
-      // Handle scaling
-      if (scaleX !== 1 || scaleY !== 1) {
-        if (isGroup && currentNode.children) {
-          // For groups: scale the group container and all children
-          // scaling group and children
-          
-          setSpec?.(prev => ({
-            ...prev,
-            root: mapNode(prev.root, nodeId, (groupNode: any) => {
-              if (groupNode.type !== 'group') return groupNode;
-              
-              // Scale the group's size if it has one
-              let newGroupSize = groupNode.size;
-              if (groupNode.size) {
-                newGroupSize = {
-                  width: Math.round(groupNode.size.width * scaleX),
-                  height: Math.round(groupNode.size.height * scaleY)
-                };
-              }
-              
-              // Scale all children positions and sizes
-              const scaledChildren = groupNode.children.map((child: any) => {
-                const scaledChild = { ...child };
-                
-                // Scale position
-                if (child.position) {
-                  scaledChild.position = {
-                    x: Math.round(child.position.x * scaleX),
-                    y: Math.round(child.position.y * scaleY)
-                  };
-                }
-                
-                // Scale size
-                if (child.size) {
-                  scaledChild.size = {
-                    width: Math.round(child.size.width * scaleX),
-                    height: Math.round(child.size.height * scaleY)
-                  };
-                }
-                
-                return scaledChild;
-              });
-              
-              return {
-                ...groupNode,
-                size: newGroupSize,
-                children: scaledChildren
+      if (applyScaleX !== 1 || applyScaleY !== 1) {
+        if (specNode.type === 'group' && Array.isArray(specNode.children)) {
+          // Scale group size (if present) and each child rel position/size
+            if (specNode.size) {
+              baseUpdate.size = {
+                width: Math.round(specNode.size.width * applyScaleX),
+                height: Math.round(specNode.size.height * applyScaleY)
               };
-            })
-          }));
-        } else if (currentNode.type === 'text') {
-          // Persist absolute Konva scale as glyph scale
-          const absX = Math.max(0.05, node.scaleX());
-          const absY = Math.max(0.05, node.scaleY());
-          setSpec?.(prev => ({
-            ...prev,
-            root: mapNode(prev.root, nodeId, (n: any) => n.type === 'text' ? { ...n, textScaleX: absX, textScaleY: absY } : n)
-          }));
-        } else {
-          // For individual non-text nodes: scale size
-          if (currentNode && currentNode.size) {
-            const newSize = {
-              width: Math.round(currentNode.size.width * scaleX),
-              height: Math.round(currentNode.size.height * scaleY)
-            };
-            if (currentNode.type === 'image') {
-              const nonUniform = Math.abs(scaleX - scaleY) > 0.0001;
-              setSpec?.(prev => ({
-                ...prev,
-                root: mapNode(prev.root, nodeId, (n: any) => {
-                  if (n.type !== 'image') return n;
-                  return {
-                    ...n,
-                    position: { x: newPos.x, y: newPos.y },
-                    size: newSize,
-                    preserveAspect: nonUniform ? false : (n.preserveAspect !== undefined ? n.preserveAspect : true),
-                    objectFit: nonUniform ? undefined : n.objectFit
-                  };
-                })
-              }));
-            } else {
-              setSpec?.(prev => applyPositionAndSize(prev, nodeId, newPos, newSize));
             }
-          }
+            // Children: replicate legacy behavior by issuing per-child updates
+            specNode.children.forEach((child: any) => {
+              const childUpd: any = { id: child.id };
+              if (child.position) childUpd.position = { x: Math.round(child.position.x * applyScaleX), y: Math.round(child.position.y * applyScaleY) };
+              if (child.size) childUpd.size = { width: Math.round(child.size.width * applyScaleX), height: Math.round(child.size.height * applyScaleY) };
+              pushOrMerge(childUpd);
+            });
+        } else if (specNode.type === 'text') {
+          const absX = Math.max(0.05, applyScaleX);
+          const absY = Math.max(0.05, applyScaleY);
+          baseUpdate.textScaleX = absX; baseUpdate.textScaleY = absY;
+        } else if (specNode.size) {
+          const newSize = { width: Math.round(specNode.size.width * applyScaleX), height: Math.round(specNode.size.height * applyScaleY) };
+          if (specNode.type === 'image') {
+            const nonUniform = Math.abs(applyScaleX - applyScaleY) > 0.0001;
+            baseUpdate.size = newSize;
+            if (nonUniform) { baseUpdate.preserveAspect = false; baseUpdate.objectFit = undefined; }
+          } else { baseUpdate.size = newSize; }
         }
       }
+      pushOrMerge(baseUpdate);
+  // Neutralize scale only; keep rotation so visual state matches spec post-commit.
+  neutralizeLater.push(() => { node.scaleX(1); node.scaleY(1); /* rotation intentionally preserved */ });
+    });
 
-      // Reset the node's transform properties
-      node.scaleX(1);
-      node.scaleY(1);
-      node.rotation(0);
+    if (updates.length && executeCommand) {
+      executeCommand(createTransformNodesCommand({ updates }));
     }
 
-    // Clear transform session after bake
     setTransformSession(null);
-
-    // Force transformer to update its targets after React re-renders
-    setTimeout(() => {
-      const tr = trRef.current;
-      if (!tr) return;
-      const stage = tr.getStage();
-      if (!stage) return;
-      
-      // Re-attach transformer to the updated nodes
+    requestAnimationFrame(() => {
+      neutralizeLater.forEach(fn => fn());
+      const tr = trRef.current; if (!tr) return;
+      const stage = tr.getStage(); if (!stage) return;
       const targets = selected.map(id => stage.findOne(`#${CSS.escape(id)}`)).filter(Boolean) as Konva.Node[];
-  // re-attaching transformer after bake
       tr.nodes(targets);
       tr.forceUpdate();
       tr.getLayer()?.batchDraw();
-    }, 0);
-  }, [setSpec, spec.root, selected, transformSession]);
+    });
+  }, [spec.root, selected, executeCommand]);
+
+  // Test exposure hook
+  useEffect(() => {
+    if (!exposeApi) return;
+    exposeApi({
+      getStage: () => stageRef.current,
+      getTransformer: () => trRef.current,
+      forceTransformEnd: () => { onTransformEnd(); },
+      getMarqueeRect: () => marqueeRectRef.current,
+      rotateNode: (id: string, deg: number) => {
+        const stage = stageRef.current; if (!stage) return;
+        const node = stage.findOne('#' + CSS.escape(id));
+        if (node) {
+          node.rotation(deg);
+          // Ensure transformer picks up change for multi-select baseline
+          trRef.current?.forceUpdate();
+          trRef.current?.getLayer()?.batchDraw();
+        }
+      },
+      getNodeClientRect: (id: string) => {
+        const stage = stageRef.current; if (!stage) return null;
+        const node = stage.findOne('#' + CSS.escape(id));
+        if (!node) return null;
+        return node.getClientRect();
+      }
+    });
+  }, [exposeApi, onTransformEnd]);
 
   // Helper function to map nodes (from stage-internal.ts pattern)
   const mapNode = (n: any, id: string, f: (n: any) => any): any => {
@@ -992,6 +1002,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
               keepRatio={false} // we enforce manually only while shift is held via boundBoxFunc
               centeredScaling={altPressed}
               rotationSnaps={[0, 90, 180, 270]}
+              visible={transformerReady}
               boundBoxFunc={(oldBox, newBox) => {
                 // Prevent scaling to zero or negative size
                 if (newBox.width < 10 || newBox.height < 10) {
@@ -1021,6 +1032,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
           {/* Marquee rectangle */}
           <Rect
             ref={marqueeRectRef}
+            name="vf-marquee-rect"
             x={0}
             y={0}
             width={0}
@@ -1202,7 +1214,11 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
           {selected.length > 0 && (
             <button
               onClick={() => {
-                setSpec?.(prev => deleteNodes(prev, new Set(selected)));
+                if (!executeCommand) {
+                  console.error('[CanvasStage] executeCommand missing: context delete skipped');
+                } else {
+                  executeCommand(createDeleteNodesCommand({ ids: selected }));
+                }
                 setSelection([]);
                 setMenu(null);
               }}
