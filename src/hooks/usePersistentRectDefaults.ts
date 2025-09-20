@@ -24,7 +24,14 @@ export function usePersistentRectDefaults(initial: RectDefaults, opts: UsePersis
   const { key = 'rectDefaults' } = opts;
   const [defaults, setDefaults] = useState<RectDefaults>(() => {
     const loaded = loadRectDefaults();
-    return { ...initial, ...(loaded || {}) };
+    // Merge persisted values over provided initial defaults.
+    // Legacy builds sometimes stored a default dash pattern [5,2] unintentionally. UX expectation now: empty dash by default.
+    // Sanitize that specific legacy artifact to 'undefined'. (If user explicitly sets another pattern it will persist normally.)
+    const merged = { ...initial, ...(loaded || {}) } as RectDefaults;
+    if (Array.isArray(merged.strokeDash) && merged.strokeDash.length === 2 && merged.strokeDash[0] === 5 && merged.strokeDash[1] === 2) {
+      merged.strokeDash = undefined; // clear legacy unintended default
+    }
+    return merged;
   });
   const writeTimer = useRef<number | null>(null);
 

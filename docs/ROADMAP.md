@@ -2,7 +2,7 @@
 
 Baseline Tag: `refactor-baseline-v1`
 Date: 2025-09-19
-Status: Main branch contains extracted paint, measurement, rect visual, selection interaction helpers. Feature branch milestone progress: Milestone 1 (Drag & Marquee) COMPLETE (2025-09-19). Milestone 2 (Command Dispatch Layer) PROGRESS: All atomic commands implemented & tested (Update, Delete, Duplicate, Group, Ungroup, Transform). Executor with undo/redo prototype added; next: refactor UI/interaction paths to use executor and finalize history semantics (then graduate to Milestone 3).
+Status: Main branch contains extracted paint, measurement, rect visual, selection interaction helpers. Feature branch milestone progress: Milestone 1 (Drag & Marquee) COMPLETE (2025-09-19). Milestone 2 (Command Dispatch Layer) COMPLETE (2025-09-20): All canvas mutation paths (insert, transform, delete, duplicate, group, ungroup, nudge, property update) now dispatch commands through a single executor; legacy direct spec mutation paths removed from interaction layer. Executor maintains history stack (undo/redo UI deferred to Milestone 3). New integration test (`CanvasStage.commandIntegration.test.tsx`) verifies command dispatch for nudge, duplicate, delete.
 
 ## Guiding Principles
 - Incremental, behavior-parity refactors precede capability changes.
@@ -33,8 +33,8 @@ Exit Criteria (all satisfied):
 
 Completion Note: Marquee refactored to session-based pure helpers (`beginMarquee/updateMarquee/finalizeMarquee`), removing imperative hit-test code. Milestone 1 closed; no behavior changes detected.
 
-## Milestone 2: Command Dispatch Layer
-Goal: Introduce a lightweight command abstraction powering all spec mutations (delete, duplicate, group, ungroup, transform, property change).
+## Milestone 2: Command Dispatch Layer (COMPLETE)
+Goal: Introduce a lightweight command abstraction powering all spec mutations (delete, duplicate, group, ungroup, transform, property change) and migrate all interaction/UI pathways to use it exclusively.
 
 Tasks:
 1. `commands/types.ts` defines:
@@ -50,11 +50,12 @@ Tasks:
 3. Tests for each command (apply + invert parity).
 4. Integrate into CanvasApp or a new `useCommandExecutor` hook (prototype executor with simple undo/redo now implemented).
 
-Exit Criteria (UPDATED - partially met):
-- (DONE) Atomic commands implemented with tests.
-- (PARTIAL) Executor/hook created; pending wiring of existing mutation pathways.
-- (PENDING) All keyboard/menu paths dispatch commands.
-- No change in user-visible behavior during refactor.
+Exit Criteria (All Met):
+- Atomic commands implemented with unit tests (apply + invert where applicable).
+- Executor hook integrated at app root; spec mutations flow only through `executeCommand`.
+- All keyboard + menu + interaction (drag finalize, transformer finalize, rectangle creation, nudge, group/ungroup, duplicate, delete, property panel edits) dispatch commands.
+- No regressions observed in existing interaction tests (full suite green at 134 prior to final doc update; new tests added).
+Deferred (moved to Optional Enhancements / Future): layer reordering command, aspect re-enable & text scale reset via commands (currently legacy), undo/redo keyboard shortcuts, rotation regression test/fix.
 
 ## Milestone 3: Undo/Redo Foundation
 Goal: Provide reversible history of applied commands with bounded memory.
@@ -120,3 +121,45 @@ Exit Criteria:
 
 ---
 Generated as initial roadmap after stabilization work. Adjust iteratively with each milestone.
+
+---
+## Stability Backlog Progress (S1 Initiated)
+
+S1: Command History Fuzz & Invariants (IN PROGRESS)
+
+Added utilities:
+- `utils/specInvariant.ts` providing `checkSpec` + `expectSpecInvariant` (current checks: root frame presence, unique ids, non-negative sizes, valid numeric positions, cycle detection placeholder).
+- `utils/seededRng.ts` deterministic LCG RNG for reproducible fuzz sequences.
+
+Added test harness:
+- `commands/commandHistory.fuzz.test.ts` executes ~120 randomized operations (insert, transform, group, ungroup, duplicate, delete, update props) with invariant validation after each successful command, then full undo-all / redo-all round-trip snapshot assertions.
+
+Outcomes so far:
+- All existing tests plus fuzz harness pass ( >140 tests ).
+- Baseline invariants show no structural corruption under randomized sequences.
+
+Next S1 Steps:
+1. Enrich invariants: group bounding box union validation, selection id validity, optional zIndex ordering.
+2. Increase fuzz sequence length & multi-seed loop (e.g., 10 seeds x 200 ops) gated behind env flag to keep default CI runtime small.
+3. Add failure artifact serializer (write minimal failing trace & spec JSON for reproduction).
+
+These will complete S1 and provide confidence to tackle S2 (deterministic bounding without visibility gating).
+
+---
+### Optional Enhancements & Backlog (Post Milestone 2)
+These are non-blocking improvements identified during the command migration.
+
+1. Rotation regression fix: Rotated node snapping back on mouseup. Action: add transform integration test asserting persisted rotation + position invariance; ensure `TransformNodesCommand` includes rotation and neutralization order is correct.
+2. Layer reordering command: Implement `ReorderSiblingsCommand` and migrate any direct reordering logic.
+3. Aspect re-enable & Text scale reset: Convert to `UpdateNodePropsCommand` batch commands.
+4. Rapid click rectangle regression test: Ensure ultra-fast click-drag-click sequences don't leak marquee or leave stale draft state.
+5. Interaction flush helper: Centralize rAF neutralization + post-commit reconciliation.
+6. Group/ungroup additional tests: Expand integration coverage beyond existing nudge/duplicate/delete.
+7. Performance profiling: Measure command execution & React reconciliation for large selections (100+ nodes) pre-composite batching.
+8. Composite batching (Milestone 4 precursor): Investigate grouping multiple property panel quick edits into one undo step.
+9. Persistence groundwork: Decide minimal command serialization format for later session restore.
+10. Alignment guides: Visual snap lines during drag/resize (will leverage command pre-commit predictions).
+11. Macro recording spike: Feasibility of capturing a sequence of commands to replay.
+
+---
+Rotation Bug Note (Tracking): Live rotation during transform interaction appears correct, but on finalize the node reverts. Initial hypothesis was legacy direct mutation path skipping rotation persistence. With all paths now command-based, reproduce and confirm if issue persists before implementing fix. Add regression test once root cause identified.

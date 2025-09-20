@@ -49,7 +49,7 @@ function validateAndSnapshot(root: any, ids: string[]): GroupSnapshot | null {
 }
 
 export function createGroupNodesCommand(payload: GroupNodesPayload): Command {
-  return {
+  const cmd: Command & { _createdGroupId?: string } = {
     id: 'group-nodes',
     description: `Group nodes ${payload.ids.join(',')}`,
     apply(ctx: CommandContext) {
@@ -57,25 +57,43 @@ export function createGroupNodesCommand(payload: GroupNodesPayload): Command {
       if (!snapshot) return ctx.spec;
   const { parentId, indices } = snapshot;
       const groupId = `group_${Math.random().toString(36).slice(2,9)}`;
+      (this as any)._createdGroupId = groupId;
 
       function transform(node: any): any {
         if (node.id === parentId && Array.isArray(node.children)) {
           const newChildren: any[] = [];
           const selectedSet = new Set(payload.ids);
-          const groupChildren: any[] = [];
+          const originalSelected: any[] = [];
           node.children.forEach((c: any) => {
-            if (selectedSet.has(c.id)) {
-              groupChildren.push(c);
-            } else {
-              newChildren.push(c);
-            }
+            if (selectedSet.has(c.id)) originalSelected.push(c); else newChildren.push(c);
           });
-          // insert group at position of first selected index
+          // Safety: need at least two
+          if (originalSelected.length < 2) return node;
+          // Compute bounding box (relative to parent space) using position + size fallbacks
+          const boxes = originalSelected.map(c => {
+            const pos = (c && c.position) ? c.position : { x: 0, y: 0 };
+            const size = (c && c.size) ? c.size : { width: 100, height: 100 }; // fallback mirrors legacy logic
+            return { x: pos.x, y: pos.y, w: size.width, h: size.height };
+          });
+          const minX = Math.min(...boxes.map(b => b.x));
+          const minY = Math.min(...boxes.map(b => b.y));
+          const maxX = Math.max(...boxes.map(b => b.x + b.w));
+          const maxY = Math.max(...boxes.map(b => b.y + b.h));
+          const groupWidth = maxX - minX;
+          const groupHeight = maxY - minY;
+          // Adjust child positions to be relative to new group origin (minX, minY)
+          const adjustedChildren = originalSelected.map(c => {
+            const pos = c.position ? c.position : { x: 0, y: 0 };
+            return { ...c, position: { x: pos.x - minX, y: pos.y - minY } };
+          });
+          // Insert group at position of first selected index for stable z-order
           const insertAt = Math.min(...indices);
           newChildren.splice(insertAt, 0, {
             id: groupId,
             type: 'group',
-            children: groupChildren.map(n => n) // keep references (will be cloned on inverse via snapshot)
+            position: { x: minX, y: minY },
+            size: { width: groupWidth, height: groupHeight },
+            children: adjustedChildren
           });
           return { ...node, children: newChildren };
         }
@@ -117,4 +135,5 @@ export function createGroupNodesCommand(payload: GroupNodesPayload): Command {
     },
     invert() { return (this as any)._inverse || null; }
   };
+  return cmd;
 }

@@ -67,6 +67,8 @@ function renderRect(n: RectNode) {
         stroke={v.stroke}
         strokeEnabled={v.strokeEnabled}
         strokeWidth={v.strokeWidth}
+        // Keep stroke width visually constant during scaling gestures; scale effect baked into size not stroke width.
+        strokeScaleEnabled={false}
         opacity={v.opacity}
         dash={v.dash}
         cornerRadius={v.cornerRadius}
@@ -124,6 +126,17 @@ function renderGroup(n: GroupNode) {
   const y = n.position?.y ?? 0;
   return (
     <Group key={n.id} id={n.id} name={`node ${n.type}`} x={x} y={y} rotation={n.rotation ?? 0} opacity={n.opacity ?? 1}>
+      {/* Invisible bounding rect to stabilize transformer initial bounds */}
+      {n.size ? (
+        <Rect
+          width={n.size.width}
+          height={n.size.height}
+          fillEnabled={false}
+          strokeEnabled={false}
+          listening={false}
+          perfectDrawEnabled={false}
+        />
+      ) : null}
       {n.children.map(renderNode)}
     </Group>
   );

@@ -39,7 +39,7 @@ function buildInitialSpec(): LayoutSpec {
 export default function CanvasApp() {
   const { spec, setSpec, reset: resetSpec } = useDesignPersistence({ buildInitial: buildInitialSpec });
   // Command executor (prototype) – initialized once; explicit reset used for full spec replacement
-  const { execute: execCommand, spec: execSpec, reset: resetExecutor } = useCommandExecutor(spec);
+  const { execute: execCommand, spec: execSpec, reset: resetExecutor } = useCommandExecutor(spec as any);
   const [tool, setTool] = useState<string>("select");
   const { selection: selectedIds, setSelection } = useSelection();
   // Rectangle default attributes (persisted)
@@ -123,6 +123,11 @@ export default function CanvasApp() {
   // Derive stage width/height from container size (padding adjustments if needed)
   const stageWidth = Math.max(0, canvasSize.width);
   const stageHeight = Math.max(0, canvasSize.height);
+
+  // NOTE: Legacy `setSpec` mutation paths inside CanvasStage are being migrated to
+  // command execution. We intentionally stop passing a spec mutator down so any
+  // stragglers become type errors during refactor, ensuring all mutations flow
+  // through the executor (Milestone 2 completion prerequisite).
 
   // Close menus on global ESC
   useEffect(() => {
