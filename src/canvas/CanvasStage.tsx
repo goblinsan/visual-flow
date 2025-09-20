@@ -55,6 +55,8 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   const trRef = useRef<Konva.Transformer>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const marqueeRectRef = useRef<Konva.Rect>(null);
+  // Flag to suppress immediate deselect from post-creation click
+  const justCreatedRef = useRef(false);
 
   // Transform session snapshot (captured at first transform frame)
   const [transformSession, setTransformSession] = useState<null | {
@@ -190,6 +192,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       }
   setSelection([id]);
       onToolChange?.('select');
+      justCreatedRef.current = true;
       setRectDraft(null);
       return;
     }
@@ -224,6 +227,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     }
   setSelection([id]);
     onToolChange?.('select');
+    justCreatedRef.current = true;
     setRectDraft(null);
   }, [isRectMode, rectDraft, altPressed, shiftPressed, setSpec, onToolChange, executeCommand, spec.root.id, rectDefaults]);
 
@@ -446,6 +450,11 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     }
     
   if (e.target === stage && !(dragSession?.passedThreshold) && !marqueeSession) {
+    if (justCreatedRef.current) {
+      // Skip one automatic clear right after creation
+      justCreatedRef.current = false;
+      return;
+    }
   // empty stage click: clear selection
   setSelection([]);
       setMenu(null);
