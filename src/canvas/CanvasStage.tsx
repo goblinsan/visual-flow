@@ -11,6 +11,7 @@ import { deleteNodes, duplicateNodes, nudgeNodes } from "./editing"; // legacy h
 import { createDeleteNodesCommand } from '../commands/deleteNodes';
 import { createDuplicateNodesCommand } from '../commands/duplicateNodes';
 import { createInsertRectCommand } from '../commands/insertRect';
+import { computeRectDraft } from './rectDraft';
 import { applyPosition, applyPositionAndSize, groupNodes, ungroupNodes } from "./stage-internal";
 
 // Props
@@ -152,31 +153,19 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   // Helper: finalize rectangle (called on mouseup or via global listener)
   const finalizeRect = useCallback(() => {
     if (!isRectMode || !rectDraft) return;
-    const { start, current } = rectDraft;
-    let x1 = start.x, y1 = start.y, x2 = current.x, y2 = current.y;
-    let w = x2 - x1; let h = y2 - y1;
-    const alt = altPressed;
-    const shift = shiftPressed;
+  const { start, current } = rectDraft;
+  const alt = altPressed;
+  const shift = shiftPressed;
   const defaults = rectDefaults || { fill: '#ffffff', stroke: '#334155', strokeWidth: 1, radius: 0, opacity: 1, strokeDash: undefined };
   if (alt) {
-      w = (current.x - start.x) * 2;
-      h = (current.y - start.y) * 2;
-      if (shift) {
-        const m = Math.max(Math.abs(w), Math.abs(h));
-        w = Math.sign(w || 1) * m; h = Math.sign(h || 1) * m;
-      }
-      const widthF = Math.max(4, Math.abs(w));
-      const heightF = Math.max(4, Math.abs(h));
-      const topLeft = { x: start.x - widthF / 2, y: start.y - heightF / 2 };
-      const isClick = Math.abs(widthF) < 4 && Math.abs(heightF) < 4;
-      const sizeFinal = isClick ? { width: 80, height: 60 } : { width: widthF, height: heightF };
+      const draft = computeRectDraft({ start, current, alt, shift, minSize: 4, clickDefault: { width: 80, height: 60 } });
       const id = 'rect_' + Math.random().toString(36).slice(2, 9);
       if (executeCommand) {
         executeCommand(createInsertRectCommand({
           parentId: spec.root.id,
           id,
-          position: topLeft,
-          size: sizeFinal,
+          position: draft.position,
+          size: draft.size,
           fill: defaults.fill,
           stroke: defaults.stroke,
           strokeWidth: defaults.strokeWidth,
@@ -187,7 +176,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       } else {
         setSpec?.(prev => ({
           ...prev,
-          root: { ...prev.root, children: [...prev.root.children, { id, type: 'rect', position: topLeft, size: sizeFinal, fill: defaults.fill, stroke: defaults.stroke, strokeWidth: defaults.strokeWidth, radius: defaults.radius, opacity: defaults.opacity, strokeDash: defaults.strokeDash }] }
+          root: { ...prev.root, children: [...prev.root.children, { id, type: 'rect', position: draft.position, size: draft.size, fill: defaults.fill, stroke: defaults.stroke, strokeWidth: defaults.strokeWidth, radius: defaults.radius, opacity: defaults.opacity, strokeDash: defaults.strokeDash }] }
         }));
       }
   setSelection([id]);
@@ -196,22 +185,14 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       setRectDraft(null);
       return;
     }
-    if (shift) {
-      const m = Math.max(Math.abs(w), Math.abs(h));
-      w = Math.sign(w || 1) * m; h = Math.sign(h || 1) * m;
-    }
-    if (w < 0) { x1 = x1 + w; w = Math.abs(w); }
-    if (h < 0) { y1 = y1 + h; h = Math.abs(h); }
-    const widthF = Math.max(4, w); const heightF = Math.max(4, h);
-    const isClick = Math.abs(widthF) < 4 && Math.abs(heightF) < 4;
-    const finalSize = isClick ? { width: 80, height: 60 } : { width: widthF, height: heightF };
+    const draft = computeRectDraft({ start, current, alt: false, shift, minSize: 4, clickDefault: { width: 80, height: 60 } });
     const id = 'rect_' + Math.random().toString(36).slice(2, 9);
     if (executeCommand) {
       executeCommand(createInsertRectCommand({
         parentId: spec.root.id,
         id,
-        position: { x: x1, y: y1 },
-        size: finalSize,
+        position: draft.position,
+        size: draft.size,
         fill: defaults.fill,
         stroke: defaults.stroke,
         strokeWidth: defaults.strokeWidth,
@@ -222,7 +203,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     } else {
       setSpec?.(prev => ({
         ...prev,
-        root: { ...prev.root, children: [...prev.root.children, { id, type: 'rect', position: { x: x1, y: y1 }, size: finalSize, fill: defaults.fill, stroke: defaults.stroke, strokeWidth: defaults.strokeWidth, radius: defaults.radius, opacity: defaults.opacity, strokeDash: defaults.strokeDash }] }
+        root: { ...prev.root, children: [...prev.root.children, { id, type: 'rect', position: draft.position, size: draft.size, fill: defaults.fill, stroke: defaults.stroke, strokeWidth: defaults.strokeWidth, radius: defaults.radius, opacity: defaults.opacity, strokeDash: defaults.strokeDash }] }
       }));
     }
   setSelection([id]);
@@ -983,7 +964,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   };
 
   return (
-  <div ref={wrapperRef} style={{ position: 'relative', width, height, cursor: isRectMode ? 'crosshair' : undefined }} onContextMenu={onWrapperContextMenu}>
+	<div ref={wrapperRef} data-testid="vf-stage-wrapper" style={{ position: 'relative', width, height, cursor: isRectMode ? 'crosshair' : undefined }} onContextMenu={onWrapperContextMenu}>
       <Stage 
         ref={stageRef} 
         width={width} 
@@ -1052,32 +1033,13 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
           />
           {/* Rectangle draft preview */}
           {isRectMode && rectDraft && (() => {
-            const { start, current } = rectDraft;
-            let x = start.x; let y = start.y; let w = current.x - start.x; let h = current.y - start.y;
-            const alt = altPressed; const shift = shiftPressed;
-            if (alt) {
-              w = (current.x - start.x) * 2;
-              h = (current.y - start.y) * 2;
-            }
-            if (shift) {
-              const m = Math.max(Math.abs(w), Math.abs(h));
-              w = Math.sign(w || 1) * m;
-              h = Math.sign(h || 1) * m;
-            }
-            if (alt) {
-              x = start.x - Math.abs(w)/2;
-              y = start.y - Math.abs(h)/2;
-              w = Math.abs(w); h = Math.abs(h);
-            } else {
-              if (w < 0) { x = x + w; w = Math.abs(w);} 
-              if (h < 0) { y = y + h; h = Math.abs(h);} 
-            }
+            const draft = computeRectDraft({ start: rectDraft.start, current: rectDraft.current, alt: altPressed, shift: shiftPressed, minSize: 0.0001, clickDefault: { width: 1, height: 1 } });
             return (
               <Rect
-                x={x}
-                y={y}
-                width={Math.max(1, w)}
-                height={Math.max(1, h)}
+                x={draft.position.x}
+                y={draft.position.y}
+                width={Math.max(1, draft.size.width)}
+                height={Math.max(1, draft.size.height)}
                 fill={'rgba(255,255,255,0.35)'}
                 stroke={'#334155'}
                 strokeWidth={1}
