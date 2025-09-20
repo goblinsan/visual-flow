@@ -1,5 +1,7 @@
 import { useCallback, useRef, useState, useEffect } from "react";
-import { findNode, updateNode } from './utils/specUtils';
+import { findNode } from './utils/specUtils';
+import { useCommandExecutor } from './commands/executor';
+import { createUpdateNodePropsCommand } from './commands/updateNodeProps';
 import RectAttributesPanel from './components/RectAttributesPanel';
 import DefaultsPanel from './components/DefaultsPanel';
 import { usePersistentRectDefaults } from './hooks/usePersistentRectDefaults';
@@ -36,6 +38,8 @@ function buildInitialSpec(): LayoutSpec {
 
 export default function CanvasApp() {
   const { spec, setSpec, reset: resetSpec } = useDesignPersistence({ buildInitial: buildInitialSpec });
+  // Command executor (prototype) – initialized once; explicit reset used for full spec replacement
+  const { execute: execCommand, spec: execSpec, reset: resetExecutor } = useCommandExecutor(spec);
   const [tool, setTool] = useState<string>("select");
   const { selection: selectedIds, setSelection } = useSelection();
   // Rectangle default attributes (persisted)
@@ -104,14 +108,16 @@ export default function CanvasApp() {
   // File menu stub handlers
   const fileAction = useCallback((action: string) => {
     if (action === "new") {
+      // Reset persisted spec AND executor internal state
       resetSpec();
-      logger.info('File action new: spec reset');
+      resetExecutor(buildInitialSpec());
+      logger.info('File action new: spec + executor reset');
     }
     if (action === 'save') {
       // Already auto-saving; force save noop here for future explicit export.
       logger.info('File action save (autosave already active)');
     }
-  }, [resetSpec]);
+  }, [resetSpec, resetExecutor]);
 
 
   // Derive stage width/height from container size (padding adjustments if needed)
@@ -249,13 +255,13 @@ export default function CanvasApp() {
             {stageWidth > 0 && stageHeight > 0 && (
               <CanvasStage
                 tool={tool}
-                spec={spec}
-                setSpec={setSpec}
+                spec={execSpec}
                 width={stageWidth}
                 height={stageHeight}
                 onToolChange={setTool}
                 selection={selectedIds}
                 setSelection={setSelection}
+                executeCommand={execCommand}
                 rectDefaults={{
                   fill: rectDefaults.fill,
                   stroke: rectDefaults.stroke,
@@ -280,7 +286,7 @@ export default function CanvasApp() {
             </div>
             {selectedIds.length === 1 && (() => {
               // Find node
-              const node = findNode(spec.root as any, selectedIds[0]);
+              const node = findNode(execSpec.root as any, selectedIds[0]);
               if (!node) return <div className="text-[11px] text-gray-400">Node not found.</div>;
               if (node.type === 'rect') {
                 const rect = node as any;
@@ -296,7 +302,8 @@ export default function CanvasApp() {
                 })();
                 const updateRect = (patch: Record<string, any>) => {
                   if (dashLogEnabled) logger.debug('updateNode(rect)', rect.id, patch);
-                  setSpec(prev => ({ ...prev, root: updateNode(prev.root as any, rect.id, patch) as any }));
+                  // Execute command; underlying executor spec updated
+                  execCommand(createUpdateNodePropsCommand({ id: rect.id, props: patch }));
                 };
                 return (
                   <RectAttributesPanel

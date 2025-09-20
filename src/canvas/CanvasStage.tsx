@@ -7,23 +7,27 @@ import { computeClickSelection, computeMarqueeSelection } from "../renderer/inte
 import { beginDrag, updateDrag, finalizeDrag } from "../interaction/drag";
 import type { DragSession } from "../interaction/types";
 import { beginMarquee, updateMarquee, finalizeMarquee, type MarqueeSession } from "../interaction/marquee";
-import { deleteNodes, duplicateNodes, nudgeNodes } from "./editing";
+import { deleteNodes, duplicateNodes, nudgeNodes } from "./editing"; // legacy helpers (will be replaced)
+import { createDeleteNodesCommand } from '../commands/deleteNodes';
+import { createDuplicateNodesCommand } from '../commands/duplicateNodes';
+import { createInsertRectCommand } from '../commands/insertRect';
 import { applyPosition, applyPositionAndSize, groupNodes, ungroupNodes } from "./stage-internal";
 
 // Props
 interface CanvasStageProps {
   spec: LayoutSpec;
-  setSpec: (spec: LayoutSpec | ((prev: LayoutSpec) => LayoutSpec)) => void;
   width?: number;
   height?: number;
   tool?: string;
-  onToolChange?: (tool: string) => void; // allow CanvasStage to request tool mode changes (e.g., after shape creation)
+  onToolChange?: (tool: string) => void;
   rectDefaults?: { fill?: string; stroke?: string; strokeWidth: number; radius: number; opacity: number; strokeDash?: number[] };
   selection: string[];
   setSelection: (ids: string[]) => void;
+  executeCommand?: (cmd: any) => void; // executor integration (optional until full migration)
+  setSpec?: (spec: LayoutSpec | ((prev: LayoutSpec) => LayoutSpec)) => void; // temporary for legacy paths
 }
 
-function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select", onToolChange, rectDefaults, selection, setSelection }: CanvasStageProps) {
+function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select", onToolChange, rectDefaults, selection, setSelection, executeCommand }: CanvasStageProps) {
   // View / interaction state
   const [scale, setScale] = useState(1);
   const [pos, setPos] = useState({ x: 0, y: 0 });
@@ -165,10 +169,25 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       const isClick = Math.abs(widthF) < 4 && Math.abs(heightF) < 4;
       const sizeFinal = isClick ? { width: 80, height: 60 } : { width: widthF, height: heightF };
       const id = 'rect_' + Math.random().toString(36).slice(2, 9);
-      setSpec(prev => ({
-        ...prev,
-        root: { ...prev.root, children: [...prev.root.children, { id, type: 'rect', position: topLeft, size: sizeFinal, fill: defaults.fill, stroke: defaults.stroke, strokeWidth: defaults.strokeWidth, radius: defaults.radius, opacity: defaults.opacity, strokeDash: defaults.strokeDash }] }
-      }));
+      if (executeCommand) {
+        executeCommand(createInsertRectCommand({
+          parentId: spec.root.id,
+          id,
+          position: topLeft,
+          size: sizeFinal,
+          fill: defaults.fill,
+          stroke: defaults.stroke,
+          strokeWidth: defaults.strokeWidth,
+          radius: defaults.radius,
+          opacity: defaults.opacity,
+          strokeDash: defaults.strokeDash,
+        }));
+      } else {
+        setSpec?.(prev => ({
+          ...prev,
+          root: { ...prev.root, children: [...prev.root.children, { id, type: 'rect', position: topLeft, size: sizeFinal, fill: defaults.fill, stroke: defaults.stroke, strokeWidth: defaults.strokeWidth, radius: defaults.radius, opacity: defaults.opacity, strokeDash: defaults.strokeDash }] }
+        }));
+      }
   setSelection([id]);
       onToolChange?.('select');
       setRectDraft(null);
@@ -184,14 +203,29 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     const isClick = Math.abs(widthF) < 4 && Math.abs(heightF) < 4;
     const finalSize = isClick ? { width: 80, height: 60 } : { width: widthF, height: heightF };
     const id = 'rect_' + Math.random().toString(36).slice(2, 9);
-    setSpec(prev => ({
-      ...prev,
-      root: { ...prev.root, children: [...prev.root.children, { id, type: 'rect', position: { x: x1, y: y1 }, size: finalSize, fill: defaults.fill, stroke: defaults.stroke, strokeWidth: defaults.strokeWidth, radius: defaults.radius, opacity: defaults.opacity, strokeDash: defaults.strokeDash }] }
-    }));
+    if (executeCommand) {
+      executeCommand(createInsertRectCommand({
+        parentId: spec.root.id,
+        id,
+        position: { x: x1, y: y1 },
+        size: finalSize,
+        fill: defaults.fill,
+        stroke: defaults.stroke,
+        strokeWidth: defaults.strokeWidth,
+        radius: defaults.radius,
+        opacity: defaults.opacity,
+        strokeDash: defaults.strokeDash,
+      }));
+    } else {
+      setSpec?.(prev => ({
+        ...prev,
+        root: { ...prev.root, children: [...prev.root.children, { id, type: 'rect', position: { x: x1, y: y1 }, size: finalSize, fill: defaults.fill, stroke: defaults.stroke, strokeWidth: defaults.strokeWidth, radius: defaults.radius, opacity: defaults.opacity, strokeDash: defaults.strokeDash }] }
+      }));
+    }
   setSelection([id]);
     onToolChange?.('select');
     setRectDraft(null);
-  }, [isRectMode, rectDraft, altPressed, shiftPressed, setSpec, onToolChange]);
+  }, [isRectMode, rectDraft, altPressed, shiftPressed, setSpec, onToolChange, executeCommand, spec.root.id, rectDefaults]);
 
   const onMouseDown = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     // Rectangle tool creation pathway
@@ -334,7 +368,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     if (dragSession) {
       const summary = finalizeDrag(dragSession);
       if (summary.moved.length > 0) {
-        setSpec(prev => {
+  setSpec?.(prev => {
           let next = prev;
           for (const mv of summary.moved) {
             next = applyPosition(next, mv.id, { x: mv.to.x, y: mv.to.y });
@@ -558,7 +592,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       }
       if (Array.isArray(n.children)) n.children.forEach(scan);
     })(next.root);
-    setSpec(next);
+  setSpec?.(next);
   if (newGroup) setSelection([newGroup]);
   }, [canGroup, selected, spec, setSpec]);
 
@@ -579,7 +613,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     }
     let next = ungroupNodes(spec, new Set([gId]));
     childAbs.forEach(cr => { next = applyPosition(next, cr.id, cr.abs); });
-    setSpec(next);
+  setSpec?.(next);
   setSelection(childAbs.map(c => c.id));
   }, [canUngroup, selected, spec, setSpec]);
 
@@ -605,15 +639,23 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       // Delete
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
-        setSpec(prev => deleteNodes(prev, new Set(selected)));
-  setSelection([]);
+        if (executeCommand) {
+          executeCommand(createDeleteNodesCommand({ ids: selected }));
+        } else if (setSpec) {
+          setSpec?.(prev => deleteNodes(prev, new Set(selected)));
+        }
+        setSelection([]);
         return;
       }
       
       // Duplicate
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
         e.preventDefault();
-        setSpec(prev => duplicateNodes(prev, new Set(selected)));
+        if (executeCommand) {
+          executeCommand(createDuplicateNodesCommand({ ids: selected }));
+        } else {
+          setSpec?.(prev => duplicateNodes(prev, new Set(selected)));
+        }
         return;
       }
       
@@ -627,7 +669,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       
       if (dx || dy) {
         e.preventDefault();
-        setSpec(prev => nudgeNodes(prev, new Set(selected), dx, dy));
+  setSpec?.(prev => nudgeNodes(prev, new Set(selected), dx, dy));
       }
     };
     window.addEventListener('keydown', handler);
@@ -734,9 +776,9 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
         const currentNode = findNode(spec.root, nodeId); if (!currentNode) return;
         const newPos = { x: node.x(), y: node.y() }; // Konva final top-left already adjusted for center-rotation illusion
         // Store position directly (remove prior inverse compensation)
-        setSpec(prev => applyPosition(prev, nodeId, newPos));
+  setSpec?.(prev => applyPosition(prev, nodeId, newPos));
         // Store absolute rotation (no cumulative addition)
-        setSpec(prev => ({
+  setSpec?.(prev => ({
           ...prev,
             root: mapNode(prev.root, nodeId, (n: any) => ({
               ...n,
@@ -749,7 +791,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
             // For text nodes in multi-selection, Konva node.scaleX()/scaleY() already represent absolute glyph scale.
             const absX = Math.max(0.05, node.scaleX());
             const absY = Math.max(0.05, node.scaleY());
-            setSpec(prev => ({
+            setSpec?.(prev => ({
               ...prev,
               root: mapNode(prev.root, nodeId, (n: any) => n.type === 'text' ? { ...n, textScaleX: absX, textScaleY: absY } : n)
             }));
@@ -760,7 +802,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
             };
             if (currentNode.type === 'image') {
               const nonUniform = Math.abs(scaleX - scaleY) > 0.0001;
-              setSpec(prev => ({
+              setSpec?.(prev => ({
                 ...prev,
                 root: mapNode(prev.root, nodeId, (n: any) => {
                   if (n.type !== 'image') return n;
@@ -774,7 +816,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
                 })
               }));
             } else {
-              setSpec(prev => applyPositionAndSize(prev, nodeId, newPos, newSize));
+              setSpec?.(prev => applyPositionAndSize(prev, nodeId, newPos, newSize));
             }
           }
         }
@@ -799,9 +841,9 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       const isGroup = currentNode?.type === 'group';
 
       // Store the position exactly as provided by Konva (already adjusted for center-rotation illusion)
-      setSpec(prev => applyPosition(prev, nodeId, newPos));
+  setSpec?.(prev => applyPosition(prev, nodeId, newPos));
       // Set absolute rotation (no cumulative add)
-      setSpec(prev => ({
+  setSpec?.(prev => ({
         ...prev,
         root: mapNode(prev.root, nodeId, (n: any) => ({
           ...n,
@@ -815,7 +857,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
           // For groups: scale the group container and all children
           // scaling group and children
           
-          setSpec(prev => ({
+          setSpec?.(prev => ({
             ...prev,
             root: mapNode(prev.root, nodeId, (groupNode: any) => {
               if (groupNode.type !== 'group') return groupNode;
@@ -863,7 +905,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
           // Persist absolute Konva scale as glyph scale
           const absX = Math.max(0.05, node.scaleX());
           const absY = Math.max(0.05, node.scaleY());
-          setSpec(prev => ({
+          setSpec?.(prev => ({
             ...prev,
             root: mapNode(prev.root, nodeId, (n: any) => n.type === 'text' ? { ...n, textScaleX: absX, textScaleY: absY } : n)
           }));
@@ -876,7 +918,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
             };
             if (currentNode.type === 'image') {
               const nonUniform = Math.abs(scaleX - scaleY) > 0.0001;
-              setSpec(prev => ({
+              setSpec?.(prev => ({
                 ...prev,
                 root: mapNode(prev.root, nodeId, (n: any) => {
                   if (n.type !== 'image') return n;
@@ -890,7 +932,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
                 })
               }));
             } else {
-              setSpec(prev => applyPositionAndSize(prev, nodeId, newPos, newSize));
+              setSpec?.(prev => applyPositionAndSize(prev, nodeId, newPos, newSize));
             }
           }
         }
@@ -1056,7 +1098,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
                 }
               }
               const applyReorder = (mode: 'forward'|'lower'|'top'|'bottom') => {
-                setSpec(prev => ({
+                setSpec?.(prev => ({
                   ...prev,
                   root: (function walk(n: any): any {
                     if (parentMap[n.id]) {
@@ -1136,12 +1178,12 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
           })() && (
             <button
               onClick={() => {
-                setSpec(prev => ({
+                setSpec?.(prev => ({
                   ...prev,
                   root: mapNode(prev.root, '__bulk__', (n: any) => n) // placeholder (we'll map individually below)
                 }));
                 // Apply per node update
-                setSpec(prev => ({
+                setSpec?.(prev => ({
                   ...prev,
                   root: (function mapAll(n: any): any {
                     if (selected.includes(n.id) && n.type === 'image' && n.preserveAspect === false) {
@@ -1170,7 +1212,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
           })() && (
             <button
               onClick={() => {
-                setSpec(prev => ({
+                setSpec?.(prev => ({
                   ...prev,
                   root: (function mapAll(n: any): any {
                     if (selected.includes(n.id) && n.type === 'text') {
@@ -1189,7 +1231,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
           {selected.length > 0 && (
             <button
               onClick={() => {
-                setSpec(prev => deleteNodes(prev, new Set(selected)));
+                setSpec?.(prev => deleteNodes(prev, new Set(selected)));
                 setSelection([]);
                 setMenu(null);
               }}

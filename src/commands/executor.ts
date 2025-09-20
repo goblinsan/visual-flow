@@ -115,29 +115,49 @@ export class CommandExecutor {
 import { useCallback, useRef, useSyncExternalStore } from 'react';
 
 export function useCommandExecutor(initialSpec: any, opts: CommandExecutorOptions = {}) {
-  const execRef = useRef<CommandExecutor | null>(null);
-  if (!execRef.current) execRef.current = new CommandExecutor(cloneSpec(initialSpec), opts);
-  const executor = execRef.current;
+  // Initialize executor only once; provide explicit reset method for full spec replacement.
+  const executorRef = useRef<CommandExecutor | null>(null);
+  if (!executorRef.current) {
+    executorRef.current = new CommandExecutor(cloneSpec(initialSpec), opts);
+  }
+  const executor = executorRef.current;
+
+  // Cache last snapshot so unchanged store state yields referentially stable snapshot.
+  const lastSnapRef = useRef<{ spec: any; selection: string[]; canUndo: boolean; canRedo: boolean } | null>(null);
 
   const subscribe = useCallback((onStoreChange: () => void) => {
-    // simple polling fallback could be replaced with event emitter; for now microtask queue triggers
     (executor as any)._notify = onStoreChange;
     return () => { if ((executor as any)._notify === onStoreChange) (executor as any)._notify = null; };
   }, [executor]);
 
-  const getSnapshot = useCallback(() => ({
-    spec: executor.spec,
-    selection: executor.selection,
-    canUndo: executor.canUndo,
-    canRedo: executor.canRedo,
-  }), [executor]);
+  const buildSnapshot = useCallback(() => {
+    const next = {
+      spec: executor.spec,
+      selection: executor.selection,
+      canUndo: executor.canUndo,
+      canRedo: executor.canRedo,
+    };
+    const prev = lastSnapRef.current;
+    if (
+      prev &&
+      prev.spec === next.spec &&
+      prev.selection === next.selection &&
+      prev.canUndo === next.canUndo &&
+      prev.canRedo === next.canRedo
+    ) {
+      return prev; // return identical reference to prevent unnecessary renders
+    }
+    lastSnapRef.current = next;
+    return next;
+  }, [executor]);
 
-  // Wrap mutating methods to emit change notifications
+  const getSnapshot = buildSnapshot; // stable reference via useCallback deps
+
+  // Mutating method wrappers
   const wrappedExecute = useCallback((cmd: Command) => {
     executor.execute(cmd);
     (executor as any)._notify && (executor as any)._notify();
   }, [executor]);
-
   const wrappedUndo = useCallback(() => {
     executor.undo();
     (executor as any)._notify && (executor as any)._notify();
@@ -150,6 +170,14 @@ export function useCommandExecutor(initialSpec: any, opts: CommandExecutorOption
     executor.setSelection(ids);
     (executor as any)._notify && (executor as any)._notify();
   }, [executor]);
+  const reset = useCallback((newSpec: any) => {
+    // Replace executor internal spec & clear history
+    (executor as any)._spec = cloneSpec(newSpec);
+    (executor as any)._history = [];
+    (executor as any)._redo = [];
+    (executor as any)._selection = [];
+    (executor as any)._notify && (executor as any)._notify();
+  }, [executor]);
 
   const snapshot = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 
@@ -159,6 +187,7 @@ export function useCommandExecutor(initialSpec: any, opts: CommandExecutorOption
     undo: wrappedUndo,
     redo: wrappedRedo,
     setSelection: wrappedSetSelection,
+    reset,
     _executor: executor,
   };
 }
