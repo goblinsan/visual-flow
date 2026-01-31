@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { parseColor } from '../utils/color';
 import { adjustAlpha, toggleColor, swapColors } from '../utils/colorEditing';
+import { GradientPicker, gradientToCSS, type GradientFill } from './GradientPicker';
 
 export interface ColorControlsProps {
   id: string; // node id
   fill: string | undefined;
+  fillGradient?: GradientFill;
   stroke: string | undefined;
   strokeWidth: number | undefined;
   radius: number | undefined;
@@ -23,13 +25,58 @@ export interface ColorControlsProps {
 }
 
 export const ColorControls: React.FC<ColorControlsProps> = ({
-  id, fill, stroke, strokeWidth, radius, opacity,
+  id, fill, fillGradient, stroke, strokeWidth, radius, opacity,
   lastFillById, lastStrokeById, setLastFillById, setLastStrokeById,
   updateRect, beginRecentSession, previewRecent, commitRecent, recentColors, pushRecent
 }) => {
+  const [showFillPanel, setShowFillPanel] = useState(false);
+  
+  // Get the display value for fill (gradient takes priority)
+  const fillDisplay = fillGradient ? gradientToCSS(fillGradient) : fill;
+  
   return (
     <div className="space-y-2">
       <p className="text-[11px] uppercase tracking-wide font-semibold text-gray-500">Rectangle</p>
+      
+      {/* Fill Section with Gradient Support */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-medium text-gray-600 flex items-center gap-1">
+            <i className="fa-solid fa-fill-drip text-gray-400 text-[9px]" />
+            Fill
+          </span>
+          <button
+            type="button"
+            onClick={() => setShowFillPanel(!showFillPanel)}
+            className="text-[10px] text-blue-500 hover:text-blue-600"
+          >
+            {showFillPanel ? 'Collapse' : 'Expand'}
+          </button>
+        </div>
+        
+        {/* Quick Preview */}
+        <div 
+          className="h-8 rounded-lg border border-gray-200 cursor-pointer hover:border-gray-300 transition-colors"
+          style={{ background: fillDisplay || '#ffffff' }}
+          onClick={() => setShowFillPanel(!showFillPanel)}
+          title="Click to edit fill"
+        />
+        
+        {showFillPanel && (
+          <div className="p-2 bg-gray-50 rounded-lg border border-gray-200">
+            <GradientPicker
+              gradient={fillGradient}
+              onGradientChange={(g) => updateRect({ fillGradient: g })}
+              solidColor={fill}
+              onSolidColorChange={(c) => {
+                updateRect({ fill: c, fillGradient: undefined });
+                if (c) setLastFillById(m => ({ ...m, [id]: c }));
+              }}
+            />
+          </div>
+        )}
+      </div>
+      
       <div className="flex items-start gap-3">
         {/* Fill */}
         <div className="flex flex-col items-center gap-1">

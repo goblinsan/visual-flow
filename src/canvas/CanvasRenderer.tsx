@@ -1,8 +1,8 @@
-import { Group, Rect, Text } from "react-konva";
+import { Group, Rect, Text, Ellipse, Line, Path } from "react-konva";
 import { type ReactNode } from "react";
 import { computeRectVisual } from "../renderer/rectVisual";
 import { estimateNodeHeight } from "../renderer/measurement";
-import type { LayoutNode, FrameNode, StackNode, TextNode, BoxNode, GridNode, GroupNode, ImageNode, RectNode } from "../layout-schema.ts";
+import type { LayoutNode, FrameNode, StackNode, TextNode, BoxNode, GridNode, GroupNode, ImageNode, RectNode, EllipseNode, LineNode, CurveNode } from "../layout-schema.ts";
 import { CanvasImage } from "./components/CanvasImage";
 import { debugOnce, logger } from "../utils/logger";
 
@@ -12,6 +12,15 @@ function renderText(n: TextNode) {
   const y = n.position?.y ?? 0;
   const scaleX = n.textScaleX ?? 1;
   const scaleY = n.textScaleY ?? 1;
+  
+  // Determine font size: use explicit fontSize if set, otherwise derive from variant
+  const defaultFontSize = n.variant === "h1" ? 28 : n.variant === "h2" ? 22 : n.variant === "h3" ? 18 : n.variant === "caption" ? 12 : 14;
+  const fontSize = n.fontSize ?? defaultFontSize;
+  
+  // Build font style string for Konva
+  const fontStyle = n.fontStyle === 'italic' ? 'italic' : 'normal';
+  const fontWeight = n.fontWeight ?? (n.variant === 'h1' || n.variant === 'h2' ? 'bold' : 'normal');
+  
   return (
     <Text
       key={n.id}
@@ -21,7 +30,9 @@ function renderText(n: TextNode) {
       y={y}
       rotation={n.rotation ?? 0}
       text={n.text}
-      fontSize={n.variant === "h1" ? 28 : n.variant === "h2" ? 22 : n.variant === "h3" ? 18 : 14}
+      fontSize={fontSize}
+      fontFamily={n.fontFamily || 'Arial'}
+      fontStyle={fontStyle}
       fill={n.color ?? "#0f172a"}
       opacity={n.opacity ?? 1}
       align={n.align ?? "left"}
@@ -70,6 +81,14 @@ function renderRect(n: RectNode) {
         opacity={v.opacity}
         dash={v.dash}
         cornerRadius={v.cornerRadius}
+        fillLinearGradientStartPoint={v.fillLinearGradientStartPoint}
+        fillLinearGradientEndPoint={v.fillLinearGradientEndPoint}
+        fillLinearGradientColorStops={v.fillLinearGradientColorStops}
+        fillRadialGradientStartPoint={v.fillRadialGradientStartPoint}
+        fillRadialGradientEndPoint={v.fillRadialGradientEndPoint}
+        fillRadialGradientStartRadius={v.fillRadialGradientStartRadius}
+        fillRadialGradientEndRadius={v.fillRadialGradientEndRadius}
+        fillRadialGradientColorStops={v.fillRadialGradientColorStops}
       />
     </Group>
   );
@@ -112,7 +131,7 @@ function renderFrame(n: FrameNode) {
   const draggable = false; // root / frames currently static
   return (
     <Group key={n.id} id={n.id} name={`node ${n.type}`} x={n.position?.x ?? 0} y={n.position?.y ?? 0} rotation={n.rotation ?? 0} opacity={n.opacity ?? 1} draggable={draggable}>
-      <Rect width={size.width} height={size.height} fill={background ?? '#ffffff'} stroke={background ? '#e2e8f0' : undefined} listening={false} />
+      {background && <Rect width={size.width} height={size.height} fill={background} stroke={'#e2e8f0'} listening={false} />}
       <Group x={pad} y={pad}>{n.children.map(renderNode)}</Group>
     </Group>
   );
@@ -196,6 +215,109 @@ function renderImage(n: ImageNode) {
   );
 }
 
+// Ellipse shape
+function renderEllipse(n: EllipseNode) {
+  const x = n.position?.x ?? 0;
+  const y = n.position?.y ?? 0;
+  const w = n.size?.width ?? 100;
+  const h = n.size?.height ?? 100;
+  // Konva Ellipse is centered, so we offset to match top-left positioning
+  const radiusX = w / 2;
+  const radiusY = h / 2;
+  const hasFill = n.fill !== undefined || n.fillGradient !== undefined;
+  const hasStroke = n.stroke !== undefined;
+  
+  // Compute gradient properties if gradient is defined
+  let gradientProps: Record<string, unknown> = {};
+  if (n.fillGradient) {
+    const { type, colors, angle = 0 } = n.fillGradient;
+    const colorStops: (string | number)[] = [];
+    colors.forEach((color, index) => {
+      const offset = index / (colors.length - 1 || 1);
+      colorStops.push(offset, color);
+    });
+    
+    if (type === 'linear') {
+      // Convert angle to start/end points
+      const rad = (angle * Math.PI) / 180;
+      const len = Math.max(w, h);
+      gradientProps = {
+        fillLinearGradientStartPoint: {
+          x: radiusX - Math.cos(rad) * len / 2,
+          y: radiusY - Math.sin(rad) * len / 2,
+        },
+        fillLinearGradientEndPoint: {
+          x: radiusX + Math.cos(rad) * len / 2,
+          y: radiusY + Math.sin(rad) * len / 2,
+        },
+        fillLinearGradientColorStops: colorStops,
+      };
+    } else {
+      gradientProps = {
+        fillRadialGradientStartPoint: { x: radiusX, y: radiusY },
+        fillRadialGradientEndPoint: { x: radiusX, y: radiusY },
+        fillRadialGradientStartRadius: 0,
+        fillRadialGradientEndRadius: Math.max(radiusX, radiusY),
+        fillRadialGradientColorStops: colorStops,
+      };
+    }
+  }
+  
+  return (
+    <Group key={n.id} id={n.id} name={`node ${n.type}`} x={x} y={y} rotation={n.rotation ?? 0} opacity={n.opacity ?? 1}>
+      <Ellipse
+        x={radiusX}
+        y={radiusY}
+        radiusX={radiusX}
+        radiusY={radiusY}
+        fill={n.fillGradient ? undefined : (n.fill ?? "#ffffff")}
+        fillEnabled={hasFill}
+        stroke={n.stroke ?? "#334155"}
+        strokeEnabled={hasStroke || !hasFill}
+        strokeWidth={n.strokeWidth ?? 1}
+        dash={n.strokeDash}
+        {...gradientProps}
+      />
+    </Group>
+  );
+}
+
+// Line shape (straight line)
+function renderLine(n: LineNode) {
+  const x = n.position?.x ?? 0;
+  const y = n.position?.y ?? 0;
+  return (
+    <Group key={n.id} id={n.id} name={`node ${n.type}`} x={x} y={y} rotation={n.rotation ?? 0} opacity={n.opacity ?? 1}>
+      <Line
+        points={n.points}
+        stroke={n.stroke ?? "#334155"}
+        strokeWidth={n.strokeWidth ?? 2}
+        dash={n.strokeDash}
+        lineCap={n.lineCap ?? "round"}
+      />
+    </Group>
+  );
+}
+
+// Curve shape (bezier/spline)
+function renderCurve(n: CurveNode) {
+  const x = n.position?.x ?? 0;
+  const y = n.position?.y ?? 0;
+  return (
+    <Group key={n.id} id={n.id} name={`node ${n.type}`} x={x} y={y} rotation={n.rotation ?? 0} opacity={n.opacity ?? 1}>
+      <Line
+        points={n.points}
+        stroke={n.stroke ?? "#334155"}
+        strokeWidth={n.strokeWidth ?? 2}
+        dash={n.strokeDash}
+        lineCap={n.lineCap ?? "round"}
+        tension={n.tension ?? 0.5}
+        bezier={n.tension === undefined || n.tension === 0}
+      />
+    </Group>
+  );
+}
+
 export function renderNode(n: LayoutNode): ReactNode {
   debugOnce('renderNode:'+n.id, n.id, n.type);
   switch (n.type) {
@@ -206,7 +328,10 @@ export function renderNode(n: LayoutNode): ReactNode {
     case "grid": return renderGrid(n as GridNode);
     case "group": return renderGroup(n as GroupNode);
     case "image": return renderImage(n as ImageNode);
-  case "rect": return renderRect(n as RectNode);
+    case "rect": return renderRect(n as RectNode);
+    case "ellipse": return renderEllipse(n as EllipseNode);
+    case "line": return renderLine(n as LineNode);
+    case "curve": return renderCurve(n as CurveNode);
     default:
       logger.warn('Unknown node type', (n as any).type, n);
       return null;

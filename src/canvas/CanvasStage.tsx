@@ -1,4 +1,4 @@
-import { Stage, Layer, Transformer, Rect, Group } from "react-konva";
+import { Stage, Layer, Transformer, Rect, Group, Ellipse, Line, Circle } from "react-konva";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type Konva from "konva";
 import type { LayoutSpec } from "../layout-schema.ts";
@@ -9,6 +9,12 @@ import type { DragSession } from "../interaction/types";
 import { beginMarquee, updateMarquee, finalizeMarquee, type MarqueeSession } from "../interaction/marquee";
 import { deleteNodes, duplicateNodes, nudgeNodes } from "./editing";
 import { applyPosition, applyPositionAndSize, groupNodes, ungroupNodes } from "./stage-internal";
+
+// Grid configuration
+const GRID_SPACING = 20; // Space between dots
+const DOT_RADIUS = 1.5; // Radius of each dot
+const DOT_COLOR = 'rgba(255, 255, 255, 0.5)'; // Whitish dots
+const GRID_BG_COLOR = '#e5e7eb'; // Light gray background (Tailwind gray-200)
 
 // Props
 interface CanvasStageProps {
@@ -21,6 +27,49 @@ interface CanvasStageProps {
   rectDefaults?: { fill?: string; stroke?: string; strokeWidth: number; radius: number; opacity: number; strokeDash?: number[] };
   selection: string[];
   setSelection: (ids: string[]) => void;
+}
+
+// Infinite dot grid component
+interface InfiniteGridProps {
+  width: number;
+  height: number;
+  scale: number;
+  offsetX: number;
+  offsetY: number;
+}
+
+function InfiniteGrid({ width, height, scale, offsetX, offsetY }: InfiniteGridProps) {
+  // Calculate visible area in world coordinates
+  const worldLeft = -offsetX / scale;
+  const worldTop = -offsetY / scale;
+  const worldRight = worldLeft + width / scale;
+  const worldBottom = worldTop + height / scale;
+  
+  // Snap to grid boundaries with padding
+  const startX = Math.floor(worldLeft / GRID_SPACING) * GRID_SPACING - GRID_SPACING;
+  const startY = Math.floor(worldTop / GRID_SPACING) * GRID_SPACING - GRID_SPACING;
+  const endX = Math.ceil(worldRight / GRID_SPACING) * GRID_SPACING + GRID_SPACING;
+  const endY = Math.ceil(worldBottom / GRID_SPACING) * GRID_SPACING + GRID_SPACING;
+  
+  // Generate dots
+  const dots: JSX.Element[] = [];
+  for (let x = startX; x <= endX; x += GRID_SPACING) {
+    for (let y = startY; y <= endY; y += GRID_SPACING) {
+      dots.push(
+        <Circle
+          key={`${x}-${y}`}
+          x={x}
+          y={y}
+          radius={DOT_RADIUS / scale} // Keep dot size consistent regardless of zoom
+          fill={DOT_COLOR}
+          listening={false}
+          perfectDrawEnabled={false}
+        />
+      );
+    }
+  }
+  
+  return <>{dots}</>;
 }
 
 function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select", onToolChange, rectDefaults, selection, setSelection }: CanvasStageProps) {
@@ -40,6 +89,12 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
 
   const isSelectMode = tool === "select";
   const isRectMode = tool === 'rect';
+  const isEllipseMode = tool === 'ellipse';
+  const isLineMode = tool === 'line';
+  const isCurveMode = tool === 'curve';
+  const isTextMode = tool === 'text';
+  const isImageMode = tool === 'image';
+  const isShapeCreationMode = isRectMode || isEllipseMode || isLineMode || isCurveMode || isTextMode || isImageMode;
   const [spacePan, setSpacePan] = useState(false);
   // Track shift key globally for aspect-ratio constrained resize
   const [shiftPressed, setShiftPressed] = useState(false);
@@ -143,6 +198,24 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     current: { x: number; y: number };
   }>(null);
 
+  // Ellipse draft state
+  const [ellipseDraft, setEllipseDraft] = useState<null | {
+    start: { x: number; y: number };
+    current: { x: number; y: number };
+  }>(null);
+
+  // Line draft state
+  const [lineDraft, setLineDraft] = useState<null | {
+    start: { x: number; y: number };
+    current: { x: number; y: number };
+  }>(null);
+
+  // Curve draft state (collect multiple points for bezier)
+  const [curveDraft, setCurveDraft] = useState<null | {
+    points: { x: number; y: number }[];
+    current: { x: number; y: number };
+  }>(null);
+
   // Helper: finalize rectangle (called on mouseup or via global listener)
   const finalizeRect = useCallback(() => {
     if (!isRectMode || !rectDraft) return;
@@ -193,6 +266,141 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     setRectDraft(null);
   }, [isRectMode, rectDraft, altPressed, shiftPressed, setSpec, onToolChange]);
 
+  // Helper: finalize ellipse
+  const finalizeEllipse = useCallback(() => {
+    if (!isEllipseMode || !ellipseDraft) return;
+    const { start, current } = ellipseDraft;
+    let x1 = start.x, y1 = start.y, x2 = current.x, y2 = current.y;
+    let w = x2 - x1; let h = y2 - y1;
+    const alt = altPressed;
+    const shift = shiftPressed;
+    const defaults = { fill: '#ffffff', stroke: '#334155', strokeWidth: 1, opacity: 1 };
+    
+    if (alt) {
+      w = (current.x - start.x) * 2;
+      h = (current.y - start.y) * 2;
+      if (shift) {
+        const m = Math.max(Math.abs(w), Math.abs(h));
+        w = Math.sign(w || 1) * m; h = Math.sign(h || 1) * m;
+      }
+      const widthF = Math.max(4, Math.abs(w));
+      const heightF = Math.max(4, Math.abs(h));
+      const topLeft = { x: start.x - widthF / 2, y: start.y - heightF / 2 };
+      const isClick = Math.abs(widthF) < 4 && Math.abs(heightF) < 4;
+      const sizeFinal = isClick ? { width: 80, height: 80 } : { width: widthF, height: heightF };
+      const id = 'ellipse_' + Math.random().toString(36).slice(2, 9);
+      setSpec(prev => ({
+        ...prev,
+        root: { ...prev.root, children: [...prev.root.children, { id, type: 'ellipse', position: topLeft, size: sizeFinal, fill: defaults.fill, stroke: defaults.stroke, strokeWidth: defaults.strokeWidth, opacity: defaults.opacity } as any] }
+      }));
+      setSelection([id]);
+      onToolChange?.('select');
+      setEllipseDraft(null);
+      return;
+    }
+    if (shift) {
+      const m = Math.max(Math.abs(w), Math.abs(h));
+      w = Math.sign(w || 1) * m; h = Math.sign(h || 1) * m;
+    }
+    if (w < 0) { x1 = x1 + w; w = Math.abs(w); }
+    if (h < 0) { y1 = y1 + h; h = Math.abs(h); }
+    const widthF = Math.max(4, w); const heightF = Math.max(4, h);
+    const isClick = Math.abs(widthF) < 4 && Math.abs(heightF) < 4;
+    const finalSize = isClick ? { width: 80, height: 80 } : { width: widthF, height: heightF };
+    const id = 'ellipse_' + Math.random().toString(36).slice(2, 9);
+    setSpec(prev => ({
+      ...prev,
+      root: { ...prev.root, children: [...prev.root.children, { id, type: 'ellipse', position: { x: x1, y: y1 }, size: finalSize, fill: defaults.fill, stroke: defaults.stroke, strokeWidth: defaults.strokeWidth, opacity: defaults.opacity } as any] }
+    }));
+    setSelection([id]);
+    onToolChange?.('select');
+    setEllipseDraft(null);
+  }, [isEllipseMode, ellipseDraft, altPressed, shiftPressed, setSpec, onToolChange, setSelection]);
+
+  // Helper: finalize line
+  const finalizeLine = useCallback(() => {
+    if (!isLineMode || !lineDraft) return;
+    const { start, current } = lineDraft;
+    // Calculate line length to check if it's a click vs drag
+    const dx = current.x - start.x;
+    const dy = current.y - start.y;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    const isClick = len < 4;
+    
+    // For lines, store points relative to position (start point)
+    const points: [number, number, number, number] = isClick 
+      ? [0, 0, 100, 0] // default horizontal line
+      : [0, 0, dx, dy];
+    
+    const id = 'line_' + Math.random().toString(36).slice(2, 9);
+    setSpec(prev => ({
+      ...prev,
+      root: { ...prev.root, children: [...prev.root.children, { id, type: 'line', position: { x: start.x, y: start.y }, points, stroke: '#334155', strokeWidth: 2 } as any] }
+    }));
+    setSelection([id]);
+    onToolChange?.('select');
+    setLineDraft(null);
+  }, [isLineMode, lineDraft, setSpec, onToolChange, setSelection]);
+
+  // Helper: finalize curve
+  const finalizeCurve = useCallback(() => {
+    if (!isCurveMode || !curveDraft) return;
+    const { points, current } = curveDraft;
+    // Need at least start and end points
+    if (points.length < 1) {
+      setCurveDraft(null);
+      return;
+    }
+    
+    // Calculate all points relative to the first point
+    const origin = points[0];
+    const allPoints = [...points, current];
+    const relativePoints: number[] = [];
+    for (const p of allPoints) {
+      relativePoints.push(p.x - origin.x, p.y - origin.y);
+    }
+    
+    // If only 2 points (start + end), create a simple curve with midpoint as control
+    if (relativePoints.length === 4) {
+      // Just a straight line, make it slightly curved
+      const midX = relativePoints[2] / 2;
+      const midY = relativePoints[3] / 2 - 20; // offset for curve effect
+      relativePoints.splice(2, 0, midX, midY);
+    }
+    
+    const id = 'curve_' + Math.random().toString(36).slice(2, 9);
+    setSpec(prev => ({
+      ...prev,
+      root: { ...prev.root, children: [...prev.root.children, { id, type: 'curve', position: { x: origin.x, y: origin.y }, points: relativePoints, stroke: '#334155', strokeWidth: 2, tension: 0.5 } as any] }
+    }));
+    setSelection([id]);
+    onToolChange?.('select');
+    setCurveDraft(null);
+  }, [isCurveMode, curveDraft, setSpec, onToolChange, setSelection]);
+
+  // Helper: create text at click position
+  const createText = useCallback((worldPos: { x: number; y: number }) => {
+    const id = 'text_' + Math.random().toString(36).slice(2, 9);
+    setSpec(prev => ({
+      ...prev,
+      root: { ...prev.root, children: [...prev.root.children, { id, type: 'text', position: worldPos, size: { width: 200, height: 24 }, text: 'Double-click to edit', variant: 'body', color: '#111827' } as any] }
+    }));
+    setSelection([id]);
+    onToolChange?.('select');
+  }, [setSpec, onToolChange, setSelection]);
+
+  // Helper: create image placeholder at click position
+  const createImage = useCallback((worldPos: { x: number; y: number }) => {
+    const id = 'image_' + Math.random().toString(36).slice(2, 9);
+    // Create with a placeholder - user can update src later
+    setSpec(prev => ({
+      ...prev,
+      root: { ...prev.root, children: [...prev.root.children, { id, type: 'image', position: worldPos, size: { width: 150, height: 150 }, src: '/vite.svg', alt: 'Placeholder image', objectFit: 'contain' } as any] }
+    }));
+    setSelection([id]);
+    onToolChange?.('select');
+  }, [setSpec, onToolChange, setSelection]);
+
   const onMouseDown = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     // Rectangle tool creation pathway
     if (isRectMode) {
@@ -204,6 +412,63 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       setRectDraft({ start: world, current: world });
       return;
     }
+    
+    // Ellipse tool creation pathway
+    if (isEllipseMode) {
+      if (e.evt.button !== 0) return;
+      const stage = e.target.getStage(); if (!stage) return;
+      const pointer = stage.getPointerPosition(); if (!pointer) return;
+      const world = toWorld(stage, pointer);
+      setEllipseDraft({ start: world, current: world });
+      return;
+    }
+    
+    // Line tool creation pathway
+    if (isLineMode) {
+      if (e.evt.button !== 0) return;
+      const stage = e.target.getStage(); if (!stage) return;
+      const pointer = stage.getPointerPosition(); if (!pointer) return;
+      const world = toWorld(stage, pointer);
+      setLineDraft({ start: world, current: world });
+      return;
+    }
+    
+    // Curve tool creation pathway - click to add points, double-click or Enter to finish
+    if (isCurveMode) {
+      if (e.evt.button !== 0) return;
+      const stage = e.target.getStage(); if (!stage) return;
+      const pointer = stage.getPointerPosition(); if (!pointer) return;
+      const world = toWorld(stage, pointer);
+      if (!curveDraft) {
+        // Start new curve
+        setCurveDraft({ points: [world], current: world });
+      } else {
+        // Add point to curve
+        setCurveDraft(prev => prev ? { ...prev, points: [...prev.points, world] } : prev);
+      }
+      return;
+    }
+    
+    // Text tool - single click creates text
+    if (isTextMode) {
+      if (e.evt.button !== 0) return;
+      const stage = e.target.getStage(); if (!stage) return;
+      const pointer = stage.getPointerPosition(); if (!pointer) return;
+      const world = toWorld(stage, pointer);
+      createText(world);
+      return;
+    }
+    
+    // Image tool - single click creates image placeholder
+    if (isImageMode) {
+      if (e.evt.button !== 0) return;
+      const stage = e.target.getStage(); if (!stage) return;
+      const pointer = stage.getPointerPosition(); if (!pointer) return;
+      const world = toWorld(stage, pointer);
+      createImage(world);
+      return;
+    }
+    
     if (!isSelectMode) return;
     const stage = e.target.getStage();
     if (!stage) return;
@@ -263,11 +528,13 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     if (!e.evt.shiftKey && !e.evt.ctrlKey) { setSelection([]); }
     
     setMenu(null);
-  }, [isSelectMode, spacePan, spec.root.id, toWorld, selected, getTopContainerAncestor, normalizeSelection, isTransformerTarget]);
+  }, [isSelectMode, spacePan, spec.root.id, toWorld, selected, getTopContainerAncestor, normalizeSelection, isTransformerTarget, isEllipseMode, isLineMode, isCurveMode, isTextMode, isImageMode, curveDraft, createText, createImage]);
 
   const onMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     const stage = e.target.getStage();
     if (!stage) return;
+    
+    // Handle shape creation tool drafts
     if (isRectMode) {
       if (!rectDraft) return;
       const pointer = stage.getPointerPosition(); if (!pointer) return;
@@ -275,6 +542,31 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       setRectDraft(prev => prev ? { ...prev, current: worldPos } : prev);
       return;
     }
+    
+    if (isEllipseMode) {
+      if (!ellipseDraft) return;
+      const pointer = stage.getPointerPosition(); if (!pointer) return;
+      const worldPos = toWorld(stage, pointer);
+      setEllipseDraft(prev => prev ? { ...prev, current: worldPos } : prev);
+      return;
+    }
+    
+    if (isLineMode) {
+      if (!lineDraft) return;
+      const pointer = stage.getPointerPosition(); if (!pointer) return;
+      const worldPos = toWorld(stage, pointer);
+      setLineDraft(prev => prev ? { ...prev, current: worldPos } : prev);
+      return;
+    }
+    
+    if (isCurveMode) {
+      if (!curveDraft) return;
+      const pointer = stage.getPointerPosition(); if (!pointer) return;
+      const worldPos = toWorld(stage, pointer);
+      setCurveDraft(prev => prev ? { ...prev, current: worldPos } : prev);
+      return;
+    }
+    
     if (!isSelectMode) return;
 
     if (panning) {
@@ -316,7 +608,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       }
       setMarqueeSession({ ...marqueeSession });
     }
-  }, [isSelectMode, panning, toWorld, dragSession, marqueeSession]);
+  }, [isSelectMode, panning, toWorld, dragSession, marqueeSession, isRectMode, rectDraft, isEllipseMode, ellipseDraft, isLineMode, lineDraft, isCurveMode, curveDraft]);
 
   const onMouseUp = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     const stage = e.target.getStage();
@@ -324,6 +616,14 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
 
     // Finalize rectangle creation
     if (isRectMode && rectDraft) { finalizeRect(); return; }
+    
+    // Finalize ellipse creation
+    if (isEllipseMode && ellipseDraft) { finalizeEllipse(); return; }
+    
+    // Finalize line creation
+    if (isLineMode && lineDraft) { finalizeLine(); return; }
+    
+    // Note: Curve finalization happens on double-click or Enter, not mouseup
 
     if (panning) {
       setPanning(false);
@@ -363,7 +663,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       if (rect) { rect.visible(false); rect.getLayer()?.batchDraw(); }
       setMarqueeSession(null);
     }
-  }, [panning, dragSession, marqueeSession, spec.root.id, getTopContainerAncestor, normalizeSelection, setSpec, isRectMode, rectDraft, finalizeRect]);
+  }, [panning, dragSession, marqueeSession, spec.root.id, getTopContainerAncestor, normalizeSelection, setSpec, isRectMode, rectDraft, finalizeRect, isEllipseMode, ellipseDraft, finalizeEllipse, isLineMode, lineDraft, finalizeLine]);
 
   // Global listeners for rectangle draft (supports dragging outside stage bounds)
   useEffect(() => {
@@ -396,6 +696,84 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     window.addEventListener('keydown', onKey, { capture: true });
     return () => window.removeEventListener('keydown', onKey, { capture: true } as any);
   }, [isRectMode, rectDraft]);
+
+  // Global listeners for ellipse draft
+  useEffect(() => {
+    if (!isEllipseMode || !ellipseDraft) return;
+    const stage = stageRef.current; if (!stage) return;
+    const onMove = (ev: MouseEvent) => {
+      const rect = stage.container().getBoundingClientRect();
+      const px = ev.clientX - rect.left;
+      const py = ev.clientY - rect.top;
+      const world = { x: (px - stage.x()) / stage.scaleX(), y: (py - stage.y()) / stage.scaleY() };
+      setEllipseDraft(prev => prev ? { ...prev, current: world } : prev);
+    };
+    const onUp = () => { finalizeEllipse(); };
+    window.addEventListener('mousemove', onMove, true);
+    window.addEventListener('mouseup', onUp, true);
+    return () => {
+      window.removeEventListener('mousemove', onMove, true);
+      window.removeEventListener('mouseup', onUp, true);
+    };
+  }, [isEllipseMode, ellipseDraft, finalizeEllipse]);
+
+  // Cancel ellipse draft with Escape
+  useEffect(() => {
+    if (!isEllipseMode || !ellipseDraft) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setEllipseDraft(null); }
+    };
+    window.addEventListener('keydown', onKey, { capture: true });
+    return () => window.removeEventListener('keydown', onKey, { capture: true } as any);
+  }, [isEllipseMode, ellipseDraft]);
+
+  // Global listeners for line draft
+  useEffect(() => {
+    if (!isLineMode || !lineDraft) return;
+    const stage = stageRef.current; if (!stage) return;
+    const onMove = (ev: MouseEvent) => {
+      const rect = stage.container().getBoundingClientRect();
+      const px = ev.clientX - rect.left;
+      const py = ev.clientY - rect.top;
+      const world = { x: (px - stage.x()) / stage.scaleX(), y: (py - stage.y()) / stage.scaleY() };
+      setLineDraft(prev => prev ? { ...prev, current: world } : prev);
+    };
+    const onUp = () => { finalizeLine(); };
+    window.addEventListener('mousemove', onMove, true);
+    window.addEventListener('mouseup', onUp, true);
+    return () => {
+      window.removeEventListener('mousemove', onMove, true);
+      window.removeEventListener('mouseup', onUp, true);
+    };
+  }, [isLineMode, lineDraft, finalizeLine]);
+
+  // Cancel line draft with Escape
+  useEffect(() => {
+    if (!isLineMode || !lineDraft) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setLineDraft(null); }
+    };
+    window.addEventListener('keydown', onKey, { capture: true });
+    return () => window.removeEventListener('keydown', onKey, { capture: true } as any);
+  }, [isLineMode, lineDraft]);
+
+  // Curve: finalize on Enter, cancel on Escape
+  useEffect(() => {
+    if (!isCurveMode) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setCurveDraft(null); }
+      if (e.key === 'Enter' && curveDraft && curveDraft.points.length >= 1) { finalizeCurve(); }
+    };
+    window.addEventListener('keydown', onKey, { capture: true });
+    return () => window.removeEventListener('keydown', onKey, { capture: true } as any);
+  }, [isCurveMode, curveDraft, finalizeCurve]);
+
+  // Curve: double-click to finalize
+  const onDblClick = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
+    if (isCurveMode && curveDraft && curveDraft.points.length >= 1) {
+      finalizeCurve();
+    }
+  }, [isCurveMode, curveDraft, finalizeCurve]);
 
   // Single click handler for empty canvas
   const onClick = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -932,7 +1310,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   };
 
   return (
-  <div ref={wrapperRef} style={{ position: 'relative', width, height, cursor: isRectMode ? 'crosshair' : undefined }} onContextMenu={onWrapperContextMenu}>
+  <div ref={wrapperRef} style={{ position: 'relative', width, height, cursor: isRectMode ? 'crosshair' : undefined, backgroundColor: GRID_BG_COLOR }} onContextMenu={onWrapperContextMenu}>
       <Stage 
         ref={stageRef} 
         width={width} 
@@ -946,7 +1324,20 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
         onMouseMove={onMouseMove} 
         onMouseUp={onMouseUp} 
         onClick={onClick}
+        onDblClick={onDblClick}
       >
+        {/* Background grid layer */}
+        <Layer listening={false}>
+          <InfiniteGrid 
+            width={width} 
+            height={height} 
+            scale={scale} 
+            offsetX={pos.x} 
+            offsetY={pos.y} 
+          />
+        </Layer>
+        
+        {/* Main content layer */}
         <Layer>
           <Group>
             {renderNode(spec.root)}
@@ -1031,6 +1422,77 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
                 stroke={'#334155'}
                 strokeWidth={1}
                 dash={[6,4]}
+                listening={false}
+              />
+            );
+          })()}
+          {/* Ellipse draft preview */}
+          {isEllipseMode && ellipseDraft && (() => {
+            const { start, current } = ellipseDraft;
+            let x = start.x; let y = start.y; let w = current.x - start.x; let h = current.y - start.y;
+            const alt = altPressed; const shift = shiftPressed;
+            if (alt) {
+              w = (current.x - start.x) * 2;
+              h = (current.y - start.y) * 2;
+            }
+            if (shift) {
+              const m = Math.max(Math.abs(w), Math.abs(h));
+              w = Math.sign(w || 1) * m;
+              h = Math.sign(h || 1) * m;
+            }
+            if (alt) {
+              x = start.x - Math.abs(w)/2;
+              y = start.y - Math.abs(h)/2;
+              w = Math.abs(w); h = Math.abs(h);
+            } else {
+              if (w < 0) { x = x + w; w = Math.abs(w);} 
+              if (h < 0) { y = y + h; h = Math.abs(h);} 
+            }
+            const radiusX = Math.max(1, w) / 2;
+            const radiusY = Math.max(1, h) / 2;
+            return (
+              <Ellipse
+                x={x + radiusX}
+                y={y + radiusY}
+                radiusX={radiusX}
+                radiusY={radiusY}
+                fill={'rgba(255,255,255,0.35)'}
+                stroke={'#334155'}
+                strokeWidth={1}
+                dash={[6,4]}
+                listening={false}
+              />
+            );
+          })()}
+          {/* Line draft preview */}
+          {isLineMode && lineDraft && (() => {
+            const { start, current } = lineDraft;
+            return (
+              <Line
+                points={[start.x, start.y, current.x, current.y]}
+                stroke={'#334155'}
+                strokeWidth={2}
+                dash={[6,4]}
+                lineCap="round"
+                listening={false}
+              />
+            );
+          })()}
+          {/* Curve draft preview */}
+          {isCurveMode && curveDraft && curveDraft.points.length >= 1 && (() => {
+            const pts: number[] = [];
+            for (const p of curveDraft.points) {
+              pts.push(p.x, p.y);
+            }
+            pts.push(curveDraft.current.x, curveDraft.current.y);
+            return (
+              <Line
+                points={pts}
+                stroke={'#334155'}
+                strokeWidth={2}
+                dash={[6,4]}
+                lineCap="round"
+                tension={0.5}
                 listening={false}
               />
             );

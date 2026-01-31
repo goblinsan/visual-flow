@@ -8,7 +8,10 @@ export type NodeType =
   | "image"
   | "box"
   | "rect"
-  | "group";
+  | "group"
+  | "ellipse"
+  | "line"
+  | "curve";
 
 export interface BaseNode {
   id: string;
@@ -83,6 +86,10 @@ export interface TextNode extends BaseNode, Partial<AbsoluteChild> {
   variant?: "h1" | "h2" | "h3" | "body" | "caption";
   color?: string;        // CSS color
   align?: "left" | "center" | "right";
+  fontFamily?: string;   // Font family name
+  fontSize?: number;     // Font size in pixels
+  fontWeight?: "normal" | "bold" | "100" | "200" | "300" | "400" | "500" | "600" | "700" | "800" | "900";
+  fontStyle?: "normal" | "italic";
   /** Persistent horizontal glyph scale (1 = original). */
   textScaleX?: number;
   /** Persistent vertical glyph scale (1 = original). */
@@ -110,14 +117,56 @@ export interface BoxNode extends BaseNode, Partial<AbsoluteChild> {
   children?: LayoutNode[];
 }
 
+/** Gradient fill definition */
+export interface GradientFill {
+  type: 'linear' | 'radial';
+  colors: string[];        // array of color stops
+  angle?: number;          // angle in degrees for linear gradient (default 0 = left to right)
+  // For radial: could add centerX, centerY, radius in future
+}
+
 /** Simple rectangle shape node (no children). */
 export interface RectNode extends BaseNode, Partial<AbsoluteChild> {
   type: "rect";
-  fill?: string;         // CSS fill color
+  fill?: string;           // CSS fill color (solid)
+  fillGradient?: GradientFill; // gradient fill (overrides fill if set)
+  stroke?: string;         // CSS stroke color
+  strokeWidth?: number;    // px
+  radius?: number;         // corner radius px
+  strokeDash?: number[];   // dash pattern e.g., [4,4]
+}
+
+/** Ellipse/circle shape node. */
+export interface EllipseNode extends BaseNode, Partial<AbsoluteChild> {
+  type: "ellipse";
+  fill?: string;           // CSS fill color (solid)
+  fillGradient?: GradientFill; // gradient fill (overrides fill if set)
+  stroke?: string;         // CSS stroke color
+  strokeWidth?: number;    // px
+  strokeDash?: number[];   // dash pattern e.g., [4,4]
+}
+
+/** Line shape node (straight line between two points). */
+export interface LineNode extends BaseNode {
+  type: "line";
+  points: [number, number, number, number]; // [x1, y1, x2, y2] relative to position
+  position?: Pos;        // offset for the line group
   stroke?: string;       // CSS stroke color
   strokeWidth?: number;  // px
-  radius?: number;       // corner radius px
-  strokeDash?: number[]; // dash pattern e.g., [4,4]
+  strokeDash?: number[]; // dash pattern
+  lineCap?: "butt" | "round" | "square";
+}
+
+/** Curve/bezier shape node (quadratic or cubic bezier). */
+export interface CurveNode extends BaseNode {
+  type: "curve";
+  points: number[];      // [x1, y1, cx1, cy1, (cx2, cy2,) x2, y2] for quadratic/cubic
+  position?: Pos;        // offset for the curve group
+  stroke?: string;       // CSS stroke color
+  strokeWidth?: number;  // px
+  strokeDash?: number[]; // dash pattern
+  lineCap?: "butt" | "round" | "square";
+  tension?: number;      // spline tension (0-1)
 }
 
 export type LayoutNode =
@@ -128,7 +177,10 @@ export type LayoutNode =
   | TextNode
   | ImageNode
   | BoxNode
-  | RectNode;
+  | RectNode
+  | EllipseNode
+  | LineNode
+  | CurveNode;
 
 export interface LayoutSpec {
   root: FrameNode;
