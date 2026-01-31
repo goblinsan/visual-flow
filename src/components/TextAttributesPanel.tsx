@@ -1,5 +1,6 @@
 import React from 'react';
 import { parseColor } from '../utils/color';
+import { GoogleFontPicker } from './GoogleFontPicker';
 
 export interface TextNode {
   id: string;
@@ -24,19 +25,6 @@ export interface TextAttributesPanelProps {
   pushRecent: (c: string) => void;
   recentColors: string[];
 }
-
-const FONT_FAMILIES = [
-  { label: 'System Default', value: '' },
-  { label: 'Arial', value: 'Arial, sans-serif' },
-  { label: 'Helvetica', value: 'Helvetica, sans-serif' },
-  { label: 'Times New Roman', value: '"Times New Roman", serif' },
-  { label: 'Georgia', value: 'Georgia, serif' },
-  { label: 'Courier New', value: '"Courier New", monospace' },
-  { label: 'Verdana', value: 'Verdana, sans-serif' },
-  { label: 'Inter', value: 'Inter, sans-serif' },
-  { label: 'Roboto', value: 'Roboto, sans-serif' },
-  { label: 'Open Sans', value: '"Open Sans", sans-serif' },
-];
 
 const FONT_WEIGHTS = [
   { label: 'Thin (100)', value: '100' },
@@ -130,36 +118,37 @@ export const TextAttributesPanel: React.FC<TextAttributesPanelProps> = ({
             Recent
           </div>
           <div className="flex flex-wrap gap-1">
-            {recentColors.map(col => (
-              <button
-                key={col}
-                type="button"
-                title={col}
-                onClick={() => { updateNode({ color: col }); pushRecent(col); }}
-                className="w-6 h-6 rounded-md border border-gray-200 hover:border-gray-400 transition-colors overflow-hidden"
-              >
-                <span className="w-full h-full block" style={{ background: col }} />
-              </button>
-            ))}
+            {recentColors.map(col => {
+              const hasAlpha = /#[0-9a-fA-F]{8}$/.test(col);
+              return (
+                <button
+                  key={col}
+                  type="button"
+                  title={col}
+                  onClick={() => { updateNode({ color: col }); pushRecent(col); }}
+                  className="w-6 h-6 rounded border border-gray-300 flex items-center justify-center relative group p-0"
+                >
+                  <span className="w-5 h-5 rounded checkerboard overflow-hidden relative">
+                    <span className="absolute inset-0" style={{ background: col }} />
+                    {hasAlpha && <span className="absolute bottom-0 right-0 px-0.5 rounded-tl bg-black/40 text-[8px] text-white leading-none">α</span>}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
 
-      {/* Font Family */}
+      {/* Font Family - Google Fonts Picker */}
       <label className="flex flex-col gap-1.5">
         <span className="text-[11px] font-medium text-gray-600 flex items-center gap-1">
           <i className="fa-solid fa-text-height text-gray-400 text-[9px]" />
           Font Family
         </span>
-        <select
+        <GoogleFontPicker
           value={fontFamily || ''}
-          onChange={e => updateNode({ fontFamily: e.target.value || undefined })}
-          className="border border-gray-200 rounded-md px-2 py-1.5 text-[11px] bg-white focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition-colors"
-        >
-          {FONT_FAMILIES.map(f => (
-            <option key={f.value} value={f.value}>{f.label}</option>
-          ))}
-        </select>
+          onChange={(val) => updateNode({ fontFamily: val || undefined })}
+        />
       </label>
 
       <div className="grid grid-cols-2 gap-3">
@@ -246,7 +235,7 @@ export const TextAttributesPanel: React.FC<TextAttributesPanelProps> = ({
               key={a}
               type="button"
               onClick={() => updateNode({ align: a })}
-              className={`flex-1 px-2 py-1.5 text-[11px] border rounded-md transition-colors ${align === a ? 'bg-blue-500 border-blue-500 text-white' : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-600'}`}
+              className={`flex-1 px-2 py-1.5 text-[11px] border rounded-md transition-colors flex items-center justify-center ${align === a ? 'bg-blue-500 border-blue-500 text-white' : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-600'}`}
             >
               <i className={`fa-solid ${a === 'left' ? 'fa-align-left' : a === 'right' ? 'fa-align-right' : 'fa-align-center'}`} />
             </button>

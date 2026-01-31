@@ -1,14 +1,15 @@
 import { Stage, Layer, Transformer, Rect, Group, Ellipse, Line, Circle } from "react-konva";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type Konva from "konva";
-import type { LayoutSpec } from "../layout-schema.ts";
-import { renderNode } from "./CanvasRenderer.tsx";
+import type { LayoutSpec, TextNode } from "../layout-schema.ts";
+import { renderNode, useFontLoading } from "./CanvasRenderer.tsx";
 import { computeClickSelection, computeMarqueeSelection } from "../renderer/interaction";
 import { beginDrag, updateDrag, finalizeDrag } from "../interaction/drag";
 import type { DragSession } from "../interaction/types";
 import { beginMarquee, updateMarquee, finalizeMarquee, type MarqueeSession } from "../interaction/marquee";
 import { deleteNodes, duplicateNodes, nudgeNodes } from "./editing";
 import { applyPosition, applyPositionAndSize, groupNodes, ungroupNodes } from "./stage-internal";
+import { findNode, mapNode } from "../commands/types";
 
 // Grid configuration
 const GRID_SPACING = 20; // Space between dots
@@ -27,6 +28,7 @@ interface CanvasStageProps {
   rectDefaults?: { fill?: string; stroke?: string; strokeWidth: number; radius: number; opacity: number; strokeDash?: number[] };
   selection: string[];
   setSelection: (ids: string[]) => void;
+  fitToContentKey?: number; // Increment to trigger fit-to-content
 }
 
 // Infinite dot grid component
@@ -72,7 +74,7 @@ function InfiniteGrid({ width, height, scale, offsetX, offsetY }: InfiniteGridPr
   return <>{dots}</>;
 }
 
-function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select", onToolChange, rectDefaults, selection, setSelection }: CanvasStageProps) {
+function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select", onToolChange, rectDefaults, selection, setSelection, fitToContentKey }: CanvasStageProps) {
   // View / interaction state
   const [scale, setScale] = useState(1);
   const [pos, setPos] = useState({ x: 0, y: 0 });
@@ -80,12 +82,20 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   const selected = selection;
   const [menu, setMenu] = useState<null | { x: number; y: number }>(null);
   
+  // Font loading - triggers re-render when fonts finish loading
+  const _fontVersion = useFontLoading();
+  
   // Interaction state
   // Drag interaction session (Milestone 1 pure helper integration)
   const [dragSession, setDragSession] = useState<DragSession | null>(null);
 
   // Marquee session (pure helper based)
   const [marqueeSession, setMarqueeSession] = useState<MarqueeSession | null>(null);
+
+  // Inline text editing state
+  const [editingTextId, setEditingTextId] = useState<string | null>(null);
+  const [editingTextValue, setEditingTextValue] = useState<string>('');
+  const editTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   const isSelectMode = tool === "select";
   const isRectMode = tool === 'rect';
@@ -116,6 +126,59 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     }>;
     selectionBox?: { x: number; y: number; width: number; height: number; center: { x: number; y: number } };
   }>(null);
+
+  // Fit-to-content: calculate scale and position to fit the spec.root content in the viewport
+  useEffect(() => {
+    if (fitToContentKey === undefined || fitToContentKey === 0) return;
+    
+    // Get bounds of all children or use root size
+    const rootSize = spec.root.size;
+    const children = spec.root.children || [];
+    
+    let minX = 0, minY = 0, maxX = rootSize?.width || 1600, maxY = rootSize?.height || 1200;
+    
+    if (children.length > 0) {
+      // Calculate bounding box of all children
+      minX = Infinity; minY = Infinity; maxX = -Infinity; maxY = -Infinity;
+      for (const child of children) {
+        const cx = (child as any).position?.x ?? 0;
+        const cy = (child as any).position?.y ?? 0;
+        const cw = (child as any).size?.width ?? 100;
+        const ch = (child as any).size?.height ?? 100;
+        minX = Math.min(minX, cx);
+        minY = Math.min(minY, cy);
+        maxX = Math.max(maxX, cx + cw);
+        maxY = Math.max(maxY, cy + ch);
+      }
+      // Add padding
+      const padding = 40;
+      minX -= padding;
+      minY -= padding;
+      maxX += padding;
+      maxY += padding;
+    }
+    
+    const contentWidth = maxX - minX;
+    const contentHeight = maxY - minY;
+    
+    // Calculate scale to fit content in viewport with some padding
+    const viewportPadding = 60;
+    const availableWidth = width - viewportPadding * 2;
+    const availableHeight = height - viewportPadding * 2;
+    
+    const scaleX = availableWidth / contentWidth;
+    const scaleY = availableHeight / contentHeight;
+    const newScale = Math.min(scaleX, scaleY, 1); // Don't zoom in beyond 100%
+    
+    // Center the content
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+    const newPosX = width / 2 - centerX * newScale;
+    const newPosY = height / 2 - centerY * newScale;
+    
+    setScale(newScale);
+    setPos({ x: newPosX, y: newPosY });
+  }, [fitToContentKey, width, height, spec]);
 
   // Utility: world coordinate conversion
   const toWorld = useCallback((stage: Konva.Stage, p: { x: number; y: number }) => ({
@@ -505,18 +568,32 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
         const newSelection = computeClickSelection({ current: selected, clickedId: nodeId, isMultiModifier: isShiftClick });
         setSelection(normalizeSelection(newSelection));
         
-        // Prepare for potential drag
+        // Check if any of the nodes to drag are locked - use fresh spec lookup
         const nodesToDrag = newSelection.includes(nodeId) ? newSelection : [nodeId];
-        const initialPositions: Record<string, { x: number; y: number }> = {};
         
-        for (const id of nodesToDrag) {
-          const node = stage.findOne(`#${CSS.escape(id)}`);
-          if (node) {
-            initialPositions[id] = { x: node.x(), y: node.y() };
-          }
+        // Build a fresh node lookup from spec to get current locked state
+        const freshNodeById: Record<string, any> = {};
+        function walkFresh(node: any) {
+          freshNodeById[node.id] = node;
+          if (Array.isArray(node.children)) node.children.forEach(walkFresh);
         }
+        walkFresh(spec.root);
         
-        setDragSession(beginDrag(nodesToDrag, worldPos, initialPositions));
+        const anyLocked = nodesToDrag.some(id => freshNodeById[id]?.locked === true);
+        
+        // Only allow dragging if no locked elements are being dragged
+        if (!anyLocked) {
+          const initialPositions: Record<string, { x: number; y: number }> = {};
+          
+          for (const id of nodesToDrag) {
+            const node = stage.findOne(`#${CSS.escape(id)}`);
+            if (node) {
+              initialPositions[id] = { x: node.x(), y: node.y() };
+            }
+          }
+          
+          setDragSession(beginDrag(nodesToDrag, worldPos, initialPositions));
+        }
         
         setMenu(null);
         return;
@@ -768,12 +845,129 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     return () => window.removeEventListener('keydown', onKey, { capture: true } as any);
   }, [isCurveMode, curveDraft, finalizeCurve]);
 
-  // Curve: double-click to finalize
+  // Double-click: finalize curve OR enter text editing mode
   const onDblClick = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
+    // Curve finalization
     if (isCurveMode && curveDraft && curveDraft.points.length >= 1) {
       finalizeCurve();
+      return;
     }
-  }, [isCurveMode, curveDraft, finalizeCurve]);
+    
+    // Text editing - check if double-clicked on a text node
+    if (isSelectMode) {
+      const target = e.target;
+      const name = target.name?.() || '';
+      const isTextNode = name.includes('text');
+      
+      if (isTextNode) {
+        const nodeId = target.id();
+        const textNode = findNode(spec.root, nodeId) as TextNode | null;
+        
+        if (textNode && textNode.type === 'text') {
+          setEditingTextId(nodeId);
+          setEditingTextValue(textNode.text || '');
+          // Focus the textarea on next tick
+          setTimeout(() => {
+            editTextareaRef.current?.focus();
+            editTextareaRef.current?.select();
+          }, 0);
+        }
+      }
+    }
+  }, [isCurveMode, curveDraft, finalizeCurve, isSelectMode, spec.root]);
+
+  // Commit text edit and close editor
+  const commitTextEdit = useCallback(() => {
+    if (!editingTextId) return;
+    
+    const newRoot = mapNode(spec.root, editingTextId, (n: any) => ({
+      ...n,
+      text: editingTextValue
+    }));
+    
+    setSpec({ ...spec, root: newRoot });
+    setEditingTextId(null);
+    setEditingTextValue('');
+  }, [editingTextId, editingTextValue, spec, setSpec]);
+
+  // Cancel text edit without saving
+  const cancelTextEdit = useCallback(() => {
+    setEditingTextId(null);
+    setEditingTextValue('');
+  }, []);
+
+  // Hide Konva text node while editing (so textarea appears to replace it)
+  useEffect(() => {
+    if (!stageRef.current || !editingTextId) return;
+    
+    const konvaNode = stageRef.current.findOne(`#${CSS.escape(editingTextId)}`);
+    if (konvaNode) {
+      konvaNode.visible(false);
+      stageRef.current.batchDraw();
+    }
+    
+    return () => {
+      if (konvaNode) {
+        konvaNode.visible(true);
+        stageRef.current?.batchDraw();
+      }
+    };
+  }, [editingTextId]);
+
+  // Calculate textarea position and style based on the text node's position on canvas
+  const getTextEditStyle = useCallback((): React.CSSProperties | null => {
+    if (!editingTextId || !stageRef.current) return null;
+    
+    const textNode = findNode(spec.root, editingTextId) as TextNode | null;
+    if (!textNode) return null;
+    
+    const stage = stageRef.current;
+    const x = textNode.position?.x ?? 0;
+    const y = textNode.position?.y ?? 0;
+    
+    // Convert world coordinates to screen coordinates
+    const stageX = x * scale + pos.x;
+    const stageY = y * scale + pos.y;
+    
+    // Get the wrapper's position
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return null;
+    
+    // Get font properties
+    const fontSize = textNode.fontSize ?? 14;
+    const fontFamily = textNode.fontFamily || 'Arial';
+    const fontWeight = textNode.fontWeight || '400';
+    
+    // Calculate text alignment offset if needed
+    const align = textNode.align ?? 'left';
+    
+    return {
+      position: 'absolute',
+      left: stageX,
+      top: stageY,
+      fontSize: fontSize * scale,
+      fontFamily,
+      fontWeight: fontWeight === 'bold' ? 700 : (fontWeight === 'normal' ? 400 : Number(fontWeight)),
+      fontStyle: textNode.fontStyle === 'italic' ? 'italic' : 'normal',
+      color: textNode.color ?? '#0f172a',
+      background: 'transparent',
+      border: 'none',
+      outline: 'none',
+      padding: 0,
+      margin: 0,
+      minWidth: '20px',
+      minHeight: '1em',
+      resize: 'none',
+      overflow: 'hidden',
+      transformOrigin: 'top left',
+      transform: `rotate(${textNode.rotation ?? 0}deg) scale(${textNode.textScaleX ?? 1}, ${textNode.textScaleY ?? 1})`,
+      zIndex: 1000,
+      lineHeight: 1.2,
+      textAlign: align as any,
+      caretColor: '#3b82f6',
+      whiteSpace: 'pre',
+    };
+  }, [editingTextId, spec.root, scale, pos]);
 
   // Single click handler for empty canvas
   const onClick = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -980,22 +1174,32 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       
       if (selected.length === 0) return;
       
-      // Delete
+      // Check if any selected elements are locked (prevent delete/nudge for locked elements)
+      const anyLocked = selected.some(id => selectionContext.nodeById[id]?.locked === true);
+      
+      // Delete (only unlocked elements)
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
-        setSpec(prev => deleteNodes(prev, new Set(selected)));
-  setSelection([]);
+        const unlocked = selected.filter(id => selectionContext.nodeById[id]?.locked !== true);
+        if (unlocked.length > 0) {
+          setSpec(prev => deleteNodes(prev, new Set(unlocked)));
+          setSelection(selected.filter(id => !unlocked.includes(id)));
+        }
         return;
       }
       
       // Duplicate
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
         e.preventDefault();
-        setSpec(prev => duplicateNodes(prev, new Set(selected)));
+        const unlocked = selected.filter(id => selectionContext.nodeById[id]?.locked !== true);
+        if (unlocked.length > 0) {
+          setSpec(prev => duplicateNodes(prev, new Set(unlocked)));
+        }
         return;
       }
       
-      // Arrow nudge
+      // Arrow nudge (only if no locked elements)
+      if (anyLocked) return;
       const step = e.shiftKey ? 10 : 1;
       let dx = 0, dy = 0;
       if (e.key === 'ArrowLeft') dx = -step;
@@ -1030,11 +1234,15 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     if (!tr) return;
     const stage = tr.getStage();
     if (!stage) return;
-    const targets = selected.map(id => stage.findOne(`#${CSS.escape(id)}`)).filter(Boolean) as Konva.Node[];
+    // Exclude locked elements from transformer
+    const targets = selected
+      .filter(id => selectionContext.nodeById[id]?.locked !== true)
+      .map(id => stage.findOne(`#${CSS.escape(id)}`))
+      .filter(Boolean) as Konva.Node[];
   // attach transformer to current selection
     tr.nodes(targets);
     tr.getLayer()?.batchDraw();
-  }, [selected]);
+  }, [selected, selectionContext.nodeById]);
 
   // Handle ongoing transform (during drag/resize)
   const onTransform = useCallback(() => {
@@ -1497,13 +1705,134 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
               />
             );
           })()}
+          
+          {/* Curve control point handles (when a curve is selected) */}
+          {isSelectMode && selected.length === 1 && (() => {
+            const curveNode = selectionContext.nodeById[selected[0]];
+            if (!curveNode || curveNode.type !== 'curve') return null;
+            
+            const curveX = curveNode.position?.x ?? 0;
+            const curveY = curveNode.position?.y ?? 0;
+            const pts = curveNode.points as number[];
+            
+            // Extract control points from the points array
+            // points are stored as [x1, y1, x2, y2, x3, y3, ...] pairs
+            const controlPoints: Array<{ x: number; y: number; index: number }> = [];
+            for (let i = 0; i < pts.length; i += 2) {
+              controlPoints.push({ x: pts[i] + curveX, y: pts[i + 1] + curveY, index: i });
+            }
+            
+            return (
+              <Group listening={!curveNode.locked}>
+                {/* Lines connecting control points */}
+                {controlPoints.length >= 2 && controlPoints.map((cp, idx) => {
+                  if (idx === controlPoints.length - 1) return null;
+                  const next = controlPoints[idx + 1];
+                  return (
+                    <Line
+                      key={`curve-line-${curveNode.id}-${idx}`}
+                      points={[cp.x, cp.y, next.x, next.y]}
+                      stroke="rgba(59, 130, 246, 0.5)"
+                      strokeWidth={1 / scale}
+                      dash={[4 / scale, 4 / scale]}
+                      listening={false}
+                    />
+                  );
+                })}
+                {/* Control point circles */}
+                {controlPoints.map((cp, idx) => {
+                  const isEndpoint = idx === 0 || idx === controlPoints.length - 1;
+                  return (
+                    <Circle
+                      key={`curve-handle-${curveNode.id}-${idx}`}
+                      x={cp.x}
+                      y={cp.y}
+                      radius={isEndpoint ? 6 / scale : 5 / scale}
+                      fill={isEndpoint ? '#3b82f6' : 'white'}
+                      stroke="#3b82f6"
+                      strokeWidth={2 / scale}
+                      draggable={!curveNode.locked}
+                      onDragMove={(e) => {
+                        const newX = e.target.x() - curveX;
+                        const newY = e.target.y() - curveY;
+                        
+                        // Update the curve points
+                        const newPoints = [...pts];
+                        newPoints[cp.index] = newX;
+                        newPoints[cp.index + 1] = newY;
+                        
+                        setSpec(prev => ({
+                          ...prev,
+                          root: mapNode(prev.root, curveNode.id, (n: any) => ({
+                            ...n,
+                            points: newPoints
+                          }))
+                        }));
+                      }}
+                      onMouseEnter={(e) => {
+                        const container = e.target.getStage()?.container();
+                        if (container) container.style.cursor = 'move';
+                      }}
+                      onMouseLeave={(e) => {
+                        const container = e.target.getStage()?.container();
+                        if (container) container.style.cursor = 'default';
+                      }}
+                    />
+                  );
+                })}
+              </Group>
+            );
+          })()}
         </Layer>
       </Stage>
+      
+      {/* Inline Text Editing Overlay */}
+      {editingTextId && (
+        <textarea
+          ref={editTextareaRef}
+          value={editingTextValue}
+          onChange={(e) => {
+            setEditingTextValue(e.target.value);
+            // Auto-resize textarea to fit content
+            const textarea = e.target;
+            textarea.style.height = 'auto';
+            textarea.style.height = textarea.scrollHeight + 'px';
+            textarea.style.width = 'auto';
+            textarea.style.width = Math.max(textarea.scrollWidth, 20) + 'px';
+          }}
+          onBlur={commitTextEdit}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              e.preventDefault();
+              cancelTextEdit();
+            } else if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              commitTextEdit();
+            }
+          }}
+          style={getTextEditStyle() || undefined}
+          className="focus:outline-none selection:bg-blue-200"
+        />
+      )}
       
       {/* Context Menu */}
       {menu && isSelectMode && (
         <div 
-          style={{ position: 'absolute', left: menu.x, top: menu.y, pointerEvents: 'auto' }}
+          ref={(el) => {
+            // Adjust position if menu extends past viewport
+            if (el) {
+              const rect = el.getBoundingClientRect();
+              const viewportHeight = window.innerHeight;
+              const viewportWidth = window.innerWidth;
+              if (rect.bottom > viewportHeight - 10) {
+                el.style.top = `${menu.y - (rect.bottom - viewportHeight) - 20}px`;
+              }
+              if (rect.right > viewportWidth - 10) {
+                el.style.left = `${menu.x - (rect.right - viewportWidth) - 20}px`;
+              }
+            }
+          }}
+          style={{ position: 'absolute', left: menu.x, top: menu.y, pointerEvents: 'auto', maxHeight: 'calc(100vh - 40px)', overflowY: 'auto' }}
           className="z-50 text-xs bg-white border border-gray-300 rounded shadow-md select-none min-w-40"
         >
           {/* Layer ordering actions (true sibling reordering) */}
@@ -1659,6 +1988,61 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
             >Delete</button>
           )}
           <div className="h-px bg-gray-200 my-1" />
+          {/* Lock/Unlock */}
+          {selected.length > 0 && (() => {
+            const anyLocked = selected.some(id => selectionContext.nodeById[id]?.locked === true);
+            const anyUnlocked = selected.some(id => selectionContext.nodeById[id]?.locked !== true);
+            return (
+              <>
+                {anyUnlocked && (
+                  <button
+                    onClick={() => {
+                      const lockedIds = [...selected];
+                      setSpec(prev => ({
+                        ...prev,
+                        root: (function mapAll(n: any): any {
+                          if (lockedIds.includes(n.id)) {
+                            return { ...n, locked: true };
+                          }
+                          if (Array.isArray(n.children)) return { ...n, children: n.children.map(mapAll) };
+                          return n;
+                        })(prev.root)
+                      }));
+                      // Clear selection so the locked state takes effect immediately
+                      setSelection([]);
+                      setMenu(null);
+                    }}
+                    className="px-3 py-1.5 w-full text-left hover:bg-gray-100 flex items-center gap-2"
+                  >
+                    <i className="fa-solid fa-lock text-gray-400 w-4" />
+                    Lock
+                  </button>
+                )}
+                {anyLocked && (
+                  <button
+                    onClick={() => {
+                      setSpec(prev => ({
+                        ...prev,
+                        root: (function mapAll(n: any): any {
+                          if (selected.includes(n.id)) {
+                            return { ...n, locked: false };
+                          }
+                          if (Array.isArray(n.children)) return { ...n, children: n.children.map(mapAll) };
+                          return n;
+                        })(prev.root)
+                      }));
+                      setMenu(null);
+                    }}
+                    className="px-3 py-1.5 w-full text-left hover:bg-gray-100 flex items-center gap-2"
+                  >
+                    <i className="fa-solid fa-lock-open text-gray-400 w-4" />
+                    Unlock
+                  </button>
+                )}
+                <div className="h-px bg-gray-200 my-1" />
+              </>
+            );
+          })()}
           <button 
             onClick={() => setMenu(null)} 
             className="px-3 py-1.5 hover:bg-gray-100 w-full text-left text-gray-500"

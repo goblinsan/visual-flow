@@ -16,6 +16,7 @@ import { logger } from "./utils/logger";
 import { dashArrayToInput } from './utils/paint';
 import CanvasStage from "./canvas/CanvasStage.tsx";
 import type { LayoutSpec } from "./layout-schema.ts";
+import { saveNamedDesign, getSavedDesigns, loadNamedDesign, getCurrentDesignName, setCurrentDesignName, type SavedDesign } from './utils/persistence';
 
 // Extracted hook
 import useElementSize from './hooks/useElementSize';
@@ -50,8 +51,9 @@ const TEMPLATES: { id: string; name: string; icon: string; description: string; 
     description: 'Website layout with top navigation bar',
     build: () => ({
       root: {
-        id: "root", type: "frame", size: { width: 1440, height: 900 }, background: "#f9fafb",
+        id: "root", type: "frame", size: { width: 1440, height: 900 }, background: undefined,
         children: [
+          { id: "bg", type: "rect", position: { x: 0, y: 0 }, size: { width: 1440, height: 900 }, fill: "#f9fafb", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1 },
           { id: "nav", type: "rect", position: { x: 0, y: 0 }, size: { width: 1440, height: 64 }, fill: "#1e293b", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1 },
           { id: "nav-logo", type: "text", text: "Logo", variant: "h2", position: { x: 32, y: 18 }, size: { width: 100, height: 28 }, color: "#ffffff" },
           { id: "nav-link1", type: "text", text: "Home", variant: "body", position: { x: 200, y: 22 }, size: { width: 60, height: 20 }, color: "#94a3b8" },
@@ -72,8 +74,9 @@ const TEMPLATES: { id: string; name: string; icon: string; description: string; 
     description: 'Dashboard-style layout with left sidebar',
     build: () => ({
       root: {
-        id: "root", type: "frame", size: { width: 1440, height: 900 }, background: "#f1f5f9",
+        id: "root", type: "frame", size: { width: 1440, height: 900 }, background: undefined,
         children: [
+          { id: "bg", type: "rect", position: { x: 0, y: 0 }, size: { width: 1440, height: 900 }, fill: "#f1f5f9", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1 },
           { id: "sidebar", type: "rect", position: { x: 0, y: 0 }, size: { width: 240, height: 900 }, fill: "#1e293b", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1 },
           { id: "sidebar-logo", type: "text", text: "Dashboard", variant: "h2", position: { x: 24, y: 24 }, size: { width: 180, height: 28 }, color: "#ffffff" },
           { id: "nav-item1", type: "rect", position: { x: 12, y: 80 }, size: { width: 216, height: 40 }, fill: "#334155", stroke: undefined, strokeWidth: 0, radius: 8, opacity: 1 },
@@ -97,8 +100,9 @@ const TEMPLATES: { id: string; name: string; icon: string; description: string; 
     description: 'Three column layout for content',
     build: () => ({
       root: {
-        id: "root", type: "frame", size: { width: 1200, height: 800 }, background: "#ffffff",
+        id: "root", type: "frame", size: { width: 1200, height: 800 }, background: undefined,
         children: [
+          { id: "bg", type: "rect", position: { x: 0, y: 0 }, size: { width: 1200, height: 800 }, fill: "#ffffff", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1 },
           { id: "header", type: "rect", position: { x: 0, y: 0 }, size: { width: 1200, height: 80 }, fill: "#f8fafc", stroke: "#e2e8f0", strokeWidth: 1, radius: 0, opacity: 1 },
           { id: "title", type: "text", text: "Page Title", variant: "h1", position: { x: 40, y: 24 }, size: { width: 300, height: 32 }, color: "#0f172a" },
           { id: "col1", type: "rect", position: { x: 40, y: 120 }, size: { width: 360, height: 640 }, fill: "#f1f5f9", stroke: "#e2e8f0", strokeWidth: 1, radius: 8, opacity: 1 },
@@ -118,8 +122,9 @@ const TEMPLATES: { id: string; name: string; icon: string; description: string; 
     description: 'Mobile app screen layout',
     build: () => ({
       root: {
-        id: "root", type: "frame", size: { width: 800, height: 1000 }, background: "#e5e7eb",
+        id: "root", type: "frame", size: { width: 800, height: 1000 }, background: undefined,
         children: [
+          { id: "bg", type: "rect", position: { x: 0, y: 0 }, size: { width: 800, height: 1000 }, fill: "#e5e7eb", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1 },
           { id: "phone-frame", type: "rect", position: { x: 200, y: 40 }, size: { width: 390, height: 844 }, fill: "#ffffff", stroke: "#d1d5db", strokeWidth: 2, radius: 48, opacity: 1 },
           { id: "status-bar", type: "rect", position: { x: 200, y: 40 }, size: { width: 390, height: 44 }, fill: "#f9fafb", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1 },
           { id: "status-time", type: "text", text: "9:41", variant: "body", position: { x: 220, y: 52 }, size: { width: 50, height: 20 }, color: "#111827" },
@@ -141,8 +146,9 @@ const TEMPLATES: { id: string; name: string; icon: string; description: string; 
     description: 'Online store product grid layout',
     build: () => ({
       root: {
-        id: "root", type: "frame", size: { width: 1440, height: 1000 }, background: "#ffffff",
+        id: "root", type: "frame", size: { width: 1440, height: 1000 }, background: undefined,
         children: [
+          { id: "bg", type: "rect", position: { x: 0, y: 0 }, size: { width: 1440, height: 1000 }, fill: "#ffffff", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1 },
           { id: "header", type: "rect", position: { x: 0, y: 0 }, size: { width: 1440, height: 72 }, fill: "#111827", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1 },
           { id: "logo", type: "text", text: "STORE", variant: "h1", position: { x: 60, y: 20 }, size: { width: 120, height: 32 }, color: "#ffffff" },
           { id: "search", type: "rect", position: { x: 400, y: 18 }, size: { width: 400, height: 36 }, fill: "#374151", stroke: undefined, strokeWidth: 0, radius: 8, opacity: 1 },
@@ -196,6 +202,9 @@ export default function CanvasApp() {
   const [aboutOpen, setAboutOpen] = useState(false);
   const [cheatOpen, setCheatOpen] = useState(false);
   const [newDialogOpen, setNewDialogOpen] = useState(false); // New design template dialog
+  const [openDialogOpen, setOpenDialogOpen] = useState(false); // Open design dialog
+  const [currentDesignName, setCurrentDesignNameState] = useState<string | null>(getCurrentDesignName);
+  const [fitToContentKey, setFitToContentKey] = useState(0); // Increment to trigger fit-to-content in CanvasStage
   // Curve control point selection
   const [selectedCurvePointIndex, setSelectedCurvePointIndex] = useState<number | null>(null);
   const appVersion = (import.meta as any).env?.VITE_APP_VERSION || '0.0.0';
@@ -251,17 +260,54 @@ export default function CanvasApp() {
     // Otherwise don't overwrite user input (e.g., multi-select or other tool)
   }, [selectedIds, tool, rectDefaults.strokeDash, spec.root]);
 
-  // File menu stub handlers
+  // File menu handlers
   const fileAction = useCallback((action: string) => {
     if (action === "new") {
-      setNewDialogOpen(true); // Open template selection dialog
+      setNewDialogOpen(true);
       logger.info('File action new: opening template dialog');
     }
-    if (action === 'save') {
-      // Already auto-saving; force save noop here for future explicit export.
-      logger.info('File action save (autosave already active)');
+    if (action === 'open') {
+      setOpenDialogOpen(true);
+      logger.info('File action open: opening saved designs dialog');
     }
-  }, []);
+    if (action === 'save') {
+      if (currentDesignName) {
+        // Save to existing name
+        saveNamedDesign(currentDesignName, spec);
+        logger.info(`Saved design: ${currentDesignName}`);
+      } else {
+        // No current name, prompt for one (like Save As)
+        const name = window.prompt("Save: Enter a name for this design", "Untitled Design");
+        if (name && name.trim()) {
+          saveNamedDesign(name.trim(), spec);
+          setCurrentDesignNameState(name.trim());
+          setCurrentDesignName(name.trim());
+          logger.info(`Saved new design: ${name.trim()}`);
+        }
+      }
+    }
+    if (action === 'saveAs') {
+      const defaultName = currentDesignName ? `${currentDesignName} (copy)` : "Untitled Design";
+      const name = window.prompt("Save As: Enter a name for this design", defaultName);
+      if (name && name.trim()) {
+        saveNamedDesign(name.trim(), spec);
+        setCurrentDesignNameState(name.trim());
+        setCurrentDesignName(name.trim());
+        logger.info(`Saved design as: ${name.trim()}`);
+      }
+    }
+  }, [spec, currentDesignName]);
+
+  // Load a saved design
+  const loadDesign = useCallback((design: SavedDesign) => {
+    setSpec(design.spec);
+    setCurrentDesignNameState(design.name);
+    setCurrentDesignName(design.name);
+    setSelection([]);
+    setOpenDialogOpen(false);
+    setTimeout(() => setFitToContentKey(k => k + 1), 50);
+    logger.info(`Loaded design: ${design.name}`);
+  }, [setSpec, setSelection]);
 
   // Apply a template from the New dialog
   const applyTemplate = useCallback((templateId: string) => {
@@ -270,6 +316,8 @@ export default function CanvasApp() {
       const newSpec = template.build();
       setSpec(newSpec);
       setSelection([]);
+      // Trigger fit-to-content after a small delay to ensure spec is applied
+      setTimeout(() => setFitToContentKey(k => k + 1), 50);
       logger.info(`Applied template: ${template.name}`);
     }
     setNewDialogOpen(false);
@@ -449,6 +497,48 @@ export default function CanvasApp() {
           ))}
         </div>
       </Modal>
+      {/* Open Design Dialog */}
+      <Modal open={openDialogOpen} onClose={() => setOpenDialogOpen(false)} title="Open Design" size="lg" variant="light">
+        <p className="text-sm text-gray-600 mb-4">Select a saved design to open:</p>
+        {(() => {
+          const designs = getSavedDesigns();
+          if (designs.length === 0) {
+            return (
+              <div className="text-center py-8 text-gray-500">
+                <i className="fa-regular fa-folder-open text-4xl mb-3 text-gray-300" />
+                <p>No saved designs yet.</p>
+                <p className="text-sm mt-1">Use "Save" or "Save As" to save your work.</p>
+              </div>
+            );
+          }
+          return (
+            <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+              {designs
+                .sort((a, b) => b.savedAt - a.savedAt)
+                .map((design) => (
+                  <button
+                    key={design.name}
+                    onClick={() => loadDesign(design)}
+                    className="w-full flex items-center justify-between p-4 rounded-lg border border-gray-200 bg-white hover:border-blue-400 hover:bg-blue-50 transition-all duration-150 text-left group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white shadow-sm group-hover:scale-105 transition-transform">
+                        <i className="fa-regular fa-file text-lg" />
+                      </div>
+                      <div>
+                        <span className="font-medium text-gray-900 block">{design.name}</span>
+                        <span className="text-xs text-gray-500">
+                          {new Date(design.savedAt).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                    <i className="fa-solid fa-arrow-right text-gray-400 group-hover:text-blue-500 transition-colors" />
+                  </button>
+                ))}
+            </div>
+          );
+        })()}
+      </Modal>
       {/* Body layout */}
       <div className="flex flex-1 min-h-0">
         {/* Left toolbar */}
@@ -501,6 +591,7 @@ export default function CanvasApp() {
                 onToolChange={setTool}
                 selection={selectedIds}
                 setSelection={setSelection}
+                fitToContentKey={fitToContentKey}
                 rectDefaults={{
                   fill: rectDefaults.fill,
                   stroke: rectDefaults.stroke,

@@ -192,17 +192,23 @@ export const EllipseAttributesPanel: React.FC<EllipseAttributesPanelProps> = ({
             Recent
           </div>
           <div className="flex flex-wrap gap-1">
-            {recentColors.map(col => (
-              <button
-                key={col}
-                type="button"
-                title={col}
-                onClick={() => { updateNode({ fill: col }); setLastFillById(m => ({ ...m, [id]: col })); pushRecent(col); }}
-                className="w-6 h-6 rounded-md border border-gray-200 hover:border-gray-400 transition-colors overflow-hidden"
-              >
-                <span className="w-full h-full block" style={{ background: col }} />
-              </button>
-            ))}
+            {recentColors.map(col => {
+              const hasAlpha = /#[0-9a-fA-F]{8}$/.test(col);
+              return (
+                <button
+                  key={col}
+                  type="button"
+                  title={col}
+                  onClick={() => { updateNode({ fill: col }); setLastFillById(m => ({ ...m, [id]: col })); pushRecent(col); }}
+                  className="w-6 h-6 rounded border border-gray-300 flex items-center justify-center relative group p-0"
+                >
+                  <span className="w-5 h-5 rounded checkerboard overflow-hidden relative">
+                    <span className="absolute inset-0" style={{ background: col }} />
+                    {hasAlpha && <span className="absolute bottom-0 right-0 px-0.5 rounded-tl bg-black/40 text-[8px] text-white leading-none">α</span>}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
       )}

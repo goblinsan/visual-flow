@@ -1,10 +1,70 @@
 import { Group, Rect, Text, Ellipse, Line, Path } from "react-konva";
-import { type ReactNode } from "react";
+import { type ReactNode, useEffect, useState, useCallback } from "react";
 import { computeRectVisual } from "../renderer/rectVisual";
 import { estimateNodeHeight } from "../renderer/measurement";
 import type { LayoutNode, FrameNode, StackNode, TextNode, BoxNode, GridNode, GroupNode, ImageNode, RectNode, EllipseNode, LineNode, CurveNode } from "../layout-schema.ts";
 import { CanvasImage } from "./components/CanvasImage";
 import { debugOnce, logger } from "../utils/logger";
+
+// Font loading cache and callbacks
+const loadedFonts = new Set<string>();
+const pendingFonts = new Set<string>();
+const systemFonts = new Set(['Arial', 'Helvetica', 'Times New Roman', 'Georgia', 'Courier New', 'Verdana', 'system-ui', 'sans-serif', 'serif', 'monospace']);
+const fontLoadCallbacks: Array<() => void> = [];
+
+function addFontLoadCallback(cb: () => void): void {
+  fontLoadCallbacks.push(cb);
+}
+
+function removeFontLoadCallback(cb: () => void): void {
+  const idx = fontLoadCallbacks.indexOf(cb);
+  if (idx >= 0) fontLoadCallbacks.splice(idx, 1);
+}
+
+function notifyFontLoaded(): void {
+  fontLoadCallbacks.forEach(cb => cb());
+}
+
+/** Hook to trigger re-render when fonts finish loading */
+export function useFontLoading(): number {
+  const [fontVersion, setFontVersion] = useState(0);
+  
+  useEffect(() => {
+    const callback = () => setFontVersion(v => v + 1);
+    addFontLoadCallback(callback);
+    return () => removeFontLoadCallback(callback);
+  }, []);
+  
+  return fontVersion;
+}
+
+function loadGoogleFont(fontName: string, weight: string = '400'): void {
+  if (!fontName || systemFonts.has(fontName)) return;
+  // Skip font values that look like font stacks (contain commas)
+  if (fontName.includes(',')) return;
+  
+  const fontKey = `${fontName}:${weight}`;
+  if (loadedFonts.has(fontKey) || pendingFonts.has(fontKey)) return;
+  
+  pendingFonts.add(fontKey);
+  
+  // Load font via CSS
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(fontName).replace(/%20/g, '+')}:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap`;
+  document.head.appendChild(link);
+  
+  // Wait for font to be ready
+  document.fonts.ready.then(() => {
+    // Check if the specific font+weight is now available
+    const fontSpec = `${weight} 16px "${fontName}"`;
+    document.fonts.load(fontSpec).then(() => {
+      loadedFonts.add(fontKey);
+      pendingFonts.delete(fontKey);
+      notifyFontLoaded();
+    });
+  });
+}
 
 // Text
 function renderText(n: TextNode) {
@@ -17,9 +77,52 @@ function renderText(n: TextNode) {
   const defaultFontSize = n.variant === "h1" ? 28 : n.variant === "h2" ? 22 : n.variant === "h3" ? 18 : n.variant === "caption" ? 12 : 14;
   const fontSize = n.fontSize ?? defaultFontSize;
   
-  // Build font style string for Konva
-  const fontStyle = n.fontStyle === 'italic' ? 'italic' : 'normal';
-  const fontWeight = n.fontWeight ?? (n.variant === 'h1' || n.variant === 'h2' ? 'bold' : 'normal');
+  // Get font weight
+  const rawWeight = n.fontWeight ?? (n.variant === 'h1' || n.variant === 'h2' ? 'bold' : 'normal');
+  
+  // Get font style (italic or not)
+  const isItalic = n.fontStyle === 'italic';
+  
+  // Ensure font is loaded for Google Fonts
+  const fontFamily = n.fontFamily || 'Arial';
+  if (fontFamily && !systemFonts.has(fontFamily)) {
+    // Load the specific weight for Google Fonts
+    const numericWeight = rawWeight === 'bold' ? '700' : (rawWeight === 'normal' ? '400' : rawWeight);
+    loadGoogleFont(fontFamily, numericWeight);
+  }
+  
+  // Build Konva fontStyle string
+  // Konva fontStyle accepts: "normal", "italic", "bold", "italic bold", "500", "italic 500", etc.
+  let fontStyleValue: string;
+  
+  // For system fonts, only use 'bold' or 'normal' since they don't support numeric weights
+  const isSystemFont = systemFonts.has(fontFamily);
+  
+  if (isSystemFont) {
+    // System fonts only support normal, bold, italic, italic bold
+    const isBold = rawWeight === 'bold' || rawWeight === '700' || Number(rawWeight) >= 600;
+    if (isItalic && isBold) {
+      fontStyleValue = 'italic bold';
+    } else if (isItalic) {
+      fontStyleValue = 'italic';
+    } else if (isBold) {
+      fontStyleValue = 'bold';
+    } else {
+      fontStyleValue = 'normal';
+    }
+  } else {
+    // Google Fonts support numeric weights
+    const weightStr = rawWeight === 'normal' ? '' : (rawWeight === 'bold' ? 'bold' : rawWeight);
+    if (isItalic && weightStr) {
+      fontStyleValue = `italic ${weightStr}`;
+    } else if (isItalic) {
+      fontStyleValue = 'italic';
+    } else if (weightStr) {
+      fontStyleValue = weightStr;
+    } else {
+      fontStyleValue = 'normal';
+    }
+  }
   
   return (
     <Text
@@ -31,8 +134,8 @@ function renderText(n: TextNode) {
       rotation={n.rotation ?? 0}
       text={n.text}
       fontSize={fontSize}
-      fontFamily={n.fontFamily || 'Arial'}
-      fontStyle={fontStyle}
+      fontFamily={fontFamily}
+      fontStyle={fontStyleValue}
       fill={n.color ?? "#0f172a"}
       opacity={n.opacity ?? 1}
       align={n.align ?? "left"}
