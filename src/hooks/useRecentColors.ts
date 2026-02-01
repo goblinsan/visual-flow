@@ -15,7 +15,7 @@ interface SessionState {
 /**
  * Recent colors manager with explicit session semantics so we only commit once per picker close.
  */
-export function useRecentColors(_opts: UseRecentColorsOptions = {}) { // _opts reserved for future options (lint: intentional underscore)
+export function useRecentColors(/* opts: UseRecentColorsOptions = {} - reserved for future options */) {
   // max reserved for future list size constraint (currently handled in addRecentColor semantics)
   const [recent, setRecent] = useState<string[]>(() => loadRecentColors() || ['#ffffff','#000000']);
   const session = useRef<SessionState>({ active: false });

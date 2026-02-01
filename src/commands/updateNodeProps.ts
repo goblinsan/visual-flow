@@ -53,7 +53,7 @@ export function createUpdateNodePropsCommand(payload: UpdateNodePropsPayload): C
       (this as any)._inverse = inverse; // ephemeral attach
       return next;
     },
-  invert(_before: LayoutSpec, _after: LayoutSpec): Command | null {
+  invert(): Command | null {
       // Prefer the captured inverse if present
       return (this as any)._inverse || null;
     }

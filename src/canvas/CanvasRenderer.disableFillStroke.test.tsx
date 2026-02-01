@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { renderNode } from './CanvasRenderer';
 import type { RectNode } from '../layout-schema';
-import React from 'react';
 
 // Helper: mount a single rect via a faux frame root if needed (direct renderNode returns Group wrapper)
 

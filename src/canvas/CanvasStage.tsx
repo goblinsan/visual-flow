@@ -111,7 +111,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   const [menu, setMenu] = useState<null | { x: number; y: number }>(null);
   
   // Font loading - triggers re-render when fonts finish loading
-  const _fontVersion = useFontLoading();
+  useFontLoading();
   
   // Interaction state
   // Drag interaction session (Milestone 1 pure helper integration)
@@ -308,7 +308,6 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   const isImageMode = tool === 'image';
   const isIconMode = tool === 'icon';
   const isComponentMode = tool === 'component';
-  const isShapeCreationMode = isRectMode || isEllipseMode || isLineMode || isCurveMode || isTextMode || isImageMode || isIconMode || isComponentMode;
   const [spacePan, setSpacePan] = useState(false);
   // Track shift key globally for aspect-ratio constrained resize
   const [shiftPressed, setShiftPressed] = useState(false);
@@ -505,7 +504,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   const finalizeRect = useCallback(() => {
     if (!isRectMode || !rectDraft) return;
     const { start, current } = rectDraft;
-    let x1 = start.x, y1 = start.y, x2 = current.x, y2 = current.y;
+    const x1 = start.x, y1 = start.y, x2 = current.x, y2 = current.y;
     let w = x2 - x1; let h = y2 - y1;
     const alt = altPressed;
     const shift = shiftPressed;
@@ -555,7 +554,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   const finalizeEllipse = useCallback(() => {
     if (!isEllipseMode || !ellipseDraft) return;
     const { start, current } = ellipseDraft;
-    let x1 = start.x, y1 = start.y, x2 = current.x, y2 = current.y;
+    const x1 = start.x, y1 = start.y, x2 = current.x, y2 = current.y;
     let w = x2 - x1; let h = y2 - y1;
     const alt = altPressed;
     const shift = shiftPressed;
@@ -1323,7 +1322,6 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     const textNode = findNode(spec.root, editingTextId) as TextNode | null;
     if (!textNode) return null;
     
-    const stage = stageRef.current;
     const worldPos = getNodeWorldPosition(editingTextId) ?? { x: 0, y: 0 };
     const x = worldPos.x;
     const y = worldPos.y;
