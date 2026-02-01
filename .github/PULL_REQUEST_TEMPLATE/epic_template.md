@@ -1,7 +1,7 @@
 ---
 name: Epic
 about: Create an Epic to track a major feature or initiative
-title: 'Epic: [FEATURE_NAME]'
+title: '[MILESTONE_NUMBER] Epic: [FEATURE_NAME]'
 labels: Epic
 assignees: ''
 ---
