@@ -59,7 +59,8 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                 <summary className="cursor-pointer font-semibold mb-2">Error Details</summary>
                 <pre className="text-xs overflow-auto text-red-300">
                   {this.state.error.toString()}
-                  {this.state.error.stack && `\n${this.state.error.stack}`}
+                  {/* Only show stack trace in development */}
+                  {import.meta.env.DEV && this.state.error.stack && `\n${this.state.error.stack}`}
                 </pre>
               </details>
             )}
