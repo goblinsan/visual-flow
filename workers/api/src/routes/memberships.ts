@@ -72,13 +72,14 @@ export async function addMember(
 
     if (!invitedUser) {
       // Create placeholder user (will be filled in when they first access)
-      const userId = body.email;
+      // Phase 1: Use email as ID for simplicity (will migrate to UUIDs in Phase 2)
+      const userIdFromEmail = body.email;
       await env.DB
         .prepare('INSERT INTO users (id, email, created_at, updated_at) VALUES (?, ?, ?, ?)')
-        .bind(userId, body.email, now, now)
+        .bind(userIdFromEmail, body.email, now, now)
         .run();
       
-      invitedUser = { id: userId, email: body.email, created_at: now, updated_at: now };
+      invitedUser = { id: userIdFromEmail, email: body.email, created_at: now, updated_at: now };
     }
 
     // Check if membership already exists

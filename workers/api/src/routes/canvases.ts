@@ -25,7 +25,7 @@ export async function listCanvases(user: User, env: Env): Promise<Response> {
     // Parse spec JSON for each canvas
     const canvases = result.results?.map(c => ({
       ...c,
-      spec: JSON.parse(c.spec as any),
+      spec: typeof c.spec === 'string' ? JSON.parse(c.spec) : c.spec,
     })) || [];
 
     return jsonResponse(canvases);
@@ -107,7 +107,7 @@ export async function getCanvas(user: User, env: Env, canvasId: string): Promise
 
     return jsonResponse({
       ...canvas,
-      spec: JSON.parse(canvas.spec as any),
+      spec: typeof canvas.spec === 'string' ? JSON.parse(canvas.spec) : canvas.spec,
       user_role: access.role,
     });
   } catch (error) {
@@ -170,7 +170,7 @@ export async function updateCanvas(
 
     return jsonResponse({
       ...canvas,
-      spec: JSON.parse((canvas as any).spec),
+      spec: typeof canvas?.spec === 'string' ? JSON.parse(canvas.spec) : canvas?.spec,
     });
   } catch (error) {
     console.error('Error updating canvas:', error);

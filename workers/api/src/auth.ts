@@ -31,14 +31,16 @@ export async function authenticateUser(request: Request, env: Env): Promise<User
   }
 
   // Create new user
-  const userId = email; // Use email as ID in Phase 1
+  // Phase 1: Use email as ID for simplicity with Cloudflare Access
+  // TODO Phase 2: Migrate to UUID-based user IDs for better separation
+  const userIdFromEmail = email;
   await env.DB
     .prepare('INSERT INTO users (id, email, created_at, updated_at) VALUES (?, ?, ?, ?)')
-    .bind(userId, email, now, now)
+    .bind(userIdFromEmail, email, now, now)
     .run();
 
   return {
-    id: userId,
+    id: userIdFromEmail,
     email,
     created_at: now,
     updated_at: now,
