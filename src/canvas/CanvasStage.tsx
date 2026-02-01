@@ -1,7 +1,7 @@
 import { Stage, Layer, Transformer, Rect, Group, Ellipse, Line, Circle } from "react-konva";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type Konva from "konva";
-import type { LayoutSpec, TextNode, TextSpan } from "../layout-schema.ts";
+import type { LayoutNode, LayoutSpec, TextNode, TextSpan } from "../layout-schema.ts";
 import { renderNode, useFontLoading } from "./CanvasRenderer.tsx";
 import { computeClickSelection, computeMarqueeSelection } from "../renderer/interaction";
 import { beginDrag, updateDrag, finalizeDrag } from "../interaction/drag";
@@ -101,6 +101,8 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   // Inline text editing state
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const justStartedTextEditRef = useRef(false);
+  const clipboardRef = useRef<LayoutNode[] | null>(null);
+  const pasteOffsetRef = useRef(0);
     const getNodeWorldPosition = useCallback((nodeId: string): { x: number; y: number } | null => {
       let result: { x: number; y: number } | null = null;
       const walk = (node: any, accX: number, accY: number) => {
@@ -121,6 +123,50 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       walk(spec.root, 0, 0);
       return result;
     }, [spec.root]);
+
+    const collectExistingIds = useCallback((root: LayoutNode): Set<string> => {
+      const ids = new Set<string>();
+      const walk = (node: LayoutNode) => {
+        ids.add(node.id);
+        if (Array.isArray((node as any).children)) {
+          (node as any).children.forEach(walk);
+        }
+      };
+      walk(root);
+      return ids;
+    }, []);
+
+    const cloneNode = useCallback(<T extends LayoutNode>(node: T): T => {
+      return JSON.parse(JSON.stringify(node)) as T;
+    }, []);
+
+    const createUniqueIdFactory = useCallback((existing: Set<string>) => {
+      return (base: string) => {
+        let candidate = `${base}-copy`;
+        let i = 2;
+        while (existing.has(candidate)) {
+          candidate = `${base}-copy-${i++}`;
+        }
+        existing.add(candidate);
+        return candidate;
+      };
+    }, []);
+
+    const remapIdsAndOffset = useCallback((node: LayoutNode, offset: { x: number; y: number }, makeId: (base: string) => string): LayoutNode => {
+      const walk = (n: LayoutNode, isRoot: boolean): LayoutNode => {
+        const next = cloneNode(n);
+        next.id = makeId(next.id);
+        if (isRoot && (next as any).position) {
+          const pos = (next as any).position ?? { x: 0, y: 0 };
+          (next as any).position = { x: (pos.x ?? 0) + offset.x, y: (pos.y ?? 0) + offset.y };
+        }
+        if (Array.isArray((next as any).children)) {
+          (next as any).children = (next as any).children.map((c: LayoutNode) => walk(c, false));
+        }
+        return next;
+      };
+      return walk(node, true);
+    }, [cloneNode]);
   const [editingTextValue, setEditingTextValue] = useState<string>('');
   const [editingTextSpans, setEditingTextSpans] = useState<TextSpan[]>([]);
   const richTextEditorRef = useRef<RichTextEditorHandle>(null);
@@ -1354,6 +1400,40 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (editingTextId) return;
+      if (target?.isContentEditable || target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.tagName === 'SELECT') {
+        return;
+      }
+
+      // Copy
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+        if (selected.length === 0) return;
+        e.preventDefault();
+        const nodes = selected.map(id => findNode(spec.root, id)).filter(Boolean) as LayoutNode[];
+        if (nodes.length > 0) {
+          clipboardRef.current = nodes.map(n => cloneNode(n));
+          pasteOffsetRef.current = 0;
+        }
+        return;
+      }
+
+      // Paste
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
+        if (!clipboardRef.current || clipboardRef.current.length === 0) return;
+        e.preventDefault();
+        const offset = 16 * (pasteOffsetRef.current + 1);
+        const existing = collectExistingIds(spec.root as LayoutNode);
+        const makeId = createUniqueIdFactory(existing);
+        const clones = clipboardRef.current.map(n => remapIdsAndOffset(cloneNode(n), { x: offset, y: offset }, makeId));
+        setSpec(prev => ({
+          ...prev,
+          root: { ...prev.root, children: [...prev.root.children, ...clones] },
+        }));
+        setSelection(clones.map(n => n.id));
+        pasteOffsetRef.current += 1;
+        return;
+      }
       const tgt = e.target as HTMLElement | null;
       if (tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA' || tgt.isContentEditable)) return;
       if (!isSelectMode) return;
@@ -1410,7 +1490,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [isSelectMode, canGroup, canUngroup, selected, performGroup, performUngroup, setSpec]);
+  }, [isSelectMode, canGroup, canUngroup, selected, performGroup, performUngroup, setSpec, setSelection, editingTextId, spec.root, collectExistingIds, createUniqueIdFactory, remapIdsAndOffset, cloneNode]);
 
   // Normalize selection on changes
   useEffect(() => {
@@ -2131,6 +2211,42 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
               );
             })()
           )}
+          <button
+            disabled={selected.length === 0}
+            onClick={() => {
+              if (selected.length === 0) return;
+              const nodes = selected.map(id => findNode(spec.root, id)).filter(Boolean) as LayoutNode[];
+              if (nodes.length > 0) {
+                clipboardRef.current = nodes.map(n => cloneNode(n));
+                pasteOffsetRef.current = 0;
+              }
+              setMenu(null);
+            }}
+            className={`px-3 py-1.5 w-full text-left ${selected.length > 0 ? 'hover:bg-gray-100' : 'text-gray-400 cursor-not-allowed'}`}
+          >
+            Copy
+          </button>
+          <button
+            disabled={!clipboardRef.current || clipboardRef.current.length === 0}
+            onClick={() => {
+              if (!clipboardRef.current || clipboardRef.current.length === 0) return;
+              const offset = 16 * (pasteOffsetRef.current + 1);
+              const existing = collectExistingIds(spec.root as LayoutNode);
+              const makeId = createUniqueIdFactory(existing);
+              const clones = clipboardRef.current.map(n => remapIdsAndOffset(cloneNode(n), { x: offset, y: offset }, makeId));
+              setSpec(prev => ({
+                ...prev,
+                root: { ...prev.root, children: [...prev.root.children, ...clones] },
+              }));
+              setSelection(clones.map(n => n.id));
+              pasteOffsetRef.current += 1;
+              setMenu(null);
+            }}
+            className={`px-3 py-1.5 w-full text-left ${clipboardRef.current && clipboardRef.current.length > 0 ? 'hover:bg-gray-100' : 'text-gray-400 cursor-not-allowed'}`}
+          >
+            Paste
+          </button>
+          <div className="h-px bg-gray-200 my-1" />
           <button 
             disabled={!canGroup}
             onClick={() => { if (canGroup) performGroup(); else setMenu(null); }}
