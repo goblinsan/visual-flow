@@ -504,7 +504,8 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   const finalizeRect = useCallback(() => {
     if (!isRectMode || !rectDraft) return;
     const { start, current } = rectDraft;
-    const x1 = start.x, y1 = start.y, x2 = current.x, y2 = current.y;
+    let x1 = start.x, y1 = start.y;
+    const x2 = current.x, y2 = current.y;
     let w = x2 - x1; let h = y2 - y1;
     const alt = altPressed;
     const shift = shiftPressed;
@@ -554,7 +555,8 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   const finalizeEllipse = useCallback(() => {
     if (!isEllipseMode || !ellipseDraft) return;
     const { start, current } = ellipseDraft;
-    const x1 = start.x, y1 = start.y, x2 = current.x, y2 = current.y;
+    let x1 = start.x, y1 = start.y;
+    const x2 = current.x, y2 = current.y;
     let w = x2 - x1; let h = y2 - y1;
     const alt = altPressed;
     const shift = shiftPressed;
