@@ -1,5 +1,6 @@
 import { Stage, Layer, Transformer, Rect, Group, Ellipse, Line, Circle } from "react-konva";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { JSX } from "react";
 import type Konva from "konva";
 import type { LayoutNode, LayoutSpec, TextNode, TextSpan } from "../layout-schema.ts";
 import { renderNode, useFontLoading } from "./CanvasRenderer.tsx";
@@ -9,7 +10,6 @@ import type { DragSession } from "../interaction/types";
 import { beginMarquee, updateMarquee, finalizeMarquee, type MarqueeSession } from "../interaction/marquee";
 import { deleteNodes, duplicateNodes, nudgeNodes } from "./editing";
 import { applyPosition, applyPositionAndSize, groupNodes, ungroupNodes } from "./stage-internal";
-import { findNode, mapNode } from "../commands/types";
 import { RichTextEditor, type RichTextEditorHandle } from "../components/RichTextEditor";
 import { TextEditToolbar } from "../components/TextEditToolbar";
 import { ImagePickerModal } from "../components/ImagePickerModal";

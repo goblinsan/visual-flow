@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState, useEffect } from "react";
+import type { JSX } from "react";
 import { findNode, updateNode } from './utils/specUtils';
 import RectAttributesPanel from './components/RectAttributesPanel';
 import EllipseAttributesPanel from './components/EllipseAttributesPanel';
