@@ -1,0 +1,16 @@
+name = "visual-flow-api"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+# D1 Database binding
+[[d1_databases]]
+binding = "DB"
+database_name = "visual-flow-db"
+database_id = "placeholder-id" # Will be set during deployment
+
+# Environment configuration
+[env.production]
+vars = { ENVIRONMENT = "production" }
+
+[env.staging]
+vars = { ENVIRONMENT = "staging" }
