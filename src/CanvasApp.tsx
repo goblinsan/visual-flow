@@ -375,10 +375,10 @@ export default function CanvasApp() {
       <header ref={headerRef} className="flex items-center justify-between border-b border-blue-900/30 bg-gradient-to-r from-blue-950 via-blue-900 to-cyan-700 shadow-lg select-none" style={{ padding: '20px' }}>
         <div className="flex items-center gap-8">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-white/15 backdrop-blur flex items-center justify-center shadow-sm">
-                <i className="fa-solid fa-pen-nib text-cyan-300 text-lg" />
+              <div className="w-10 h-10 rounded-lg bg-white/15 backdrop-blur flex items-center justify-center shadow-sm overflow-hidden">
+                <img src="/vizail-mark.svg" alt="Vizail" className="w-7 h-7" />
               </div>
-              <h1 className="tracking-wide text-white" style={{ fontFamily: '"Cal Sans", "Cal Sans Semibold", sans-serif', fontWeight: 600, fontSize: '2em' }}>Visual Flow</h1>
+              <h1 className="tracking-wide text-white" style={{ fontFamily: '"Cal Sans", "Cal Sans Semibold", sans-serif', fontWeight: 600, fontSize: '2em' }}>Viz<span className="text-cyan-300">ai</span>l</h1>
             </div>
             {/* File menu */}
             <div className="relative">
@@ -453,7 +453,7 @@ export default function CanvasApp() {
         </div>
       </header>
       {/* Modals */}
-      <Modal open={aboutOpen} onClose={() => setAboutOpen(false)} title="About Visual Flow" size="sm" variant="light">
+      <Modal open={aboutOpen} onClose={() => setAboutOpen(false)} title="About Vizail" size="sm" variant="light">
         <p><strong>visual-flow</strong> version <code>{appVersion}</code></p>
         <p className="mt-2">Experimental canvas + layout editor. Transforms are baked to schema on release.</p>
         <p className="mt-4 opacity-70 text-[10px]">© {new Date().getFullYear()} visual-flow</p>

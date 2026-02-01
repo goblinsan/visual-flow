@@ -23,7 +23,7 @@ function CanvasStoryWrapper() {
       size: { width: 800, height: 520 },
       background: "#0f172a",
       children: [
-        { id: "title", type: "text", text: "Visual Flow Canvas", variant: "h1", position: { x: 24, y: 24 }, size: { width: 300, height: 40 }, color: "#f8fafc" },
+        { id: "title", type: "text", text: "Vizail Canvas", variant: "h1", position: { x: 24, y: 24 }, size: { width: 300, height: 40 }, color: "#f8fafc" },
         { id: "img", type: "image", position: { x: 24, y: 90 }, size: { width: 120, height: 120 }, src: "/vite.svg", radius: 10, objectFit: "contain" },
         { id: "box", type: "box", position: { x: 170, y: 90 }, size: { width: 240, height: 120 }, background: "#1f2937", border: "1px solid #334155", radius: 10 },
       ],

@@ -354,7 +354,7 @@ export function VisualFlowEditor({ initial }: EditorProps) {
           </div>
         </div>
         {/* Modals */}
-        <Modal open={aboutOpen} onClose={() => setAboutOpen(false)} title="About Visual Flow" size="sm">
+        <Modal open={aboutOpen} onClose={() => setAboutOpen(false)} title="About Vizail" size="sm">
           <p><strong>visual-flow</strong> version <code>{appVersion}</code></p>
           <p className="mt-2">A lightweight experimental visual layout & canvas transform playground built with React, Konva & Tailwind.</p>
           <p className="mt-2">Transforms use a bake & reset pattern: live manipulations are applied via Konva, then persisted to a schema on release.</p>

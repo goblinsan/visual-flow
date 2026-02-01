@@ -82,12 +82,13 @@ export interface GridNode extends BaseNode, Partial<AbsoluteChild> {
 /** Text leaf node. */
 export interface TextNode extends BaseNode, Partial<AbsoluteChild> {
   type: "text";
-  text: string;
+  text: string;          // Plain text (fallback/legacy)
+  spans?: TextSpan[];    // Rich text spans - if present, takes precedence over text
   variant?: "h1" | "h2" | "h3" | "body" | "caption";
-  color?: string;        // CSS color
+  color?: string;        // CSS color (default for all spans)
   align?: "left" | "center" | "right";
-  fontFamily?: string;   // Font family name
-  fontSize?: number;     // Font size in pixels
+  fontFamily?: string;   // Font family name (default for all spans)
+  fontSize?: number;     // Font size in pixels (default for all spans)
   fontWeight?: "normal" | "bold" | "100" | "200" | "300" | "400" | "500" | "600" | "700" | "800" | "900";
   fontStyle?: "normal" | "italic";
   /** Persistent horizontal glyph scale (1 = original). */
@@ -115,6 +116,16 @@ export interface BoxNode extends BaseNode, Partial<AbsoluteChild> {
   border?: string;       // e.g., "1px solid #e5e7eb"
   padding?: number;      // px
   children?: LayoutNode[];
+}
+
+/** Individual text span with optional formatting (for rich text). */
+export interface TextSpan {
+  text: string;
+  color?: string;        // override color for this span
+  fontWeight?: "normal" | "bold" | "100" | "200" | "300" | "400" | "500" | "600" | "700" | "800" | "900";
+  fontStyle?: "normal" | "italic";
+  fontFamily?: string;   // override font family
+  fontSize?: number;     // override font size
 }
 
 /** Gradient fill definition */

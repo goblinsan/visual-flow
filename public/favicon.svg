@@ -1,0 +1,25 @@
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="left" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1E88E5"/>
+      <stop offset="100%" stop-color="#2BB0E6"/>
+    </linearGradient>
+
+    <linearGradient id="right" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#2ECC71"/>
+      <stop offset="100%" stop-color="#7ED957"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Left wedge -->
+  <polygon
+    points="48,48 112,48 128,200 100,200"
+    fill="url(#left)"
+  />
+
+  <!-- Right wedge -->
+  <polygon
+    points="144,48 208,48 156,200 128,200"
+    fill="url(#right)"
+  />
+</svg>

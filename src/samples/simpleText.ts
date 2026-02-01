@@ -5,7 +5,7 @@ export const simpleText: RootSpec = {
   background: "white",
   body: {
     type: "text",
-    text: "Visual Flow",
+    text: "Vizail",
     variant: "h1",
     align: "center",
   },

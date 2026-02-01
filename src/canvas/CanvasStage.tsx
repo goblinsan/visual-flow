@@ -1,7 +1,7 @@
 import { Stage, Layer, Transformer, Rect, Group, Ellipse, Line, Circle } from "react-konva";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type Konva from "konva";
-import type { LayoutSpec, TextNode } from "../layout-schema.ts";
+import type { LayoutSpec, TextNode, TextSpan } from "../layout-schema.ts";
 import { renderNode, useFontLoading } from "./CanvasRenderer.tsx";
 import { computeClickSelection, computeMarqueeSelection } from "../renderer/interaction";
 import { beginDrag, updateDrag, finalizeDrag } from "../interaction/drag";
@@ -10,6 +10,9 @@ import { beginMarquee, updateMarquee, finalizeMarquee, type MarqueeSession } fro
 import { deleteNodes, duplicateNodes, nudgeNodes } from "./editing";
 import { applyPosition, applyPositionAndSize, groupNodes, ungroupNodes } from "./stage-internal";
 import { findNode, mapNode } from "../commands/types";
+import { RichTextEditor, type RichTextEditorHandle } from "../components/RichTextEditor";
+import { TextEditToolbar } from "../components/TextEditToolbar";
+import { ImagePickerModal } from "../components/ImagePickerModal";
 
 // Grid configuration
 const GRID_SPACING = 20; // Space between dots
@@ -95,7 +98,13 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   // Inline text editing state
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [editingTextValue, setEditingTextValue] = useState<string>('');
-  const editTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const [editingTextSpans, setEditingTextSpans] = useState<TextSpan[]>([]);
+  const richTextEditorRef = useRef<RichTextEditorHandle>(null);
+  const [textSelection, setTextSelection] = useState<{ start: number; end: number } | null>(null);
+
+  // Image picker state
+  const [imagePickerOpen, setImagePickerOpen] = useState(false);
+  const [pendingImagePosition, setPendingImagePosition] = useState<{ x: number; y: number } | null>(null);
 
   const isSelectMode = tool === "select";
   const isRectMode = tool === 'rect';
@@ -452,17 +461,31 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     onToolChange?.('select');
   }, [setSpec, onToolChange, setSelection]);
 
-  // Helper: create image placeholder at click position
+  // Helper: open image picker at click position
   const createImage = useCallback((worldPos: { x: number; y: number }) => {
+    setPendingImagePosition(worldPos);
+    setImagePickerOpen(true);
+  }, []);
+
+  // Actually insert the image after picker selection
+  const handleImageSelected = useCallback((src: string, width: number, height: number) => {
+    if (!pendingImagePosition) return;
     const id = 'image_' + Math.random().toString(36).slice(2, 9);
-    // Create with a placeholder - user can update src later
     setSpec(prev => ({
       ...prev,
-      root: { ...prev.root, children: [...prev.root.children, { id, type: 'image', position: worldPos, size: { width: 150, height: 150 }, src: '/vite.svg', alt: 'Placeholder image', objectFit: 'contain' } as any] }
+      root: { ...prev.root, children: [...prev.root.children, { id, type: 'image', position: pendingImagePosition, size: { width, height }, src, alt: 'Image', objectFit: 'contain' } as any] }
     }));
     setSelection([id]);
     onToolChange?.('select');
-  }, [setSpec, onToolChange, setSelection]);
+    setImagePickerOpen(false);
+    setPendingImagePosition(null);
+  }, [pendingImagePosition, setSpec, onToolChange, setSelection]);
+
+  const handleImagePickerClose = useCallback(() => {
+    setImagePickerOpen(false);
+    setPendingImagePosition(null);
+    onToolChange?.('select');
+  }, [onToolChange]);
 
   const onMouseDown = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     // Rectangle tool creation pathway
@@ -857,19 +880,35 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     if (isSelectMode) {
       const target = e.target;
       const name = target.name?.() || '';
-      const isTextNode = name.includes('text');
+      let isTextNode = name.includes('text');
+      let nodeId = target.id();
       
-      if (isTextNode) {
-        const nodeId = target.id();
+      // If we clicked on a child element (like a Text inside a Group for rich text),
+      // check the parent for the text node name
+      if (!isTextNode && target.parent) {
+        const parentName = target.parent.name?.() || '';
+        if (parentName.includes('text')) {
+          isTextNode = true;
+          nodeId = target.parent.id();
+        }
+      }
+      
+      if (isTextNode && nodeId) {
         const textNode = findNode(spec.root, nodeId) as TextNode | null;
         
         if (textNode && textNode.type === 'text') {
           setEditingTextId(nodeId);
           setEditingTextValue(textNode.text || '');
-          // Focus the textarea on next tick
+          // Initialize spans - either from existing spans or create one from plain text
+          if (textNode.spans && textNode.spans.length > 0) {
+            setEditingTextSpans(textNode.spans);
+          } else {
+            setEditingTextSpans([{ text: textNode.text || '' }]);
+          }
+          // Focus the editor on next tick
           setTimeout(() => {
-            editTextareaRef.current?.focus();
-            editTextareaRef.current?.select();
+            richTextEditorRef.current?.focus();
+            richTextEditorRef.current?.selectAll();
           }, 0);
         }
       }
@@ -882,18 +921,35 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     
     const newRoot = mapNode(spec.root, editingTextId, (n: any) => ({
       ...n,
-      text: editingTextValue
+      text: editingTextValue,
+      spans: editingTextSpans.length > 0 ? editingTextSpans : undefined,
     }));
     
     setSpec({ ...spec, root: newRoot });
     setEditingTextId(null);
     setEditingTextValue('');
-  }, [editingTextId, editingTextValue, spec, setSpec]);
+    setEditingTextSpans([]);
+    setTextSelection(null);
+  }, [editingTextId, editingTextValue, editingTextSpans, spec, setSpec]);
 
   // Cancel text edit without saving
   const cancelTextEdit = useCallback(() => {
     setEditingTextId(null);
     setEditingTextValue('');
+    setEditingTextSpans([]);
+    setTextSelection(null);
+  }, []);
+
+  // Handle text/spans change from rich text editor
+  const handleTextChange = useCallback((text: string, spans: TextSpan[]) => {
+    setEditingTextValue(text);
+    setEditingTextSpans(spans);
+  }, []);
+
+  // Apply formatting to selected text
+  const applyFormat = useCallback((format: Partial<TextSpan>) => {
+    if (!richTextEditorRef.current) return;
+    richTextEditorRef.current.applyFormatToSelection(format);
   }, []);
 
   // Hide Konva text node while editing (so textarea appears to replace it)
@@ -1787,33 +1843,62 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       </Stage>
       
       {/* Inline Text Editing Overlay */}
-      {editingTextId && (
-        <textarea
-          ref={editTextareaRef}
-          value={editingTextValue}
-          onChange={(e) => {
-            setEditingTextValue(e.target.value);
-            // Auto-resize textarea to fit content
-            const textarea = e.target;
-            textarea.style.height = 'auto';
-            textarea.style.height = textarea.scrollHeight + 'px';
-            textarea.style.width = 'auto';
-            textarea.style.width = Math.max(textarea.scrollWidth, 20) + 'px';
-          }}
-          onBlur={commitTextEdit}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') {
-              e.preventDefault();
-              cancelTextEdit();
-            } else if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              commitTextEdit();
-            }
-          }}
-          style={getTextEditStyle() || undefined}
-          className="focus:outline-none selection:bg-blue-200"
-        />
-      )}
+      {editingTextId && (() => {
+        const textNode = findNode(spec.root, editingTextId) as TextNode | null;
+        if (!textNode) return null;
+        
+        const baseStyles = {
+          fontFamily: textNode.fontFamily || 'Arial',
+          fontSize: (textNode.fontSize ?? 14) * scale,
+          fontWeight: textNode.fontWeight || '400',
+          fontStyle: textNode.fontStyle || 'normal',
+          color: textNode.color ?? '#0f172a',
+        };
+        
+        // Calculate toolbar anchor position (center of text node)
+        const textX = (textNode.position?.x ?? 0) * scale + pos.x;
+        const textY = (textNode.position?.y ?? 0) * scale + pos.y;
+        const textWidth = (textNode.size?.width ?? 200) * scale;
+        const toolbarAnchor = { x: textX + textWidth / 2, y: textY };
+        
+        return (
+          <>
+            {/* Fixed toolbar above text */}
+            <TextEditToolbar
+              visible={true}
+              anchorPosition={toolbarAnchor}
+              hasSelection={!!(textSelection && textSelection.start !== textSelection.end)}
+              currentFormat={undefined}
+              onApplyFormat={applyFormat}
+            />
+            <RichTextEditor
+              ref={richTextEditorRef}
+              value={editingTextValue}
+              spans={editingTextSpans}
+              baseStyles={baseStyles}
+              onChange={handleTextChange}
+              onCommit={commitTextEdit}
+              onCancel={cancelTextEdit}
+              onSelectionChange={(sel) => {
+                setTextSelection(sel);
+              }}
+              onFormatShortcut={(format) => {
+                if (!richTextEditorRef.current) return;
+                const sel = richTextEditorRef.current.getSelection();
+                if (!sel || sel.start === sel.end) return;
+                
+                if (format === 'bold') {
+                  richTextEditorRef.current.applyFormatToSelection({ fontWeight: 'bold' });
+                } else if (format === 'italic') {
+                  richTextEditorRef.current.applyFormatToSelection({ fontStyle: 'italic' });
+                }
+              }}
+              style={getTextEditStyle() || undefined}
+              className="focus:outline-none selection:bg-blue-200"
+            />
+          </>
+        );
+      })()}
       
       {/* Context Menu */}
       {menu && isSelectMode && (
@@ -2051,6 +2136,13 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
           </button>
         </div>
       )}
+      
+      {/* Image Picker Modal */}
+      <ImagePickerModal
+        isOpen={imagePickerOpen}
+        onClose={handleImagePickerClose}
+        onImageSelected={handleImageSelected}
+      />
     </div>
   );
 }

@@ -1,8 +1,8 @@
 import { Group, Rect, Text, Ellipse, Line, Path } from "react-konva";
-import { type ReactNode, useEffect, useState, useCallback } from "react";
+import { type ReactNode, useEffect, useState, useCallback, Fragment } from "react";
 import { computeRectVisual } from "../renderer/rectVisual";
 import { estimateNodeHeight } from "../renderer/measurement";
-import type { LayoutNode, FrameNode, StackNode, TextNode, BoxNode, GridNode, GroupNode, ImageNode, RectNode, EllipseNode, LineNode, CurveNode } from "../layout-schema.ts";
+import type { LayoutNode, FrameNode, StackNode, TextNode, BoxNode, GridNode, GroupNode, ImageNode, RectNode, EllipseNode, LineNode, CurveNode, TextSpan } from "../layout-schema.ts";
 import { CanvasImage } from "./components/CanvasImage";
 import { debugOnce, logger } from "../utils/logger";
 
@@ -66,82 +66,138 @@ function loadGoogleFont(fontName: string, weight: string = '400'): void {
   });
 }
 
-// Text
+// Helper to compute Konva fontStyle string
+function computeFontStyle(fontWeight: string, fontStyle: string, fontFamily: string): string {
+  const isItalic = fontStyle === 'italic';
+  const isSystemFont = systemFonts.has(fontFamily);
+  
+  if (isSystemFont) {
+    // System fonts only support normal, bold, italic, italic bold
+    const isBold = fontWeight === 'bold' || fontWeight === '700' || Number(fontWeight) >= 600;
+    if (isItalic && isBold) return 'italic bold';
+    if (isItalic) return 'italic';
+    if (isBold) return 'bold';
+    return 'normal';
+  } else {
+    // Google Fonts support numeric weights
+    const weightStr = fontWeight === 'normal' ? '' : (fontWeight === 'bold' ? 'bold' : fontWeight);
+    if (isItalic && weightStr) return `italic ${weightStr}`;
+    if (isItalic) return 'italic';
+    if (weightStr) return weightStr;
+    return 'normal';
+  }
+}
+
+// Measure text width using canvas 2D context
+function measureTextWidth(text: string, fontSize: number, fontFamily: string, fontWeight: string, fontStyle: string): number {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return text.length * fontSize * 0.6; // fallback estimate
+  
+  const weight = fontWeight === 'bold' ? 'bold' : (fontWeight === 'normal' ? 'normal' : fontWeight);
+  const style = fontStyle === 'italic' ? 'italic' : 'normal';
+  ctx.font = `${style} ${weight} ${fontSize}px "${fontFamily}"`;
+  return ctx.measureText(text).width;
+}
+
+// Text - supports both plain text and rich text spans
 function renderText(n: TextNode) {
   const x = n.position?.x ?? 0;
   const y = n.position?.y ?? 0;
   const scaleX = n.textScaleX ?? 1;
   const scaleY = n.textScaleY ?? 1;
   
-  // Determine font size: use explicit fontSize if set, otherwise derive from variant
+  // Determine default font size from variant
   const defaultFontSize = n.variant === "h1" ? 28 : n.variant === "h2" ? 22 : n.variant === "h3" ? 18 : n.variant === "caption" ? 12 : 14;
-  const fontSize = n.fontSize ?? defaultFontSize;
+  const baseFontSize = n.fontSize ?? defaultFontSize;
+  const baseFontFamily = n.fontFamily || 'Arial';
+  const baseFontWeight = n.fontWeight ?? (n.variant === 'h1' || n.variant === 'h2' ? 'bold' : 'normal');
+  const baseFontStyle = n.fontStyle ?? 'normal';
+  const baseColor = n.color ?? "#0f172a";
   
-  // Get font weight
-  const rawWeight = n.fontWeight ?? (n.variant === 'h1' || n.variant === 'h2' ? 'bold' : 'normal');
-  
-  // Get font style (italic or not)
-  const isItalic = n.fontStyle === 'italic';
-  
-  // Ensure font is loaded for Google Fonts
-  const fontFamily = n.fontFamily || 'Arial';
-  if (fontFamily && !systemFonts.has(fontFamily)) {
-    // Load the specific weight for Google Fonts
-    const numericWeight = rawWeight === 'bold' ? '700' : (rawWeight === 'normal' ? '400' : rawWeight);
-    loadGoogleFont(fontFamily, numericWeight);
+  // If no spans, render as simple text
+  if (!n.spans || n.spans.length === 0) {
+    // Ensure font is loaded for Google Fonts
+    if (baseFontFamily && !systemFonts.has(baseFontFamily)) {
+      const numericWeight = baseFontWeight === 'bold' ? '700' : (baseFontWeight === 'normal' ? '400' : baseFontWeight);
+      loadGoogleFont(baseFontFamily, numericWeight);
+    }
+    
+    const fontStyleValue = computeFontStyle(baseFontWeight, baseFontStyle, baseFontFamily);
+    
+    return (
+      <Text
+        key={n.id}
+        id={n.id}
+        name={`node ${n.type}`}
+        x={x}
+        y={y}
+        rotation={n.rotation ?? 0}
+        text={n.text}
+        fontSize={baseFontSize}
+        fontFamily={baseFontFamily}
+        fontStyle={fontStyleValue}
+        fill={baseColor}
+        opacity={n.opacity ?? 1}
+        align={n.align ?? "left"}
+        scaleX={scaleX}
+        scaleY={scaleY}
+      />
+    );
   }
   
-  // Build Konva fontStyle string
-  // Konva fontStyle accepts: "normal", "italic", "bold", "italic bold", "500", "italic 500", etc.
-  let fontStyleValue: string;
+  // Rich text: render each span as a separate Text element
+  // We need to position each span inline by measuring previous spans
+  let offsetX = 0;
   
-  // For system fonts, only use 'bold' or 'normal' since they don't support numeric weights
-  const isSystemFont = systemFonts.has(fontFamily);
-  
-  if (isSystemFont) {
-    // System fonts only support normal, bold, italic, italic bold
-    const isBold = rawWeight === 'bold' || rawWeight === '700' || Number(rawWeight) >= 600;
-    if (isItalic && isBold) {
-      fontStyleValue = 'italic bold';
-    } else if (isItalic) {
-      fontStyleValue = 'italic';
-    } else if (isBold) {
-      fontStyleValue = 'bold';
-    } else {
-      fontStyleValue = 'normal';
+  // Load fonts for all spans
+  n.spans.forEach(span => {
+    const fontFamily = span.fontFamily || baseFontFamily;
+    const fontWeight = span.fontWeight || baseFontWeight;
+    if (fontFamily && !systemFonts.has(fontFamily)) {
+      const numericWeight = fontWeight === 'bold' ? '700' : (fontWeight === 'normal' ? '400' : fontWeight);
+      loadGoogleFont(fontFamily, numericWeight);
     }
-  } else {
-    // Google Fonts support numeric weights
-    const weightStr = rawWeight === 'normal' ? '' : (rawWeight === 'bold' ? 'bold' : rawWeight);
-    if (isItalic && weightStr) {
-      fontStyleValue = `italic ${weightStr}`;
-    } else if (isItalic) {
-      fontStyleValue = 'italic';
-    } else if (weightStr) {
-      fontStyleValue = weightStr;
-    } else {
-      fontStyleValue = 'normal';
-    }
-  }
+  });
   
   return (
-    <Text
+    <Group
       key={n.id}
       id={n.id}
       name={`node ${n.type}`}
       x={x}
       y={y}
       rotation={n.rotation ?? 0}
-      text={n.text}
-      fontSize={fontSize}
-      fontFamily={fontFamily}
-      fontStyle={fontStyleValue}
-      fill={n.color ?? "#0f172a"}
-      opacity={n.opacity ?? 1}
-      align={n.align ?? "left"}
       scaleX={scaleX}
       scaleY={scaleY}
-    />
+      opacity={n.opacity ?? 1}
+    >
+      {n.spans.map((span, idx) => {
+        const fontFamily = span.fontFamily || baseFontFamily;
+        const fontSize = span.fontSize || baseFontSize;
+        const fontWeight = span.fontWeight || baseFontWeight;
+        const fontStyle = span.fontStyle || baseFontStyle;
+        const color = span.color || baseColor;
+        const fontStyleValue = computeFontStyle(fontWeight, fontStyle, fontFamily);
+        
+        const currentOffsetX = offsetX;
+        // Measure this span's width and advance offsetX for the next span
+        offsetX += measureTextWidth(span.text, fontSize, fontFamily, fontWeight, fontStyle);
+        
+        return (
+          <Text
+            key={`${n.id}-span-${idx}`}
+            x={currentOffsetX}
+            y={0}
+            text={span.text}
+            fontSize={fontSize}
+            fontFamily={fontFamily}
+            fontStyle={fontStyleValue}
+            fill={color}
+          />
+        );
+      })}
+    </Group>
   );
 }
 
