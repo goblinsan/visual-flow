@@ -7,6 +7,7 @@ import CurveAttributesPanel from './components/CurveAttributesPanel';
 import TextAttributesPanel from './components/TextAttributesPanel';
 import ImageAttributesPanel from './components/ImageAttributesPanel';
 import DefaultsPanel from './components/DefaultsPanel';
+import { FlowAttributesPanel } from './components/FlowAttributesPanel';
 import { usePersistentRectDefaults } from './hooks/usePersistentRectDefaults';
 import { useRecentColors } from './hooks/useRecentColors';
 import { useDesignPersistence } from './hooks/useDesignPersistence';
@@ -15,12 +16,10 @@ import { Modal } from "./components/Modal";
 import { logger } from "./utils/logger";
 import { dashArrayToInput } from './utils/paint';
 import CanvasStage from "./canvas/CanvasStage.tsx";
-import type { LayoutSpec } from "./layout-schema.ts";
-import { COMPONENT_LIBRARY, ICON_LIBRARY } from "./library";
+import type { LayoutSpec, FlowTransition } from "./layout-schema.ts";
 import { saveNamedDesign, getSavedDesigns, loadNamedDesign, getCurrentDesignName, setCurrentDesignName, type SavedDesign } from './utils/persistence';
-
-// Extracted hook
 import useElementSize from './hooks/useElementSize';
+import { COMPONENT_LIBRARY, ICON_LIBRARY } from "./library";
 
 function buildInitialSpec(): LayoutSpec {
   return {
@@ -28,13 +27,12 @@ function buildInitialSpec(): LayoutSpec {
       id: "root",
       type: "frame",
       size: { width: 1600, height: 1200 },
-      background: undefined, // No background - let the grid show through
+      background: undefined,
       children: [],
     },
   };
 }
 
-// Template definitions for New dialog
 const TEMPLATES: { id: string; name: string; icon: string; description: string; build: () => LayoutSpec }[] = [
   {
     id: 'blank',
@@ -243,6 +241,12 @@ export default function CanvasApp() {
   const [selectedIconId, setSelectedIconId] = useState(ICON_LIBRARY[0]?.id || "star");
   const [selectedComponentId, setSelectedComponentId] = useState(COMPONENT_LIBRARY[0]?.id || "button");
   const [iconSearch, setIconSearch] = useState('');
+  const [activeFlowId, setActiveFlowId] = useState<string | null>(null);
+  const [focusNodeId, setFocusNodeId] = useState<string | null>(null);
+  const [attributeTab, setAttributeTab] = useState<'element' | 'flow'>('element');
+  const [draggingGroupIndex, setDraggingGroupIndex] = useState<number | null>(null);
+  const [dragOverGroupIndex, setDragOverGroupIndex] = useState<number | null>(null);
+  const [flowPreview, setFlowPreview] = useState<null | (FlowTransition & { _key: string })>(null);
   const [newDialogOpen, setNewDialogOpen] = useState(false); // New design template dialog
   const [openDialogOpen, setOpenDialogOpen] = useState(false); // Open design dialog
   const [currentDesignName, setCurrentDesignNameState] = useState<string | null>(getCurrentDesignName);
@@ -253,9 +257,39 @@ export default function CanvasApp() {
 
   const pushRecent = useCallback((col: string) => { commitRecent(col); }, [commitRecent]);
 
+  const updateFlows = useCallback((nextFlows: any[]) => {
+    setSpec(prev => ({ ...prev, flows: nextFlows }));
+  }, [setSpec]);
+
+  const focusScreen = useCallback((screenId: string) => {
+    setSelection([screenId]);
+    setFocusNodeId(screenId);
+  }, [setSelection]);
+
+  const playTransitionPreview = useCallback((transition?: FlowTransition) => {
+    if (!transition || transition.animation === 'none') {
+      setFlowPreview(null);
+      return;
+    }
+    setFlowPreview({ ...transition, _key: `${transition.id}_${Date.now().toString(36)}` });
+  }, []);
+
+  useEffect(() => {
+    if (!flowPreview) return;
+    const duration = Math.max(0, flowPreview.durationMs ?? 300);
+    const t = window.setTimeout(() => setFlowPreview(null), duration);
+    return () => window.clearTimeout(t);
+  }, [flowPreview]);
+
   // Clear curve point selection when selection changes
   useEffect(() => {
     setSelectedCurvePointIndex(null);
+  }, [selectedIds]);
+
+  useEffect(() => {
+    if (selectedIds.length !== 1) {
+      setAttributeTab('element');
+    }
   }, [selectedIds]);
 
   // Debug: log spec on mount
@@ -705,6 +739,36 @@ export default function CanvasApp() {
             </button>
           ))}
           <div className="flex-1" />
+          <div className="flex flex-col gap-1 mb-2">
+            <button
+              onClick={() => setTool('zoom')}
+              title="Zoom tool (click to zoom in, Alt-click to zoom out)"
+              className={`relative w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-150 ${
+                tool === 'zoom'
+                  ? "text-white"
+                  : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              }`}
+            >
+              {tool === 'zoom' && (
+                <span className="absolute inset-0 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow-md" />
+              )}
+              <i className="fa-solid fa-magnifying-glass text-base relative z-10" />
+            </button>
+            <button
+              onClick={() => setTool('pan')}
+              title="Pan tool (drag to pan)"
+              className={`relative w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-150 ${
+                tool === 'pan'
+                  ? "text-white"
+                  : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              }`}
+            >
+              {tool === 'pan' && (
+                <span className="absolute inset-0 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow-md" />
+              )}
+              <i className="fa-regular fa-hand text-base relative z-10" />
+            </button>
+          </div>
           <div className="w-8 h-px bg-gray-200 my-2" />
           <button
             onClick={() => setCheatOpen(true)}
@@ -718,29 +782,57 @@ export default function CanvasApp() {
         <main className="flex-1 relative min-w-0">
           <div ref={canvasRef} className="absolute inset-0">
             {stageWidth > 0 && stageHeight > 0 && (
-              <CanvasStage
-                tool={tool}
-                spec={spec}
-                setSpec={setSpec}
-                width={stageWidth}
-                height={stageHeight}
-                onToolChange={setTool}
-                onUndo={undo}
-                onRedo={redo}
-                selectedIconId={selectedIconId}
-                selectedComponentId={selectedComponentId}
-                selection={selectedIds}
-                setSelection={setSelection}
-                fitToContentKey={fitToContentKey}
-                rectDefaults={{
-                  fill: rectDefaults.fill,
-                  stroke: rectDefaults.stroke,
-                  strokeWidth: rectDefaults.strokeWidth ?? 1,
-                  radius: rectDefaults.radius ?? 0,
-                  opacity: rectDefaults.opacity ?? 1,
-                  strokeDash: rectDefaults.strokeDash,
-                }}
-              />
+              <div
+                key={flowPreview?._key || 'no-transition'}
+                className={
+                  flowPreview?.animation === 'fade' ? 'flow-transition-fade'
+                    : flowPreview?.animation === 'slide-left' ? 'flow-transition-slide-left'
+                    : flowPreview?.animation === 'slide-right' ? 'flow-transition-slide-right'
+                    : flowPreview?.animation === 'slide-up' ? 'flow-transition-slide-up'
+                    : flowPreview?.animation === 'slide-down' ? 'flow-transition-slide-down'
+                    : ''
+                }
+                style={flowPreview ? {
+                  animationDuration: `${flowPreview.durationMs ?? 300}ms`,
+                  animationTimingFunction: flowPreview.easing ?? 'ease-out',
+                } : undefined}
+              >
+                <CanvasStage
+                  tool={tool}
+                  spec={spec}
+                  setSpec={setSpec}
+                  width={stageWidth}
+                  height={stageHeight}
+                  onToolChange={setTool}
+                  onUndo={undo}
+                  onRedo={redo}
+                  focusNodeId={focusNodeId}
+                  onUngroup={(ids) => {
+                    if (!spec.flows || ids.length === 0) return;
+                    const nextFlows = spec.flows
+                      .map(f => ({
+                        ...f,
+                        screenIds: f.screenIds.filter(id => !ids.includes(id)),
+                        transitions: f.transitions.filter(t => !ids.includes(t.from) && !ids.includes(t.to)),
+                      }))
+                      .filter(f => f.screenIds.length > 0);
+                    setSpec(prev => ({ ...prev, flows: nextFlows }));
+                  }}
+                  selectedIconId={selectedIconId}
+                  selectedComponentId={selectedComponentId}
+                  selection={selectedIds}
+                  setSelection={setSelection}
+                  fitToContentKey={fitToContentKey}
+                  rectDefaults={{
+                    fill: rectDefaults.fill,
+                    stroke: rectDefaults.stroke,
+                    strokeWidth: rectDefaults.strokeWidth ?? 1,
+                    radius: rectDefaults.radius ?? 0,
+                    opacity: rectDefaults.opacity ?? 1,
+                    strokeDash: rectDefaults.strokeDash,
+                  }}
+                />
+              </div>
             )}
           </div>
         </main>
@@ -770,111 +862,319 @@ export default function CanvasApp() {
               const createUpdateFn = (nodeId: string) => (patch: Record<string, any>) => {
                 setSpec(prev => ({ ...prev, root: updateNode(prev.root as any, nodeId, patch) as any }));
               };
-              
-              if (node.type === 'rect') {
-                const rect = node as any;
-                const updateRect = createUpdateFn(rect.id);
-                return (
-                  <RectAttributesPanel
-                    rect={rect}
-                    lastFillById={lastFillById}
-                    lastStrokeById={lastStrokeById}
-                    setLastFillById={setLastFillById}
-                    setLastStrokeById={setLastStrokeById}
-                    updateRect={updateRect}
-                    rawDashInput={rawDashInput}
-                    setRawDashInput={setRawDashInput}
-                    beginRecentSession={beginRecentSession}
-                    previewRecent={previewRecent}
-                    commitRecent={commitRecent}
-                    pushRecent={pushRecent}
-                    recentColors={recentColors}
-                  />
-                );
+
+              const isScreenEligible = ['group', 'frame', 'stack', 'grid', 'box'].includes(node.type);
+              const screenMeta = (node as any).screen as { id: string; name: string } | undefined;
+              const flows = spec.flows ?? [];
+
+              const removeScreenFromFlows = (screenId: string) => {
+                const nextFlows = flows
+                  .map(f => ({
+                    ...f,
+                    screenIds: f.screenIds.filter(id => id !== screenId),
+                    transitions: f.transitions.filter(t => t.from !== screenId && t.to !== screenId),
+                  }))
+                  .filter(f => f.screenIds.length > 0);
+                updateFlows(nextFlows);
+              };
+
+              const screenPanel = isScreenEligible ? (
+                <div className="space-y-2">
+                  <div className="text-[11px] font-semibold text-gray-600 flex items-center gap-2">
+                    <i className="fa-solid fa-rectangle-list text-gray-400 text-[10px]" />
+                    Screen
+                  </div>
+                  <label className="flex items-center gap-2 text-[11px]">
+                    <input
+                      type="checkbox"
+                      checked={!!screenMeta}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          const name = (node.name || `Screen ${selectedIds[0].slice(0, 4)}`) as string;
+                          createUpdateFn(node.id)({ screen: { id: node.id, name } });
+                          if (!flows.some(f => f.screenIds.includes(node.id))) {
+                            const id = `flow_${Date.now().toString(36)}`;
+                            updateFlows([...flows, { id, name: `Flow ${flows.length + 1}`, screenIds: [node.id], transitions: [] }]);
+                            setActiveFlowId(id);
+                          }
+                        } else {
+                          createUpdateFn(node.id)({ screen: undefined });
+                          removeScreenFromFlows(node.id);
+                        }
+                      }}
+                    />
+                    Mark as Screen
+                  </label>
+                  {screenMeta && (
+                    <input
+                      value={screenMeta.name}
+                      onChange={(e) => createUpdateFn(node.id)({ screen: { id: node.id, name: e.target.value } })}
+                      className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-[11px]"
+                      placeholder="Screen name"
+                    />
+                  )}
+                </div>
+              ) : null;
+
+              const flowPanel = screenMeta ? (
+                <FlowAttributesPanel
+                  flows={flows}
+                  activeFlowId={activeFlowId}
+                  setActiveFlowId={setActiveFlowId}
+                  screenId={screenMeta.id}
+                  screenName={screenMeta.name}
+                  onUpdateFlows={updateFlows}
+                  onFocusScreen={focusScreen}
+                  onSelectScreen={focusScreen}
+                  onTriggerTransition={(toId, transition) => {
+                    focusScreen(toId);
+                    playTransitionPreview(transition);
+                  }}
+                />
+              ) : null;
+
+              const screenFlowPanel = isScreenEligible ? (
+                <>
+                  {screenPanel}
+                  {flowPanel}
+                </>
+              ) : (
+                <div className="text-[11px] text-gray-400">Screen/flow attributes are available for groups, frames, stacks, grids, and boxes.</div>
+              );
+
+              const renderElementPanelFor = (targetNode: any): JSX.Element => {
+                if (targetNode.type === 'rect') {
+                  const rect = targetNode as any;
+                  const updateRect = createUpdateFn(rect.id);
+                  return (
+                    <RectAttributesPanel
+                      rect={rect}
+                      lastFillById={lastFillById}
+                      lastStrokeById={lastStrokeById}
+                      setLastFillById={setLastFillById}
+                      setLastStrokeById={setLastStrokeById}
+                      updateRect={updateRect}
+                      rawDashInput={rawDashInput}
+                      setRawDashInput={setRawDashInput}
+                      beginRecentSession={beginRecentSession}
+                      previewRecent={previewRecent}
+                      commitRecent={commitRecent}
+                      pushRecent={pushRecent}
+                      recentColors={recentColors}
+                    />
+                  );
+                }
+
+                if (targetNode.type === 'ellipse') {
+                  const ellipse = targetNode as any;
+                  const updateEllipse = createUpdateFn(ellipse.id);
+                  return (
+                    <EllipseAttributesPanel
+                      ellipse={ellipse}
+                      lastFillById={lastFillById}
+                      lastStrokeById={lastStrokeById}
+                      setLastFillById={setLastFillById}
+                      setLastStrokeById={setLastStrokeById}
+                      updateNode={updateEllipse}
+                      beginRecentSession={beginRecentSession}
+                      previewRecent={previewRecent}
+                      commitRecent={commitRecent}
+                      pushRecent={pushRecent}
+                      recentColors={recentColors}
+                    />
+                  );
+                }
+
+                if (targetNode.type === 'line') {
+                  const line = targetNode as any;
+                  const updateLine = createUpdateFn(line.id);
+                  return (
+                    <LineAttributesPanel
+                      line={line}
+                      updateNode={updateLine}
+                      beginRecentSession={beginRecentSession}
+                      previewRecent={previewRecent}
+                      commitRecent={commitRecent}
+                      pushRecent={pushRecent}
+                      recentColors={recentColors}
+                    />
+                  );
+                }
+
+                if (targetNode.type === 'curve') {
+                  const curve = targetNode as any;
+                  const updateCurve = createUpdateFn(curve.id);
+                  return (
+                    <CurveAttributesPanel
+                      curve={curve}
+                      updateNode={updateCurve}
+                      selectedPointIndex={selectedCurvePointIndex}
+                      setSelectedPointIndex={setSelectedCurvePointIndex}
+                      beginRecentSession={beginRecentSession}
+                      previewRecent={previewRecent}
+                      commitRecent={commitRecent}
+                      pushRecent={pushRecent}
+                      recentColors={recentColors}
+                    />
+                  );
+                }
+
+                if (targetNode.type === 'text') {
+                  const textNode = targetNode as any;
+                  const updateText = createUpdateFn(textNode.id);
+                  return (
+                    <TextAttributesPanel
+                      textNode={textNode}
+                      updateNode={updateText}
+                      beginRecentSession={beginRecentSession}
+                      previewRecent={previewRecent}
+                      commitRecent={commitRecent}
+                      pushRecent={pushRecent}
+                      recentColors={recentColors}
+                    />
+                  );
+                }
+
+                if (targetNode.type === 'image') {
+                  const imageNode = targetNode as any;
+                  const updateImage = createUpdateFn(imageNode.id);
+                  return (
+                    <ImageAttributesPanel
+                      imageNode={imageNode}
+                      updateNode={updateImage}
+                    />
+                  );
+                }
+
+                return <div className="text-[11px] text-gray-400">No editable attributes for type: {targetNode.type}</div>;
+              };
+
+              const elementPanel = renderElementPanelFor(node);
+              const groupChildren = (node as any).children as any[] | undefined;
+              const hasChildren = Array.isArray(groupChildren) && groupChildren.length > 0;
+              const moveChild = (fromIndex: number, toIndex: number) => {
+                if (!groupChildren) return;
+                if (toIndex < 0 || toIndex >= groupChildren.length) return;
+                const nextChildren = [...groupChildren];
+                const [moved] = nextChildren.splice(fromIndex, 1);
+                nextChildren.splice(toIndex, 0, moved);
+                createUpdateFn(node.id)({ children: nextChildren });
+              };
+
+              const orderedChildren = groupChildren
+                ? groupChildren.map((child, index) => ({ child, index })).reverse()
+                : [];
+
+              const moveChildByDisplayIndex = (fromDisplayIndex: number, toDisplayIndex: number) => {
+                if (!groupChildren) return;
+                if (toDisplayIndex < 0 || toDisplayIndex >= orderedChildren.length) return;
+                const fromOriginal = orderedChildren[fromDisplayIndex].index;
+                const toOriginal = orderedChildren[toDisplayIndex].index;
+                if (fromOriginal === toOriginal) return;
+                moveChild(fromOriginal, toOriginal);
+              };
+
+              const groupPanel = hasChildren ? (
+                <div className="space-y-2">
+                  <div className="text-[11px] font-semibold text-gray-600 flex items-center gap-2">
+                    <i className="fa-solid fa-layer-group text-gray-400 text-[10px]" />
+                    Elements
+                  </div>
+                  <div className="space-y-2">
+                    {orderedChildren.map(({ child }, displayIndex) => (
+                      <details
+                        key={child.id}
+                        className={`rounded-md border ${dragOverGroupIndex === displayIndex ? 'border-blue-400' : 'border-gray-200'} bg-white/70`}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          setDragOverGroupIndex(displayIndex);
+                        }}
+                        onDragEnter={(e) => {
+                          e.preventDefault();
+                          setDragOverGroupIndex(displayIndex);
+                        }}
+                        onDragLeave={() => {
+                          if (dragOverGroupIndex === displayIndex) setDragOverGroupIndex(null);
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (draggingGroupIndex === null) return;
+                          moveChildByDisplayIndex(draggingGroupIndex, displayIndex);
+                          setDraggingGroupIndex(null);
+                          setDragOverGroupIndex(null);
+                        }}
+                      >
+                        <summary
+                          className="cursor-pointer select-none px-2 py-1.5 text-[11px] text-gray-600 flex items-center justify-between gap-2"
+                          draggable
+                          onDragStart={(e) => {
+                            e.dataTransfer.effectAllowed = 'move';
+                            e.dataTransfer.setData('text/plain', child.id);
+                            setDraggingGroupIndex(displayIndex);
+                            setDragOverGroupIndex(displayIndex);
+                          }}
+                          onDragEnd={() => {
+                            setDraggingGroupIndex(null);
+                            setDragOverGroupIndex(null);
+                          }}
+                        >
+                          <span
+                            className="mr-1 inline-flex h-5 w-5 items-center justify-center rounded border border-gray-200 text-gray-400 hover:text-gray-600 cursor-grab"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                            }}
+                            aria-label="Reorder layer"
+                          >
+                            <i className="fa-solid fa-grip-vertical text-[10px]" />
+                          </span>
+                          <span className="font-medium truncate">{child.name || child.text || `Untitled ${child.type}`}</span>
+                          <span className="ml-auto text-[10px] uppercase tracking-wide text-gray-400">{child.type}</span>
+                        </summary>
+                        <div className="px-2 py-2 space-y-2">
+                          <div className="space-y-1">
+                            <div className="text-[10px] uppercase tracking-wider text-gray-400">Name</div>
+                            <input
+                              value={(child.name as string) ?? ''}
+                              onChange={(e) => createUpdateFn(child.id)({ name: e.target.value })}
+                              className="w-full border border-gray-200 rounded-md px-2 py-1 text-[11px]"
+                              placeholder="Layer name"
+                            />
+                          </div>
+                          {renderElementPanelFor(child)}
+                        </div>
+                      </details>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-[11px] text-gray-400">No child elements to edit.</div>
+              );
+
+              if (!hasChildren) {
+                return elementPanel;
               }
-              
-              if (node.type === 'ellipse') {
-                const ellipse = node as any;
-                const updateEllipse = createUpdateFn(ellipse.id);
-                return (
-                  <EllipseAttributesPanel
-                    ellipse={ellipse}
-                    lastFillById={lastFillById}
-                    lastStrokeById={lastStrokeById}
-                    setLastFillById={setLastFillById}
-                    setLastStrokeById={setLastStrokeById}
-                    updateNode={updateEllipse}
-                    beginRecentSession={beginRecentSession}
-                    previewRecent={previewRecent}
-                    commitRecent={commitRecent}
-                    pushRecent={pushRecent}
-                    recentColors={recentColors}
-                  />
-                );
-              }
-              
-              if (node.type === 'line') {
-                const line = node as any;
-                const updateLine = createUpdateFn(line.id);
-                return (
-                  <LineAttributesPanel
-                    line={line}
-                    updateNode={updateLine}
-                    beginRecentSession={beginRecentSession}
-                    previewRecent={previewRecent}
-                    commitRecent={commitRecent}
-                    pushRecent={pushRecent}
-                    recentColors={recentColors}
-                  />
-                );
-              }
-              
-              if (node.type === 'curve') {
-                const curve = node as any;
-                const updateCurve = createUpdateFn(curve.id);
-                return (
-                  <CurveAttributesPanel
-                    curve={curve}
-                    updateNode={updateCurve}
-                    selectedPointIndex={selectedCurvePointIndex}
-                    setSelectedPointIndex={setSelectedCurvePointIndex}
-                    beginRecentSession={beginRecentSession}
-                    previewRecent={previewRecent}
-                    commitRecent={commitRecent}
-                    pushRecent={pushRecent}
-                    recentColors={recentColors}
-                  />
-                );
-              }
-              
-              if (node.type === 'text') {
-                const textNode = node as any;
-                const updateText = createUpdateFn(textNode.id);
-                return (
-                  <TextAttributesPanel
-                    textNode={textNode}
-                    updateNode={updateText}
-                    beginRecentSession={beginRecentSession}
-                    previewRecent={previewRecent}
-                    commitRecent={commitRecent}
-                    pushRecent={pushRecent}
-                    recentColors={recentColors}
-                  />
-                );
-              }
-              
-              if (node.type === 'image') {
-                const imageNode = node as any;
-                const updateImage = createUpdateFn(imageNode.id);
-                return (
-                  <ImageAttributesPanel
-                    imageNode={imageNode}
-                    updateNode={updateImage}
-                  />
-                );
-              }
-              
-              return <div className="text-[11px] text-gray-400">No editable attributes for type: {node.type}</div>;
+
+              return (
+                <>
+                  <div className="flex items-center gap-1 rounded-md bg-gray-100 p-1 text-[11px]">
+                    <button
+                      className={`flex-1 rounded-md px-2 py-1 transition ${attributeTab === 'element' ? 'bg-white shadow-sm text-gray-700' : 'text-gray-500 hover:text-gray-700'}`}
+                      onClick={() => setAttributeTab('element')}
+                    >
+                      Group
+                    </button>
+                    <button
+                      className={`flex-1 rounded-md px-2 py-1 transition ${attributeTab === 'flow' ? 'bg-white shadow-sm text-gray-700' : 'text-gray-500 hover:text-gray-700'}`}
+                      onClick={() => setAttributeTab('flow')}
+                    >
+                      Screen/Flow
+                    </button>
+                  </div>
+                  {attributeTab === 'element' ? groupPanel : screenFlowPanel}
+                </>
+              );
             })()}
             {selectedIds.length !== 1 && tool==='rect' && selectedIds.length===0 && (
               <DefaultsPanel

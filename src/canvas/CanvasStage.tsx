@@ -33,6 +33,8 @@ interface CanvasStageProps {
   selectedComponentId?: string;
   onUndo?: () => void;
   onRedo?: () => void;
+  focusNodeId?: string | null;
+  onUngroup?: (ids: string[]) => void;
   rectDefaults?: { fill?: string; stroke?: string; strokeWidth: number; radius: number; opacity: number; strokeDash?: number[] };
   selection: string[];
   setSelection: (ids: string[]) => void;
@@ -49,22 +51,31 @@ interface InfiniteGridProps {
 }
 
 function InfiniteGrid({ width, height, scale, offsetX, offsetY }: InfiniteGridProps) {
+  if (scale <= 0.5) return null;
   // Calculate visible area in world coordinates
   const worldLeft = -offsetX / scale;
   const worldTop = -offsetY / scale;
   const worldRight = worldLeft + width / scale;
   const worldBottom = worldTop + height / scale;
+
+  const decimation = scale >= 0.75 ? 1
+    : scale >= 0.5 ? 2
+    : scale >= 0.35 ? 3
+    : scale >= 0.25 ? 4
+    : scale >= 0.18 ? 5
+    : 6;
+  const spacing = GRID_SPACING * decimation;
   
   // Snap to grid boundaries with padding
-  const startX = Math.floor(worldLeft / GRID_SPACING) * GRID_SPACING - GRID_SPACING;
-  const startY = Math.floor(worldTop / GRID_SPACING) * GRID_SPACING - GRID_SPACING;
-  const endX = Math.ceil(worldRight / GRID_SPACING) * GRID_SPACING + GRID_SPACING;
-  const endY = Math.ceil(worldBottom / GRID_SPACING) * GRID_SPACING + GRID_SPACING;
+  const startX = Math.floor(worldLeft / spacing) * spacing - spacing;
+  const startY = Math.floor(worldTop / spacing) * spacing - spacing;
+  const endX = Math.ceil(worldRight / spacing) * spacing + spacing;
+  const endY = Math.ceil(worldBottom / spacing) * spacing + spacing;
   
   // Generate dots
   const dots: JSX.Element[] = [];
-  for (let x = startX; x <= endX; x += GRID_SPACING) {
-    for (let y = startY; y <= endY; y += GRID_SPACING) {
+  for (let x = startX; x <= endX; x += spacing) {
+    for (let y = startY; y <= endY; y += spacing) {
       dots.push(
         <Circle
           key={`${x}-${y}`}
@@ -82,11 +93,12 @@ function InfiniteGrid({ width, height, scale, offsetX, offsetY }: InfiniteGridPr
   return <>{dots}</>;
 }
 
-function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select", onToolChange, selectedIconId, selectedComponentId, onUndo, onRedo, rectDefaults, selection, setSelection, fitToContentKey }: CanvasStageProps) {
+function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select", onToolChange, selectedIconId, selectedComponentId, onUndo, onRedo, focusNodeId, onUngroup, rectDefaults, selection, setSelection, fitToContentKey }: CanvasStageProps) {
   // View / interaction state
   const [scale, setScale] = useState(1);
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const [panning, setPanning] = useState(false);
+  const panLastPosRef = useRef<{ x: number; y: number } | null>(null);
   const selected = selection;
   const [menu, setMenu] = useState<null | { x: number; y: number }>(null);
   
@@ -180,6 +192,8 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
 
   const isSelectMode = tool === "select";
   const isRectMode = tool === 'rect';
+  const isPanMode = tool === 'pan';
+  const isZoomMode = tool === 'zoom';
   const isEllipseMode = tool === 'ellipse';
   const isLineMode = tool === 'line';
   const isCurveMode = tool === 'curve';
@@ -262,6 +276,24 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     setScale(newScale);
     setPos({ x: newPosX, y: newPosY });
   }, [fitToContentKey, width, height, spec]);
+
+  useEffect(() => {
+    if (!focusNodeId) return;
+    const node = findNode(spec.root, focusNodeId) as any;
+    if (!node) return;
+    const pos = node.position ?? { x: 0, y: 0 };
+    const size = node.size ?? { width: 300, height: 200 };
+    const padding = 60;
+    const availableWidth = width - padding * 2;
+    const availableHeight = height - padding * 2;
+    const scaleX = availableWidth / (size.width || 1);
+    const scaleY = availableHeight / (size.height || 1);
+    const newScale = Math.min(scaleX, scaleY, 1);
+    const centerX = (pos.x ?? 0) + (size.width ?? 0) / 2;
+    const centerY = (pos.y ?? 0) + (size.height ?? 0) / 2;
+    setScale(newScale);
+    setPos({ x: width / 2 - centerX * newScale, y: height / 2 - centerY * newScale });
+  }, [focusNodeId, spec.root, width, height]);
 
   // Utility: world coordinate conversion
   const toWorld = useCallback((stage: Konva.Stage, p: { x: number; y: number }) => ({
@@ -699,6 +731,32 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       return;
     }
 
+    // Zoom tool - click to zoom in (Alt/right-click to zoom out)
+    if (isZoomMode) {
+      const stage = e.target.getStage(); if (!stage) return;
+      const pointer = stage.getPointerPosition(); if (!pointer) return;
+      const worldPos = toWorld(stage, pointer);
+      const zoomFactor = (e.evt.altKey || e.evt.button === 2) ? 1 / 1.15 : 1.15;
+      const nextScale = Math.min(5, Math.max(0.05, scale * zoomFactor));
+      const newPos = {
+        x: pointer.x - worldPos.x * nextScale,
+        y: pointer.y - worldPos.y * nextScale,
+      };
+      setScale(nextScale);
+      setPos(newPos);
+      return;
+    }
+
+    // Pan tool - drag to pan
+    if (isPanMode) {
+      if (e.evt.button !== 0) return;
+      const stage = e.target.getStage(); if (!stage) return;
+      const pointer = stage.getPointerPosition(); if (!pointer) return;
+      panLastPosRef.current = pointer;
+      setPanning(true);
+      return;
+    }
+
     // Icon tool - single click places selected icon
     if (isIconMode) {
       if (e.evt.button !== 0) return;
@@ -719,7 +777,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       return;
     }
     
-    if (!isSelectMode) return;
+    if (!isSelectMode && !isPanMode) return;
     const stage = e.target.getStage();
     if (!stage) return;
 
@@ -731,6 +789,8 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
 
     // Handle panning
     if (e.evt.button === 1 || (e.evt.button === 0 && (e.evt.altKey || spacePan))) {
+      const pointer = stage.getPointerPosition();
+      if (pointer) panLastPosRef.current = pointer;
       setPanning(true);
       return;
     }
@@ -792,7 +852,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     if (!e.evt.shiftKey && !e.evt.ctrlKey) { setSelection([]); }
     
     setMenu(null);
-  }, [isSelectMode, spacePan, spec.root.id, toWorld, selected, getTopContainerAncestor, normalizeSelection, isTransformerTarget, isEllipseMode, isLineMode, isCurveMode, isTextMode, isImageMode, isIconMode, isComponentMode, curveDraft, createText, createImage, createIcon, createComponent]);
+  }, [isSelectMode, isPanMode, isZoomMode, scale, spacePan, spec.root.id, toWorld, selected, getTopContainerAncestor, normalizeSelection, isTransformerTarget, isEllipseMode, isLineMode, isCurveMode, isTextMode, isImageMode, isIconMode, isComponentMode, curveDraft, createText, createImage, createIcon, createComponent]);
 
   const onMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     const stage = e.target.getStage();
@@ -831,10 +891,20 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       return;
     }
     
-    if (!isSelectMode) return;
+    if (!isSelectMode && !isPanMode) return;
 
     if (panning) {
-      setPos({ x: stage.x() + e.evt.movementX, y: stage.y() + e.evt.movementY });
+      const pointer = stage.getPointerPosition();
+      if (!pointer) return;
+      const last = panLastPosRef.current;
+      if (!last) {
+        panLastPosRef.current = pointer;
+        return;
+      }
+      const dx = pointer.x - last.x;
+      const dy = pointer.y - last.y;
+      panLastPosRef.current = pointer;
+      setPos(prev => ({ x: prev.x + dx, y: prev.y + dy }));
       return;
     }
 
@@ -872,7 +942,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       }
       setMarqueeSession({ ...marqueeSession });
     }
-  }, [isSelectMode, panning, toWorld, dragSession, marqueeSession, isRectMode, rectDraft, isEllipseMode, ellipseDraft, isLineMode, lineDraft, isCurveMode, curveDraft]);
+  }, [isSelectMode, isPanMode, panning, toWorld, dragSession, marqueeSession, isRectMode, rectDraft, isEllipseMode, ellipseDraft, isLineMode, lineDraft, isCurveMode, curveDraft]);
 
   const onMouseUp = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     const stage = e.target.getStage();
@@ -891,6 +961,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
 
     if (panning) {
       setPanning(false);
+      panLastPosRef.current = null;
       return;
     }
 
@@ -1246,7 +1317,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     const worldPos = toWorld(stage, pointer);
     const direction = e.evt.deltaY > 0 ? -1 : 1;
     let newScale = direction > 0 ? oldScale * scaleBy : oldScale / scaleBy;
-    newScale = Math.min(5, Math.max(0.2, newScale));
+    newScale = Math.min(5, Math.max(0.05, newScale));
     const newPos = {
       x: pointer.x - worldPos.x * newScale,
       y: pointer.y - worldPos.y * newScale,
@@ -1396,8 +1467,9 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     let next = ungroupNodes(spec, new Set([gId]));
     childAbs.forEach(cr => { next = applyPosition(next, cr.id, cr.abs); });
     setSpec(next);
-  setSelection(childAbs.map(c => c.id));
-  }, [canUngroup, selected, spec, setSpec]);
+    setSelection(childAbs.map(c => c.id));
+    onUngroup?.([gId]);
+  }, [canUngroup, selected, spec, setSpec, onUngroup, setSelection]);
 
   // Keyboard shortcuts
   useEffect(() => {

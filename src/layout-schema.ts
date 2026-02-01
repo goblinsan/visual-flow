@@ -21,6 +21,7 @@ export interface BaseNode {
   rotation?: number; // degrees
   opacity?: number;  // 0..1
   zIndex?: number;
+  screen?: { id: string; name: string };
 }
 
 export interface Pos {
@@ -195,4 +196,22 @@ export type LayoutNode =
 
 export interface LayoutSpec {
   root: FrameNode;
+  flows?: Flow[];
+}
+
+export interface FlowTransition {
+  id: string;
+  from: string; // screen id
+  to: string;   // screen id
+  trigger: string;
+  animation: "none" | "fade" | "slide-left" | "slide-right" | "slide-up" | "slide-down";
+  durationMs: number;
+  easing: "linear" | "ease" | "ease-in" | "ease-out" | "ease-in-out";
+}
+
+export interface Flow {
+  id: string;
+  name: string;
+  screenIds: string[];
+  transitions: FlowTransition[];
 }
