@@ -1,8 +1,8 @@
-import { Group, Rect, Text, Ellipse, Line, Path } from "react-konva";
-import { type ReactNode, useEffect, useState, useCallback, Fragment } from "react";
+import { Group, Rect, Text, Ellipse, Line } from "react-konva";
+import { type ReactNode, useEffect, useState } from "react";
 import { computeRectVisual } from "../renderer/rectVisual";
 import { estimateNodeHeight } from "../renderer/measurement";
-import type { LayoutNode, FrameNode, StackNode, TextNode, BoxNode, GridNode, GroupNode, ImageNode, RectNode, EllipseNode, LineNode, CurveNode, TextSpan } from "../layout-schema.ts";
+import type { LayoutNode, FrameNode, StackNode, TextNode, BoxNode, GridNode, GroupNode, ImageNode, RectNode, EllipseNode, LineNode, CurveNode } from "../layout-schema.ts";
 import { CanvasImage } from "./components/CanvasImage";
 import { debugOnce, logger } from "../utils/logger";
 

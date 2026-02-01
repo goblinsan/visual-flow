@@ -195,6 +195,7 @@ export type LayoutNode =
   | CurveNode;
 
 export interface LayoutSpec {
+  version?: string; // schema version (e.g., "1.0.0"); undefined = legacy/pre-versioning
   root: FrameNode;
   flows?: Flow[];
 }

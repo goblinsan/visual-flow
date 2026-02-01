@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState, useEffect } from "react";
+import type { JSX } from "react";
 import { findNode, updateNode } from './utils/specUtils';
 import RectAttributesPanel from './components/RectAttributesPanel';
 import EllipseAttributesPanel from './components/EllipseAttributesPanel';
@@ -17,7 +18,7 @@ import { logger } from "./utils/logger";
 import { dashArrayToInput } from './utils/paint';
 import CanvasStage from "./canvas/CanvasStage.tsx";
 import type { LayoutSpec, FlowTransition } from "./layout-schema.ts";
-import { saveNamedDesign, getSavedDesigns, loadNamedDesign, getCurrentDesignName, setCurrentDesignName, type SavedDesign } from './utils/persistence';
+import { saveNamedDesign, getSavedDesigns, getCurrentDesignName, setCurrentDesignName, type SavedDesign } from './utils/persistence';
 import useElementSize from './hooks/useElementSize';
 import { COMPONENT_LIBRARY, ICON_LIBRARY } from "./library";
 
@@ -182,7 +183,7 @@ const TEMPLATES: { id: string; name: string; icon: string; description: string; 
 ];
 
 export default function CanvasApp() {
-  const { spec, setSpec: setSpecRaw, reset: resetSpec } = useDesignPersistence({ buildInitial: buildInitialSpec });
+  const { spec, setSpec: setSpecRaw } = useDesignPersistence({ buildInitial: buildInitialSpec });
   const historyRef = useRef<{ past: LayoutSpec[]; future: LayoutSpec[] }>({ past: [], future: [] });
   const historyLockRef = useRef(false);
   const setSpec = useCallback((next: LayoutSpec | ((prev: LayoutSpec) => LayoutSpec)) => {
