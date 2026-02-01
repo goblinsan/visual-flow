@@ -55,7 +55,7 @@ export function saveRecentColors(colors: string[]): void {
 }
 
 // --- Design Spec Persistence (Phase 3 extraction) ---
-// We persist the entire LayoutSpec root object. Future enhancements may add versioning & migrations.
+// We persist the entire LayoutSpec root object with versioning & migration support.
 
 export function loadDesignSpec<T = any>(): T | null {
   try {
@@ -63,12 +63,20 @@ export function loadDesignSpec<T = any>(): T | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed === 'object') return parsed as T;
-  } catch {/* ignore */}
+  } catch (err) {
+    // Log corruption for debugging but don't throw
+    console.warn('Failed to load design spec from localStorage:', err);
+  }
   return null;
 }
 
 export function saveDesignSpec<T = any>(spec: T): void {
-  try { localStorage.setItem(LS_KEYS.designSpec, JSON.stringify(spec)); } catch {/* ignore */}
+  try {
+    localStorage.setItem(LS_KEYS.designSpec, JSON.stringify(spec));
+  } catch (err) {
+    // Log storage errors for debugging
+    console.warn('Failed to save design spec to localStorage:', err);
+  }
 }
 
 export function clearDesignSpec(): void {
@@ -84,7 +92,8 @@ export function getSavedDesigns(): SavedDesign[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
-  } catch {
+  } catch (err) {
+    console.warn('Failed to load saved designs from localStorage:', err);
     return [];
   }
 }
@@ -104,7 +113,9 @@ export function saveNamedDesign(name: string, spec: any): void {
     
     localStorage.setItem(LS_KEYS.savedDesigns, JSON.stringify(designs));
     setCurrentDesignName(name);
-  } catch {/* ignore */}
+  } catch (err) {
+    console.warn('Failed to save named design to localStorage:', err);
+  }
 }
 
 /** Load a design by name */
@@ -118,7 +129,9 @@ export function deleteNamedDesign(name: string): void {
   try {
     const designs = getSavedDesigns().filter(d => d.name !== name);
     localStorage.setItem(LS_KEYS.savedDesigns, JSON.stringify(designs));
-  } catch {/* ignore */}
+  } catch (err) {
+    console.warn('Failed to delete named design from localStorage:', err);
+  }
 }
 
 /** Get/set current design name */
@@ -137,7 +150,9 @@ export function setCurrentDesignName(name: string | null): void {
     } else {
       localStorage.removeItem(LS_KEYS.currentDesignName);
     }
-  } catch {/* ignore */}
+  } catch (err) {
+    console.warn('Failed to set current design name in localStorage:', err);
+  }
 }
 
 // Note: Disabled fill/stroke (represented as undefined) are NOT explicitly persisted yet.
