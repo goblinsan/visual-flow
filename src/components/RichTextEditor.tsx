@@ -28,6 +28,10 @@ export interface RichTextEditorProps {
   style?: React.CSSProperties;
   /** Class name */
   className?: string;
+  /** Auto focus on mount */
+  autoFocus?: boolean;
+  /** Commit on blur */
+  commitOnBlur?: boolean;
 }
 
 export interface RichTextEditorHandle {
@@ -100,6 +104,23 @@ function htmlToSpans(html: string, baseStyles: RichTextEditorProps['baseStyles']
       }
     } else if (node.nodeType === Node.ELEMENT_NODE) {
       const el = node as HTMLElement;
+      const tagName = el.tagName.toLowerCase();
+
+      // Handle block elements and line breaks
+      const isBlock = ['div', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li'].includes(tagName);
+      if (isBlock && fullText.length > 0 && !fullText.endsWith('\n')) {
+         if (spans.length > 0) spans[spans.length-1].text += '\n';
+         else spans.push({ text: '\n' });
+         fullText += '\n';
+      }
+      
+      if (tagName === 'br') {
+         if (spans.length > 0) spans[spans.length-1].text += '\n';
+         else spans.push({ text: '\n' });
+         fullText += '\n';
+         return;
+      }
+
       const style = el.style;
       const newStyle: Partial<TextSpan> = { ...inheritedStyle };
       
@@ -116,7 +137,6 @@ function htmlToSpans(html: string, baseStyles: RichTextEditorProps['baseStyles']
       if (style.fontSize) newStyle.fontSize = parseFloat(style.fontSize);
       
       // Handle semantic tags
-      const tagName = el.tagName.toLowerCase();
       if (tagName === 'b' || tagName === 'strong') newStyle.fontWeight = 'bold';
       if (tagName === 'i' || tagName === 'em') newStyle.fontStyle = 'italic';
       
@@ -153,6 +173,8 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
   onFormatShortcut,
   style,
   className,
+  autoFocus,
+  commitOnBlur = true,
 }, ref) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const [isComposing, setIsComposing] = useState(false);
@@ -165,6 +187,20 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
       editorRef.current.innerHTML = spansToHtml(spans, baseStyles);
     } else {
       editorRef.current.textContent = value;
+    }
+
+    if (autoFocus) {
+      // Small timeout to ensure DOM is ready and layout is computed
+      setTimeout(() => {
+        editorRef.current?.focus();
+        // Place caret at end
+        const range = document.createRange();
+        range.selectNodeContents(editorRef.current!);
+        range.collapse(false);
+        const sel = window.getSelection();
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+      }, 0);
     }
   }, []); // Only on mount
   
@@ -180,21 +216,38 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
     if (e.key === 'Escape') {
       e.preventDefault();
       onCancel();
-    } else if (e.key === 'Enter' && !e.shiftKey) {
+      return;
+    }
+
+    if (e.key === 'Enter' && !e.shiftKey) {
+      if (e.ctrlKey || e.metaKey) {
+        // Insert a newline
+        e.preventDefault();
+        document.execCommand('insertLineBreak');
+        // Ensure spans update after DOM change
+        setTimeout(() => handleInput(), 0);
+        return;
+      }
+
+      // Commit on Enter
       e.preventDefault();
       onCommit();
-    } else if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
+      return;
+    }
+
+    if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
       e.preventDefault();
       onFormatShortcut?.('bold');
     } else if ((e.metaKey || e.ctrlKey) && e.key === 'i') {
       e.preventDefault();
       onFormatShortcut?.('italic');
     }
-  }, [onCommit, onCancel, onFormatShortcut]);
+  }, [onCommit, onCancel, onFormatShortcut, handleInput]);
   
   const handleBlur = useCallback(() => {
+    if (!commitOnBlur) return;
     onCommit();
-  }, [onCommit]);
+  }, [onCommit, commitOnBlur]);
   
   // Get current selection range in terms of text offset
   const getSelection = useCallback((): { start: number; end: number } | null => {
@@ -295,7 +348,6 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
       suppressContentEditableWarning
       className={className}
       style={{
-        ...style,
         // Apply base styles for proper font sizing
         fontFamily: baseStyles.fontFamily,
         fontSize: `${baseStyles.fontSize}px`,
@@ -306,6 +358,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
         whiteSpace: 'pre',
         minWidth: '20px',
         minHeight: '1em',
+        ...style,
       }}
       onInput={handleInput}
       onKeyDown={handleKeyDown}

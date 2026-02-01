@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { Select } from './Select';
 
 export interface ImageNode {
   id: string;
@@ -166,14 +167,14 @@ export const ImageAttributesPanel: React.FC<ImageAttributesPanelProps> = ({
             <i className="fa-solid fa-up-right-and-down-left-from-center text-gray-400 text-[9px]" />
             Fit
           </span>
-          <select
+          <Select
             value={objectFit || 'contain'}
-            onChange={e => updateNode({ objectFit: e.target.value as ImageNode['objectFit'] })}
-            className="border border-gray-200 rounded-md px-2 py-1.5 text-[11px] bg-white focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition-colors"
-          >
-            <option value="contain">Contain</option>
-            <option value="cover">Cover</option>
-          </select>
+            onChange={val => updateNode({ objectFit: val as ImageNode['objectFit'] })}
+            options={[
+              { value: 'contain', label: 'Contain' },
+              { value: 'cover', label: 'Cover' },
+            ]}
+          />
         </label>
 
         {/* Corner Radius */}

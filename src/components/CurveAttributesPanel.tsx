@@ -1,6 +1,7 @@
 import React from 'react';
 import { parseColor } from '../utils/color';
 import { parseDashPattern } from '../utils/dashPattern';
+import { Select } from './Select';
 
 export interface CurveNode {
   id: string;
@@ -172,15 +173,15 @@ export const CurveAttributesPanel: React.FC<CurveAttributesPanelProps> = ({
             <i className="fa-solid fa-draw-polygon text-gray-400 text-[9px]" />
             Cap
           </span>
-          <select
+          <Select
             value={lineCap || 'round'}
-            onChange={e => updateNode({ lineCap: e.target.value as CurveNode['lineCap'] })}
-            className="border border-gray-200 rounded-md px-2 py-1.5 text-[11px] bg-white focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition-colors"
-          >
-            <option value="butt">Butt</option>
-            <option value="round">Round</option>
-            <option value="square">Square</option>
-          </select>
+            onChange={val => updateNode({ lineCap: val as CurveNode['lineCap'] })}
+            options={[
+              { value: 'butt', label: 'Butt' },
+              { value: 'round', label: 'Round' },
+              { value: 'square', label: 'Square' },
+            ]}
+          />
         </label>
       </div>
 

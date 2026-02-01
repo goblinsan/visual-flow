@@ -1,6 +1,7 @@
 import React from 'react';
 import { parseColor } from '../utils/color';
 import { GoogleFontPicker } from './GoogleFontPicker';
+import { Select } from './Select';
 
 export interface TextNode {
   id: string;
@@ -49,6 +50,29 @@ export const TextAttributesPanel: React.FC<TextAttributesPanelProps> = ({
 }) => {
   const { text, color, fontFamily, fontSize, fontWeight, fontStyle, align, variant, opacity } = textNode;
 
+  // Helper to update node AND its spans if they exist
+  // This ensures that when the user changes a top-level attribute, it cascades to existing characters
+  // unless they have been explicitly formatted differently. For simplicity/consistency in this "fix",
+  // we will propagate the top-level property to all spans to ensure the visual update happens.
+  const handleUpdate = (patch: Partial<TextNode>) => {
+    // If the node has spans (rich text), we need to update them too to keep things in sync
+    // otherwise the spans will keep rendering with their old values
+    const textNodeWithSpans = textNode as any;
+    if (textNodeWithSpans.spans && textNodeWithSpans.spans.length > 0) {
+      const updatedSpans = textNodeWithSpans.spans.map((span: any) => {
+        const newSpan = { ...span };
+        if (patch.fontSize !== undefined) newSpan.fontSize = patch.fontSize;
+        if (patch.fontFamily !== undefined) newSpan.fontFamily = patch.fontFamily;
+        if (patch.fontWeight !== undefined) newSpan.fontWeight = patch.fontWeight;
+        if (patch.fontStyle !== undefined) newSpan.fontStyle = patch.fontStyle;
+        if (patch.color !== undefined) newSpan.color = patch.color;
+        return newSpan;
+      });
+      patch.spans = updatedSpans;
+    }
+    updateNode(patch);
+  };
+
   // Determine default font size based on variant
   const getDefaultFontSize = () => {
     switch (variant) {
@@ -77,7 +101,7 @@ export const TextAttributesPanel: React.FC<TextAttributesPanelProps> = ({
         </span>
         <textarea
           value={text}
-          onChange={e => updateNode({ text: e.target.value })}
+          onChange={e => handleUpdate({ text: e.target.value })}
           rows={3}
           className="border border-gray-200 rounded-md px-2.5 py-2 text-[11px] resize-none bg-white focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition-colors"
           placeholder="Enter text..."
@@ -92,7 +116,7 @@ export const TextAttributesPanel: React.FC<TextAttributesPanelProps> = ({
             type="color"
             value={color || '#111827'}
             onPointerDown={() => beginRecentSession(color || '#111827')}
-            onInput={e => { const val = (e.target as HTMLInputElement).value; updateNode({ color: val }); previewRecent(val); }}
+            onInput={e => { const val = (e.target as HTMLInputElement).value; handleUpdate({ color: val }); previewRecent(val); }}
             onChange={e => { const val = e.target.value; previewRecent(val); }}
             onBlur={e => { const val = e.target.value; if (parseColor(val)) commitRecent(val); }}
             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
@@ -104,7 +128,7 @@ export const TextAttributesPanel: React.FC<TextAttributesPanelProps> = ({
         <input
           type="text"
           value={color || '#111827'}
-          onChange={e => updateNode({ color: e.target.value })}
+          onChange={e => handleUpdate({ color: e.target.value })}
           onBlur={e => { if (parseColor(e.target.value)) pushRecent(e.target.value); }}
           className="flex-1 border border-gray-200 rounded-md px-2 py-1.5 text-[11px] font-mono bg-white focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition-colors"
         />
@@ -125,7 +149,7 @@ export const TextAttributesPanel: React.FC<TextAttributesPanelProps> = ({
                   key={col}
                   type="button"
                   title={col}
-                  onClick={() => { updateNode({ color: col }); pushRecent(col); }}
+                  onClick={() => { handleUpdate({ color: col }); pushRecent(col); }}
                   className="w-6 h-6 rounded border border-gray-300 flex items-center justify-center relative group p-0"
                 >
                   <span className="w-5 h-5 rounded checkerboard overflow-hidden relative">
@@ -147,7 +171,7 @@ export const TextAttributesPanel: React.FC<TextAttributesPanelProps> = ({
         </span>
         <GoogleFontPicker
           value={fontFamily || ''}
-          onChange={(val) => updateNode({ fontFamily: val || undefined })}
+          onChange={(val) => handleUpdate({ fontFamily: val || undefined })}
         />
       </label>
 
@@ -163,7 +187,7 @@ export const TextAttributesPanel: React.FC<TextAttributesPanelProps> = ({
             min={8}
             max={200}
             value={fontSize ?? getDefaultFontSize()}
-            onChange={e => updateNode({ fontSize: Math.max(8, Number(e.target.value) || 14) })}
+            onChange={e => handleUpdate({ fontSize: Math.max(8, Number(e.target.value) || 14) })}
             className="border border-gray-200 rounded-md px-2 py-1.5 text-[11px] bg-white focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition-colors"
           />
         </label>
@@ -174,17 +198,17 @@ export const TextAttributesPanel: React.FC<TextAttributesPanelProps> = ({
             <i className="fa-solid fa-heading text-gray-400 text-[9px]" />
             Variant
           </span>
-          <select
+          <Select
             value={variant || 'body'}
-            onChange={e => updateNode({ variant: e.target.value as TextNode['variant'] })}
-            className="border border-gray-200 rounded-md px-2 py-1.5 text-[11px] bg-white focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition-colors"
-          >
-            <option value="h1">Heading 1</option>
-            <option value="h2">Heading 2</option>
-            <option value="h3">Heading 3</option>
-            <option value="body">Body</option>
-            <option value="caption">Caption</option>
-          </select>
+            onChange={val => handleUpdate({ variant: val as TextNode['variant'] })}
+            options={[
+              { value: 'h1', label: 'Heading 1' },
+              { value: 'h2', label: 'Heading 2' },
+              { value: 'h3', label: 'Heading 3' },
+              { value: 'body', label: 'Body' },
+              { value: 'caption', label: 'Caption' },
+            ]}
+          />
         </label>
       </div>
 
@@ -195,15 +219,11 @@ export const TextAttributesPanel: React.FC<TextAttributesPanelProps> = ({
             <i className="fa-solid fa-bold text-gray-400 text-[9px]" />
             Weight
           </span>
-          <select
+          <Select
             value={fontWeight || '400'}
-            onChange={e => updateNode({ fontWeight: e.target.value as TextNode['fontWeight'] })}
-            className="border border-gray-200 rounded-md px-2 py-1.5 text-[11px] bg-white focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition-colors"
-          >
-            {FONT_WEIGHTS.map(w => (
-              <option key={w.value} value={w.value}>{w.label}</option>
-            ))}
-          </select>
+            onChange={val => handleUpdate({ fontWeight: val as TextNode['fontWeight'] })}
+            options={FONT_WEIGHTS}
+          />
         </label>
 
         {/* Font Style */}
@@ -212,14 +232,14 @@ export const TextAttributesPanel: React.FC<TextAttributesPanelProps> = ({
             <i className="fa-solid fa-italic text-gray-400 text-[9px]" />
             Style
           </span>
-          <select
+          <Select
             value={fontStyle || 'normal'}
-            onChange={e => updateNode({ fontStyle: e.target.value as TextNode['fontStyle'] })}
-            className="border border-gray-200 rounded-md px-2 py-1.5 text-[11px] bg-white focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition-colors"
-          >
-            <option value="normal">Normal</option>
-            <option value="italic">Italic</option>
-          </select>
+            onChange={val => handleUpdate({ fontStyle: val as TextNode['fontStyle'] })}
+            options={[
+              { value: 'normal', label: 'Normal' },
+              { value: 'italic', label: 'Italic' },
+            ]}
+          />
         </label>
       </div>
 
@@ -234,7 +254,7 @@ export const TextAttributesPanel: React.FC<TextAttributesPanelProps> = ({
             <button
               key={a}
               type="button"
-              onClick={() => updateNode({ align: a })}
+              onClick={() => handleUpdate({ align: a })}
               className={`flex-1 px-2 py-1.5 text-[11px] border rounded-md transition-colors flex items-center justify-center ${align === a ? 'bg-blue-500 border-blue-500 text-white' : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-600'}`}
             >
               <i className={`fa-solid ${a === 'left' ? 'fa-align-left' : a === 'right' ? 'fa-align-right' : 'fa-align-center'}`} />
@@ -255,7 +275,7 @@ export const TextAttributesPanel: React.FC<TextAttributesPanelProps> = ({
           max={1}
           step={0.01}
           value={opacity ?? 1}
-          onChange={e => updateNode({ opacity: Number(e.target.value) })}
+          onChange={e => handleUpdate({ opacity: Number(e.target.value) })}
           className="accent-blue-500"
         />
       </label>

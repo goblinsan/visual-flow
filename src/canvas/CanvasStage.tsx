@@ -97,6 +97,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
 
   // Inline text editing state
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
+  const justStartedTextEditRef = useRef(false);
   const [editingTextValue, setEditingTextValue] = useState<string>('');
   const [editingTextSpans, setEditingTextSpans] = useState<TextSpan[]>([]);
   const richTextEditorRef = useRef<RichTextEditorHandle>(null);
@@ -315,7 +316,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
         root: { ...prev.root, children: [...prev.root.children, { id, type: 'rect', position: topLeft, size: sizeFinal, fill: defaults.fill, stroke: defaults.stroke, strokeWidth: defaults.strokeWidth, radius: defaults.radius, opacity: defaults.opacity, strokeDash: defaults.strokeDash }] }
       }));
   setSelection([id]);
-      onToolChange?.('select');
+      // Stay in text mode while editing; switch to select on commit.
       setRectDraft(null);
       return;
     }
@@ -365,7 +366,6 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
         ...prev,
         root: { ...prev.root, children: [...prev.root.children, { id, type: 'ellipse', position: topLeft, size: sizeFinal, fill: defaults.fill, stroke: defaults.stroke, strokeWidth: defaults.strokeWidth, opacity: defaults.opacity } as any] }
       }));
-      setSelection([id]);
       onToolChange?.('select');
       setEllipseDraft(null);
       return;
@@ -535,13 +535,37 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       return;
     }
     
-    // Text tool - single click creates text
+    // Text tool - single click creates text (creates empty text and immediately edits)
     if (isTextMode) {
       if (e.evt.button !== 0) return;
       const stage = e.target.getStage(); if (!stage) return;
       const pointer = stage.getPointerPosition(); if (!pointer) return;
       const world = toWorld(stage, pointer);
-      createText(world);
+      
+      const id = 'text_' + Math.random().toString(36).slice(2, 9);
+      // Create empty text placeholder
+      setSpec(prev => ({
+        ...prev,
+        root: { ...prev.root, children: [...prev.root.children, { 
+          id, type: 'text', position: world, text: ' ', 
+          fontSize: 14, fontFamily: 'Arial', color: '#000000',
+          spans: [] // Ensure we start with empty spans
+        } as any] }
+      }));
+      setSelection([id]);
+      onToolChange?.('select');
+      
+      // Immediately start editing
+      // We do NOT clear selection here because we just set it.
+      // But we must ensure onToolChange doesn't cause a remount or state reset.
+      justStartedTextEditRef.current = true;
+      setEditingTextId(id);
+      setEditingTextValue(' ');
+      setEditingTextSpans([]);
+
+      e.cancelBubble = true;
+      e.evt.preventDefault();
+      
       return;
     }
     
@@ -897,6 +921,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
         const textNode = findNode(spec.root, nodeId) as TextNode | null;
         
         if (textNode && textNode.type === 'text') {
+          justStartedTextEditRef.current = true;
           setEditingTextId(nodeId);
           setEditingTextValue(textNode.text || '');
           // Initialize spans - either from existing spans or create one from plain text
@@ -926,6 +951,8 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     }));
     
     setSpec({ ...spec, root: newRoot });
+    onToolChange?.('select');
+    setSelection([editingTextId]);
     setEditingTextId(null);
     setEditingTextValue('');
     setEditingTextSpans([]);
@@ -938,6 +965,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     setEditingTextValue('');
     setEditingTextSpans([]);
     setTextSelection(null);
+    onToolChange?.('select');
   }, []);
 
   // Handle text/spans change from rich text editor
@@ -996,11 +1024,15 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     
     // Calculate text alignment offset if needed
     const align = textNode.align ?? 'left';
+
+    const PADDING = 6;
+    const MIN_WIDTH = 15;
+    const MIN_HEIGHT = 30;
     
     return {
       position: 'absolute',
-      left: stageX,
-      top: stageY,
+      left: stageX - PADDING,
+      top: stageY - PADDING,
       fontSize: fontSize * scale,
       fontFamily,
       fontWeight: fontWeight === 'bold' ? 700 : (fontWeight === 'normal' ? 400 : Number(fontWeight)),
@@ -1009,12 +1041,14 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       background: 'transparent',
       border: 'none',
       outline: 'none',
-      padding: 0,
+      padding: `${PADDING}px`,
       margin: 0,
-      minWidth: '20px',
-      minHeight: '1em',
+      display: 'inline-block',
+      width: 'auto',
+      minWidth: `${MIN_WIDTH}px`,
+      minHeight: `${MIN_HEIGHT}px`,
       resize: 'none',
-      overflow: 'hidden',
+      overflow: 'visible',
       transformOrigin: 'top left',
       transform: `rotate(${textNode.rotation ?? 0}deg) scale(${textNode.textScaleX ?? 1}, ${textNode.textScaleY ?? 1})`,
       zIndex: 1000,
@@ -1027,6 +1061,19 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
 
   // Single click handler for empty canvas
   const onClick = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
+    // If we are editing, clicking the background commits (except immediately after start).
+    if (editingTextId) {
+      if (justStartedTextEditRef.current) {
+        justStartedTextEditRef.current = false;
+        return;
+      }
+      if (e.target === e.target.getStage()) {
+        commitTextEdit();
+        setSelection([]);
+      }
+      return;
+    }
+
     if (!isSelectMode) return;
     if (e.evt.button !== 0) return;
     
@@ -1044,7 +1091,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   setSelection([]);
       setMenu(null);
     }
-  }, [isSelectMode, dragSession, marqueeSession, isTransformerTarget]);
+  }, [isSelectMode, dragSession, marqueeSession, isTransformerTarget, editingTextId, commitTextEdit]);
 
   // Wheel zoom
   const onWheel = useCallback((e: Konva.KonvaEventObject<WheelEvent>) => {
@@ -1607,7 +1654,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
             {renderNode(spec.root)}
           </Group>
           
-          {isSelectMode && (
+          {isSelectMode && !editingTextId && (
             <Transformer 
               ref={trRef as unknown as React.RefObject<Konva.Transformer>} 
               rotateEnabled={true} 
@@ -1865,7 +1912,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
           <>
             {/* Fixed toolbar above text */}
             <TextEditToolbar
-              visible={true}
+              visible={!!(textSelection && textSelection.start !== textSelection.end)}
               anchorPosition={toolbarAnchor}
               hasSelection={!!(textSelection && textSelection.start !== textSelection.end)}
               currentFormat={undefined}
@@ -1873,6 +1920,8 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
             />
             <RichTextEditor
               ref={richTextEditorRef}
+              autoFocus
+              commitOnBlur={false}
               value={editingTextValue}
               spans={editingTextSpans}
               baseStyles={baseStyles}
