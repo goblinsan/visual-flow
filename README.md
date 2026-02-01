@@ -25,6 +25,18 @@ pnpm build     # production bundle (if required later)
 Open the app, create rectangles (`R`), experiment with grouping, resizing, and context menu actions.
 
 ---
+## Project Management
+
+This repository uses an automated **Epic/Milestone/Issue** hierarchy for project management:
+- **Milestones** represent release goals or project phases
+- **Epics** (labeled PRs) represent major features tied to Milestones  
+- **Issues** represent individual tasks tied to Epics
+- When an Epic is merged, all linked Issues are **automatically closed**
+
+📖 See [Epic Management Guide](docs/EPIC_MANAGEMENT.md) for details  
+⚡ See [Quick Reference](docs/EPIC_QUICK_REFERENCE.md) for commands
+
+---
 ## Architecture Overview
 
 | Layer | Purpose | Key Files |

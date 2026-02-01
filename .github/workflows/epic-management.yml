@@ -1,0 +1,184 @@
+name: Epic and Issue Management
+on:
+  pull_request:
+    types: [opened, labeled, unlabeled, closed, edited, synchronize]
+  issues:
+    types: [opened, labeled, unlabeled, edited, closed]
+  issue_comment:
+    types: [created, edited]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  manage-epic-relationships:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check if PR is an Epic
+        id: check-epic
+        if: github.event_name == 'pull_request'
+        run: |
+          # Check if PR has Epic label
+          LABELS='${{ toJson(github.event.pull_request.labels) }}'
+          if echo "$LABELS" | jq -e '.[] | select(.name == "Epic")' > /dev/null; then
+            echo "is_epic=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_epic=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Link Epic to Milestone
+        if: |
+          github.event_name == 'pull_request' && 
+          steps.check-epic.outputs.is_epic == 'true' &&
+          github.event.pull_request.milestone != null
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          EPIC_NUM="${{ github.event.pull_request.number }}"
+          MILESTONE="${{ github.event.pull_request.milestone.title }}"
+          echo "Epic PR #${EPIC_NUM} is linked to Milestone: ${MILESTONE}"
+
+          # Add a comment to the PR documenting the Epic-Milestone relationship
+          COMMENT_BODY="📊 **Epic Tracking**: This Epic is tied to Milestone **${MILESTONE}**
+
+          To link an issue to this Epic, add a comment with:
+          - \`Relates to #${EPIC_NUM}\`
+          - \`Part of #${EPIC_NUM}\`
+
+          When this Epic is merged, all related issues will be automatically closed."
+
+          gh api repos/${{ github.repository }}/issues/${EPIC_NUM}/comments \
+            -f body="${COMMENT_BODY}"
+
+      - name: Close related Issues when Epic is merged
+        if: |
+          github.event_name == 'pull_request' &&
+          github.event.action == 'closed' &&
+          github.event.pull_request.merged == true &&
+          steps.check-epic.outputs.is_epic == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          EPIC_NUMBER=${{ github.event.pull_request.number }}
+          echo "Epic PR #${EPIC_NUMBER} was merged. Finding related issues..."
+          
+          # Search for issues that reference this Epic PR
+          gh api graphql -f query='
+          query($owner: String!, $repo: String!, $epicNumber: Int!) {
+            repository(owner: $owner, name: $repo) {
+              pullRequest(number: $epicNumber) {
+                closingIssuesReferences(first: 100) {
+                  nodes {
+                    number
+                    title
+                    state
+                  }
+                }
+                timelineItems(first: 100, itemTypes: [CROSS_REFERENCED_EVENT]) {
+                  nodes {
+                    ... on CrossReferencedEvent {
+                      source {
+                        ... on Issue {
+                          number
+                          title
+                          state
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            search(query: "repo:${{ github.repository }} is:issue is:open relates to #${EPIC_NUMBER} OR part of #${EPIC_NUMBER} in:body", type: ISSUE, first: 100) {
+              nodes {
+                ... on Issue {
+                  number
+                  title
+                }
+              }
+            }
+          }' -f owner=${{ github.repository_owner }} -f repo=${{ github.event.repository.name }} -F epicNumber=${EPIC_NUMBER} > issues.json
+          
+          # Extract issue numbers from the response and close them
+          cat issues.json | jq -r '.data.search.nodes[].number' | while read issue_number; do
+            if [ ! -z "$issue_number" ]; then
+              echo "Closing issue #${issue_number}"
+              gh issue close ${issue_number} \
+                --repo ${{ github.repository }} \
+                --comment "✅ Automatically closed because Epic #${EPIC_NUMBER} was merged and completed."
+            fi
+          done
+          
+          # Also check timeline items for cross-references
+          cat issues.json | jq -r '.data.repository.pullRequest.timelineItems.nodes[].source.number // empty' | while read issue_number; do
+            if [ ! -z "$issue_number" ]; then
+              echo "Closing cross-referenced issue #${issue_number}"
+              gh issue close ${issue_number} \
+                --repo ${{ github.repository }} \
+                --comment "✅ Automatically closed because Epic #${EPIC_NUMBER} was merged and completed."
+            fi
+          done
+
+      - name: Track Issue-Epic relationship
+        if: |
+          github.event_name == 'issue_comment' &&
+          github.event.action == 'created'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          COMMENT_BODY='${{ github.event.comment.body }}'
+          
+          # Check if comment mentions "Relates to #" or "Part of #" followed by a PR number
+          if echo "$COMMENT_BODY" | grep -iE "(relates to|part of) #[0-9]+" > /dev/null; then
+            echo "Found Epic relationship in comment"
+            
+            # Extract the Epic PR number
+            EPIC_NUMBER=$(echo "$COMMENT_BODY" | grep -oiE "(relates to|part of) #[0-9]+" | grep -oE "[0-9]+" | head -1)
+            
+            # Check if the referenced PR is an Epic
+            EPIC_LABELS=$(gh pr view ${EPIC_NUMBER} --repo ${{ github.repository }} --json labels --jq '.labels[].name')
+            
+            if echo "$EPIC_LABELS" | grep -q "Epic"; then
+              echo "✅ Issue #${{ github.event.issue.number }} is linked to Epic #${EPIC_NUMBER}"
+              
+              # Add a label to the issue to track it
+              gh issue edit ${{ github.event.issue.number }} \
+                --repo ${{ github.repository }} \
+                --add-label "epic:${EPIC_NUMBER}"
+              
+              # Add a comment confirming the link
+              gh issue comment ${{ github.event.issue.number }} \
+                --repo ${{ github.repository }} \
+                --body "🔗 This issue has been linked to Epic #${EPIC_NUMBER}. It will be automatically closed when the Epic is merged."
+            else
+              echo "⚠️  Referenced PR #${EPIC_NUMBER} is not an Epic"
+            fi
+          fi
+
+      - name: Ensure Epic has Milestone
+        if: |
+          github.event_name == 'pull_request' &&
+          (github.event.action == 'labeled' || github.event.action == 'opened') &&
+          steps.check-epic.outputs.is_epic == 'true' &&
+          github.event.pull_request.milestone == null
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          EPIC_NUM="${{ github.event.pull_request.number }}"
+          echo "Warning: Epic PR #${EPIC_NUM} does not have a Milestone assigned."
+
+          # Add a comment to remind about milestone assignment
+          COMMENT_BODY="⚠️  **Action Required**: This PR is labeled as an Epic but does not have a Milestone assigned.
+
+          Please assign a Milestone to properly track this Epic's progress.
+
+          **Why Milestones for Epics?**
+          - Epics represent major features or initiatives
+          - Milestones group related Epics and track overall release progress
+          - This helps with project planning and release management"
+
+          gh pr comment ${EPIC_NUM} \
+            --repo ${{ github.repository }} \
+            --body "${COMMENT_BODY}"
