@@ -184,7 +184,43 @@ const TEMPLATES: { id: string; name: string; icon: string; description: string; 
 ];
 
 export default function CanvasApp() {
-  const { spec, setSpec, reset: resetSpec } = useDesignPersistence({ buildInitial: buildInitialSpec });
+  const { spec, setSpec: setSpecRaw, reset: resetSpec } = useDesignPersistence({ buildInitial: buildInitialSpec });
+  const historyRef = useRef<{ past: LayoutSpec[]; future: LayoutSpec[] }>({ past: [], future: [] });
+  const historyLockRef = useRef(false);
+  const setSpec = useCallback((next: LayoutSpec | ((prev: LayoutSpec) => LayoutSpec)) => {
+    setSpecRaw((prev) => {
+      const resolved = typeof next === 'function' ? (next as (p: LayoutSpec) => LayoutSpec)(prev) : next;
+      if (!historyLockRef.current && resolved !== prev) {
+        historyRef.current.past.push(prev);
+        historyRef.current.future = [];
+      }
+      return resolved;
+    });
+  }, [setSpecRaw]);
+
+  const undo = useCallback(() => {
+    const past = historyRef.current.past;
+    if (past.length === 0) return;
+    const prev = past.pop()!;
+    historyLockRef.current = true;
+    setSpecRaw((current) => {
+      historyRef.current.future.unshift(current);
+      return prev;
+    });
+    historyLockRef.current = false;
+  }, [setSpecRaw]);
+
+  const redo = useCallback(() => {
+    const future = historyRef.current.future;
+    if (future.length === 0) return;
+    const next = future.shift()!;
+    historyLockRef.current = true;
+    setSpecRaw((current) => {
+      historyRef.current.past.push(current);
+      return next;
+    });
+    historyLockRef.current = false;
+  }, [setSpecRaw]);
   const [tool, setTool] = useState<string>("select");
   const { selection: selectedIds, setSelection } = useSelection();
   // Rectangle default attributes (persisted)
@@ -689,6 +725,8 @@ export default function CanvasApp() {
                 width={stageWidth}
                 height={stageHeight}
                 onToolChange={setTool}
+                onUndo={undo}
+                onRedo={redo}
                 selectedIconId={selectedIconId}
                 selectedComponentId={selectedComponentId}
                 selection={selectedIds}

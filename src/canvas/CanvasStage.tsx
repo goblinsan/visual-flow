@@ -31,6 +31,8 @@ interface CanvasStageProps {
   onToolChange?: (tool: string) => void; // allow CanvasStage to request tool mode changes (e.g., after shape creation)
   selectedIconId?: string;
   selectedComponentId?: string;
+  onUndo?: () => void;
+  onRedo?: () => void;
   rectDefaults?: { fill?: string; stroke?: string; strokeWidth: number; radius: number; opacity: number; strokeDash?: number[] };
   selection: string[];
   setSelection: (ids: string[]) => void;
@@ -80,7 +82,7 @@ function InfiniteGrid({ width, height, scale, offsetX, offsetY }: InfiniteGridPr
   return <>{dots}</>;
 }
 
-function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select", onToolChange, selectedIconId, selectedComponentId, rectDefaults, selection, setSelection, fitToContentKey }: CanvasStageProps) {
+function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select", onToolChange, selectedIconId, selectedComponentId, onUndo, onRedo, rectDefaults, selection, setSelection, fitToContentKey }: CanvasStageProps) {
   // View / interaction state
   const [scale, setScale] = useState(1);
   const [pos, setPos] = useState({ x: 0, y: 0 });
@@ -1406,6 +1408,17 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
         return;
       }
 
+      // Undo / Redo
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          onRedo?.();
+        } else {
+          onUndo?.();
+        }
+        return;
+      }
+
       // Copy
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
         if (selected.length === 0) return;
@@ -1490,7 +1503,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [isSelectMode, canGroup, canUngroup, selected, performGroup, performUngroup, setSpec, setSelection, editingTextId, spec.root, collectExistingIds, createUniqueIdFactory, remapIdsAndOffset, cloneNode]);
+  }, [isSelectMode, canGroup, canUngroup, selected, performGroup, performUngroup, setSpec, setSelection, editingTextId, spec.root, collectExistingIds, createUniqueIdFactory, remapIdsAndOffset, cloneNode, onUndo, onRedo]);
 
   // Normalize selection on changes
   useEffect(() => {
