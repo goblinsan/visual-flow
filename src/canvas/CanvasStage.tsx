@@ -13,6 +13,7 @@ import { findNode, mapNode } from "../commands/types";
 import { RichTextEditor, type RichTextEditorHandle } from "../components/RichTextEditor";
 import { TextEditToolbar } from "../components/TextEditToolbar";
 import { ImagePickerModal } from "../components/ImagePickerModal";
+import { COMPONENT_LIBRARY, ICON_LIBRARY } from "../library";
 
 // Grid configuration
 const GRID_SPACING = 20; // Space between dots
@@ -28,6 +29,8 @@ interface CanvasStageProps {
   height?: number;
   tool?: string;
   onToolChange?: (tool: string) => void; // allow CanvasStage to request tool mode changes (e.g., after shape creation)
+  selectedIconId?: string;
+  selectedComponentId?: string;
   rectDefaults?: { fill?: string; stroke?: string; strokeWidth: number; radius: number; opacity: number; strokeDash?: number[] };
   selection: string[];
   setSelection: (ids: string[]) => void;
@@ -77,7 +80,7 @@ function InfiniteGrid({ width, height, scale, offsetX, offsetY }: InfiniteGridPr
   return <>{dots}</>;
 }
 
-function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select", onToolChange, rectDefaults, selection, setSelection, fitToContentKey }: CanvasStageProps) {
+function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select", onToolChange, selectedIconId, selectedComponentId, rectDefaults, selection, setSelection, fitToContentKey }: CanvasStageProps) {
   // View / interaction state
   const [scale, setScale] = useState(1);
   const [pos, setPos] = useState({ x: 0, y: 0 });
@@ -98,6 +101,26 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   // Inline text editing state
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const justStartedTextEditRef = useRef(false);
+    const getNodeWorldPosition = useCallback((nodeId: string): { x: number; y: number } | null => {
+      let result: { x: number; y: number } | null = null;
+      const walk = (node: any, accX: number, accY: number) => {
+        const pos = node.position ?? { x: 0, y: 0 };
+        const nextX = accX + (pos.x ?? 0);
+        const nextY = accY + (pos.y ?? 0);
+        if (node.id === nodeId) {
+          result = { x: nextX, y: nextY };
+          return;
+        }
+        if (Array.isArray(node.children)) {
+          for (const child of node.children) {
+            if (result) return;
+            walk(child, nextX, nextY);
+          }
+        }
+      };
+      walk(spec.root, 0, 0);
+      return result;
+    }, [spec.root]);
   const [editingTextValue, setEditingTextValue] = useState<string>('');
   const [editingTextSpans, setEditingTextSpans] = useState<TextSpan[]>([]);
   const richTextEditorRef = useRef<RichTextEditorHandle>(null);
@@ -114,7 +137,9 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   const isCurveMode = tool === 'curve';
   const isTextMode = tool === 'text';
   const isImageMode = tool === 'image';
-  const isShapeCreationMode = isRectMode || isEllipseMode || isLineMode || isCurveMode || isTextMode || isImageMode;
+  const isIconMode = tool === 'icon';
+  const isComponentMode = tool === 'component';
+  const isShapeCreationMode = isRectMode || isEllipseMode || isLineMode || isCurveMode || isTextMode || isImageMode || isIconMode || isComponentMode;
   const [spacePan, setSpacePan] = useState(false);
   // Track shift key globally for aspect-ratio constrained resize
   const [shiftPressed, setShiftPressed] = useState(false);
@@ -467,6 +492,53 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     setImagePickerOpen(true);
   }, []);
 
+  const makeId = useCallback((prefix: string) => `${prefix}_${Math.random().toString(36).slice(2, 9)}`, []);
+
+  const createIcon = useCallback((worldPos: { x: number; y: number }) => {
+    const icon = ICON_LIBRARY.find(i => i.id === selectedIconId) ?? ICON_LIBRARY[0];
+    if (!icon) return;
+    const id = makeId('icon');
+    const [w, h, , , d] = icon.icon.icon;
+    const path = Array.isArray(d) ? d.join(' ') : d;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" fill="#111827"><path d="${path}"/></svg>`;
+    const src = `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+    setSpec(prev => ({
+      ...prev,
+      root: {
+        ...prev.root,
+        children: [
+          ...prev.root.children,
+          {
+            id,
+            type: 'image',
+            position: worldPos,
+            size: { width: 32, height: 32 },
+            src,
+            alt: icon.label,
+            objectFit: 'contain',
+          } as any,
+        ],
+      },
+    }));
+    setSelection([id]);
+    onToolChange?.('select');
+  }, [makeId, onToolChange, selectedIconId, setSelection, setSpec]);
+
+  const createComponent = useCallback((worldPos: { x: number; y: number }) => {
+    const template = COMPONENT_LIBRARY.find(c => c.id === selectedComponentId) ?? COMPONENT_LIBRARY[0];
+    if (!template) return;
+    const groupNode = template.build(worldPos, makeId);
+    setSpec(prev => ({
+      ...prev,
+      root: {
+        ...prev.root,
+        children: [...prev.root.children, groupNode],
+      },
+    }));
+    setSelection([groupNode.id]);
+    onToolChange?.('select');
+  }, [makeId, onToolChange, selectedComponentId, setSelection, setSpec]);
+
   // Actually insert the image after picker selection
   const handleImageSelected = useCallback((src: string, width: number, height: number) => {
     if (!pendingImagePosition) return;
@@ -578,6 +650,26 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       createImage(world);
       return;
     }
+
+    // Icon tool - single click places selected icon
+    if (isIconMode) {
+      if (e.evt.button !== 0) return;
+      const stage = e.target.getStage(); if (!stage) return;
+      const pointer = stage.getPointerPosition(); if (!pointer) return;
+      const world = toWorld(stage, pointer);
+      createIcon(world);
+      return;
+    }
+
+    // Component tool - single click places selected component
+    if (isComponentMode) {
+      if (e.evt.button !== 0) return;
+      const stage = e.target.getStage(); if (!stage) return;
+      const pointer = stage.getPointerPosition(); if (!pointer) return;
+      const world = toWorld(stage, pointer);
+      createComponent(world);
+      return;
+    }
     
     if (!isSelectMode) return;
     const stage = e.target.getStage();
@@ -652,7 +744,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     if (!e.evt.shiftKey && !e.evt.ctrlKey) { setSelection([]); }
     
     setMenu(null);
-  }, [isSelectMode, spacePan, spec.root.id, toWorld, selected, getTopContainerAncestor, normalizeSelection, isTransformerTarget, isEllipseMode, isLineMode, isCurveMode, isTextMode, isImageMode, curveDraft, createText, createImage]);
+  }, [isSelectMode, spacePan, spec.root.id, toWorld, selected, getTopContainerAncestor, normalizeSelection, isTransformerTarget, isEllipseMode, isLineMode, isCurveMode, isTextMode, isImageMode, isIconMode, isComponentMode, curveDraft, createText, createImage, createIcon, createComponent]);
 
   const onMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     const stage = e.target.getStage();
@@ -1006,8 +1098,9 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     if (!textNode) return null;
     
     const stage = stageRef.current;
-    const x = textNode.position?.x ?? 0;
-    const y = textNode.position?.y ?? 0;
+    const worldPos = getNodeWorldPosition(editingTextId) ?? { x: 0, y: 0 };
+    const x = worldPos.x;
+    const y = worldPos.y;
     
     // Convert world coordinates to screen coordinates
     const stageX = x * scale + pos.x;
@@ -1057,7 +1150,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       caretColor: '#3b82f6',
       whiteSpace: 'pre',
     };
-  }, [editingTextId, spec.root, scale, pos]);
+  }, [editingTextId, spec.root, scale, pos, getNodeWorldPosition]);
 
   // Single click handler for empty canvas
   const onClick = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -1903,8 +1996,9 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
         };
         
         // Calculate toolbar anchor position (center of text node)
-        const textX = (textNode.position?.x ?? 0) * scale + pos.x;
-        const textY = (textNode.position?.y ?? 0) * scale + pos.y;
+        const worldPos = getNodeWorldPosition(editingTextId) ?? { x: 0, y: 0 };
+        const textX = worldPos.x * scale + pos.x;
+        const textY = worldPos.y * scale + pos.y;
         const textWidth = (textNode.size?.width ?? 200) * scale;
         const toolbarAnchor = { x: textX + textWidth / 2, y: textY };
         

@@ -16,6 +16,7 @@ import { logger } from "./utils/logger";
 import { dashArrayToInput } from './utils/paint';
 import CanvasStage from "./canvas/CanvasStage.tsx";
 import type { LayoutSpec } from "./layout-schema.ts";
+import { COMPONENT_LIBRARY, ICON_LIBRARY } from "./library";
 import { saveNamedDesign, getSavedDesigns, loadNamedDesign, getCurrentDesignName, setCurrentDesignName, type SavedDesign } from './utils/persistence';
 
 // Extracted hook
@@ -201,6 +202,11 @@ export default function CanvasApp() {
   const [fileOpen, setFileOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [cheatOpen, setCheatOpen] = useState(false);
+  const [iconLibraryOpen, setIconLibraryOpen] = useState(false);
+  const [componentLibraryOpen, setComponentLibraryOpen] = useState(false);
+  const [selectedIconId, setSelectedIconId] = useState(ICON_LIBRARY[0]?.id || "star");
+  const [selectedComponentId, setSelectedComponentId] = useState(COMPONENT_LIBRARY[0]?.id || "button");
+  const [iconSearch, setIconSearch] = useState('');
   const [newDialogOpen, setNewDialogOpen] = useState(false); // New design template dialog
   const [openDialogOpen, setOpenDialogOpen] = useState(false); // Open design dialog
   const [currentDesignName, setCurrentDesignNameState] = useState<string | null>(getCurrentDesignName);
@@ -476,6 +482,86 @@ export default function CanvasApp() {
           <li>Nudge: Arrows (1px) / Shift+Arrows (10px).</li>
         </ul>
       </Modal>
+      <Modal open={iconLibraryOpen} onClose={() => setIconLibraryOpen(false)} title="Icons" size="md" variant="light">
+        <p className="text-xs text-gray-600 mb-3">Choose an icon to place on the canvas.</p>
+        <div className="relative mb-3">
+          <i className="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-[10px]" />
+          <input
+            value={iconSearch}
+            onChange={(e) => setIconSearch(e.target.value)}
+            placeholder="Search icons..."
+            className="w-full border border-gray-200 rounded-md pl-7 pr-2 py-2 text-[11px] bg-white focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition-colors"
+          />
+        </div>
+        {(() => {
+          const q = iconSearch.trim().toLowerCase();
+          const filteredIcons = q
+            ? ICON_LIBRARY.filter((icon) => icon.label.toLowerCase().includes(q) || icon.id.toLowerCase().includes(q))
+            : ICON_LIBRARY;
+
+          return (
+            <>
+              <div className="grid grid-cols-4 gap-2 max-h-[50vh] overflow-y-auto pr-1">
+                {filteredIcons.map((icon) => {
+                  const [w, h, , , d] = icon.icon.icon;
+                  const path = Array.isArray(d) ? d.join(' ') : d;
+                  return (
+                    <button
+                      key={icon.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedIconId(icon.id);
+                        setIconLibraryOpen(false);
+                      }}
+                      className={`flex flex-col items-center justify-center gap-1.5 px-2 py-2 rounded-lg border text-[10px] transition-colors ${
+                        selectedIconId === icon.id
+                          ? 'border-blue-500 bg-blue-50 text-blue-700'
+                          : 'border-gray-200 hover:bg-gray-50 text-gray-600'
+                      }`}
+                    >
+                      <svg viewBox={`0 0 ${w} ${h}`} className="w-4 h-4" fill="currentColor" aria-hidden="true">
+                        <path d={path} />
+                      </svg>
+                      <span className="truncate w-full text-center">{icon.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {filteredIcons.length === 0 && (
+                <div className="mt-3 text-[11px] text-gray-500">No icons match “{iconSearch}”.</div>
+              )}
+            </>
+          );
+        })()}
+      </Modal>
+      <Modal open={componentLibraryOpen} onClose={() => setComponentLibraryOpen(false)} title="Components" size="md" variant="light">
+        <p className="text-xs text-gray-600 mb-3">Choose a component to place on the canvas.</p>
+        <div className="grid grid-cols-1 gap-2 max-h-[50vh] overflow-y-auto pr-1">
+          {COMPONENT_LIBRARY.map((component) => (
+            <button
+              key={component.id}
+              type="button"
+              onClick={() => {
+                setSelectedComponentId(component.id);
+                setComponentLibraryOpen(false);
+              }}
+              className={`flex items-center gap-3 px-3 py-2 rounded-lg border text-left transition-colors ${
+                selectedComponentId === component.id
+                  ? 'border-blue-500 bg-blue-50'
+                  : 'border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center text-gray-500">
+                <i className={`${component.iconClassName}`} />
+              </div>
+              <div>
+                <div className="text-sm font-medium text-gray-800">{component.name}</div>
+                <div className="text-[11px] text-gray-500">{component.description}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </Modal>
       {/* New Design Template Dialog */}
       <Modal open={newDialogOpen} onClose={() => setNewDialogOpen(false)} title="Create New Design" size="lg" variant="light">
         <p className="text-sm text-gray-600 mb-4">Choose a template to get started:</p>
@@ -544,17 +630,31 @@ export default function CanvasApp() {
         {/* Left toolbar */}
         <aside className="w-14 border-r border-gray-200 bg-gradient-to-b from-white to-gray-50 flex flex-col items-center py-3 gap-1 shadow-sm">
           {[
-            ["fa-solid fa-arrow-pointer", "select", "Select (V)"],
-            ["fa-regular fa-square", "rect", "Rectangle (R)"],
-            ["fa-regular fa-circle", "ellipse", "Ellipse (O)"],
-            ["fa-solid fa-minus", "line", "Line (L)"],
-            ["fa-solid fa-bezier-curve", "curve", "Curve (P)"],
-            ["fa-solid fa-font", "text", "Text (T)"],
-            ["fa-regular fa-image", "image", "Image (I)"],
-          ].map(([icon, val, tooltip]) => (
+            { icon: "fa-solid fa-arrow-pointer", val: "select", tooltip: "Select (V)" },
+            { icon: "fa-regular fa-square", val: "rect", tooltip: "Rectangle (R)" },
+            { icon: "fa-regular fa-circle", val: "ellipse", tooltip: "Ellipse (O)" },
+            { icon: "fa-solid fa-minus", val: "line", tooltip: "Line (L)" },
+            { icon: "fa-solid fa-bezier-curve", val: "curve", tooltip: "Curve (P)" },
+            { icon: "fa-solid fa-font", val: "text", tooltip: "Text (T)" },
+            { icon: "fa-regular fa-image", val: "image", tooltip: "Image (I)" },
+            { icon: "fa-solid fa-icons", val: "icon", tooltip: "Icon Library" },
+            { icon: "fa-solid fa-layer-group", val: "component", tooltip: "Components" },
+          ].map(({ icon, val, tooltip }) => (
             <button
               key={val}
-              onClick={() => setTool(val)}
+              onClick={() => {
+                if (val === 'icon') {
+                  setTool('icon');
+                  setIconLibraryOpen(true);
+                  return;
+                }
+                if (val === 'component') {
+                  setTool('component');
+                  setComponentLibraryOpen(true);
+                  return;
+                }
+                setTool(val);
+              }}
               title={tooltip}
               className={`relative w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-150 ${
                 tool === val 
@@ -589,6 +689,8 @@ export default function CanvasApp() {
                 width={stageWidth}
                 height={stageHeight}
                 onToolChange={setTool}
+                selectedIconId={selectedIconId}
+                selectedComponentId={selectedComponentId}
                 selection={selectedIds}
                 setSelection={setSelection}
                 fitToContentKey={fitToContentKey}

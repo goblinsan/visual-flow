@@ -2,6 +2,7 @@ import React from 'react';
 import { parseColor } from '../utils/color';
 import { GoogleFontPicker } from './GoogleFontPicker';
 import { Select } from './Select';
+import type { TextSpan } from '../layout-schema';
 
 export interface TextNode {
   id: string;
@@ -55,6 +56,7 @@ export const TextAttributesPanel: React.FC<TextAttributesPanelProps> = ({
   // unless they have been explicitly formatted differently. For simplicity/consistency in this "fix",
   // we will propagate the top-level property to all spans to ensure the visual update happens.
   const handleUpdate = (patch: Partial<TextNode>) => {
+    const nextPatch: Partial<TextNode> & { spans?: TextSpan[] } = { ...patch };
     // If the node has spans (rich text), we need to update them too to keep things in sync
     // otherwise the spans will keep rendering with their old values
     const textNodeWithSpans = textNode as any;
@@ -68,9 +70,9 @@ export const TextAttributesPanel: React.FC<TextAttributesPanelProps> = ({
         if (patch.color !== undefined) newSpan.color = patch.color;
         return newSpan;
       });
-      patch.spans = updatedSpans;
+      nextPatch.spans = updatedSpans;
     }
-    updateNode(patch);
+    updateNode(nextPatch);
   };
 
   // Determine default font size based on variant
