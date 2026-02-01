@@ -204,7 +204,7 @@ export interface FlowTransition {
   from: string; // screen id
   to: string;   // screen id
   trigger: string;
-  animation: "none" | "fade" | "slide-left" | "slide-right" | "slide-up" | "slide-down";
+  animation: "none" | "fade" | "slide";
   durationMs: number;
   easing: "linear" | "ease" | "ease-in" | "ease-out" | "ease-in-out";
 }

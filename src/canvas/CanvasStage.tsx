@@ -39,6 +39,12 @@ interface CanvasStageProps {
   selection: string[];
   setSelection: (ids: string[]) => void;
   fitToContentKey?: number; // Increment to trigger fit-to-content
+  viewportTransition?: {
+    targetId: string;
+    durationMs?: number;
+    easing?: "linear" | "ease" | "ease-in" | "ease-out" | "ease-in-out";
+    _key?: string;
+  } | null;
 }
 
 // Infinite dot grid component
@@ -93,12 +99,14 @@ function InfiniteGrid({ width, height, scale, offsetX, offsetY }: InfiniteGridPr
   return <>{dots}</>;
 }
 
-function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select", onToolChange, selectedIconId, selectedComponentId, onUndo, onRedo, focusNodeId, onUngroup, rectDefaults, selection, setSelection, fitToContentKey }: CanvasStageProps) {
+function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select", onToolChange, selectedIconId, selectedComponentId, onUndo, onRedo, focusNodeId, onUngroup, rectDefaults, selection, setSelection, fitToContentKey, viewportTransition }: CanvasStageProps) {
   // View / interaction state
   const [scale, setScale] = useState(1);
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const [panning, setPanning] = useState(false);
   const panLastPosRef = useRef<{ x: number; y: number } | null>(null);
+  const posRef = useRef(pos);
+  const transitionRafRef = useRef<number | null>(null);
   const selected = selection;
   const [menu, setMenu] = useState<null | { x: number; y: number }>(null);
   
@@ -117,6 +125,105 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   const justStartedTextEditRef = useRef(false);
   const clipboardRef = useRef<LayoutNode[] | null>(null);
   const pasteOffsetRef = useRef(0);
+  useEffect(() => {
+    posRef.current = pos;
+  }, [pos]);
+
+  const easingFn = useCallback((name: "linear" | "ease" | "ease-in" | "ease-out" | "ease-in-out") => {
+    switch (name) {
+      case "linear":
+        return (t: number) => t;
+      case "ease-in":
+        return (t: number) => t * t;
+      case "ease-out":
+        return (t: number) => 1 - Math.pow(1 - t, 2);
+      case "ease-in-out":
+        return (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+      default:
+        return (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+    }
+  }, []);
+
+  const getNodeBounds = useCallback((node: any, accX: number, accY: number): { x: number; y: number; width: number; height: number } | null => {
+    const pos = node.position ?? { x: 0, y: 0 };
+    const baseX = accX + (pos.x ?? 0);
+    const baseY = accY + (pos.y ?? 0);
+    const size = node.size;
+    const hasSize = size && typeof size.width === "number" && typeof size.height === "number";
+    let bounds = hasSize ? { x: baseX, y: baseY, width: size.width, height: size.height } : null;
+    if (Array.isArray(node.children) && node.children.length > 0) {
+      const childBounds = node.children
+        .map((child: any) => getNodeBounds(child, baseX, baseY))
+        .filter(Boolean) as Array<{ x: number; y: number; width: number; height: number }>;
+      if (childBounds.length > 0 && !bounds) {
+        const minX = Math.min(...childBounds.map(b => b.x));
+        const minY = Math.min(...childBounds.map(b => b.y));
+        const maxX = Math.max(...childBounds.map(b => b.x + b.width));
+        const maxY = Math.max(...childBounds.map(b => b.y + b.height));
+        bounds = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+      }
+    }
+    return bounds;
+  }, []);
+
+  const findNodeBoundsById = useCallback((node: any, id: string, accX = 0, accY = 0): { x: number; y: number; width: number; height: number } | null => {
+    const pos = node.position ?? { x: 0, y: 0 };
+    const nextX = accX + (pos.x ?? 0);
+    const nextY = accY + (pos.y ?? 0);
+    if (node.id === id) {
+      return getNodeBounds(node, accX, accY);
+    }
+    if (Array.isArray(node.children)) {
+      for (const child of node.children) {
+        const found = findNodeBoundsById(child, id, nextX, nextY);
+        if (found) return found;
+      }
+    }
+    return null;
+  }, [getNodeBounds]);
+
+  useEffect(() => {
+    if (!viewportTransition?.targetId) return;
+    const bounds = findNodeBoundsById(spec.root, viewportTransition.targetId);
+    if (!bounds) return;
+    const duration = Math.max(0, viewportTransition.durationMs ?? 300);
+    const ease = easingFn(viewportTransition.easing ?? "ease-out");
+    const targetX = width / 2 - (bounds.x + bounds.width / 2) * scale;
+    const targetY = height / 2 - (bounds.y + bounds.height / 2) * scale;
+    const from = posRef.current;
+
+    if (transitionRafRef.current) {
+      cancelAnimationFrame(transitionRafRef.current);
+      transitionRafRef.current = null;
+    }
+
+    if (duration === 0) {
+      setPos({ x: targetX, y: targetY });
+      return;
+    }
+
+    const start = performance.now();
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / duration);
+      const k = ease(t);
+      setPos({
+        x: from.x + (targetX - from.x) * k,
+        y: from.y + (targetY - from.y) * k,
+      });
+      if (t < 1) {
+        transitionRafRef.current = requestAnimationFrame(tick);
+      } else {
+        transitionRafRef.current = null;
+      }
+    };
+    transitionRafRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (transitionRafRef.current) {
+        cancelAnimationFrame(transitionRafRef.current);
+        transitionRafRef.current = null;
+      }
+    };
+  }, [viewportTransition?._key, viewportTransition?.targetId, viewportTransition?.durationMs, viewportTransition?.easing, width, height, scale, spec.root, findNodeBoundsById, easingFn]);
     const getNodeWorldPosition = useCallback((nodeId: string): { x: number; y: number } | null => {
       let result: { x: number; y: number } | null = null;
       const walk = (node: any, accX: number, accY: number) => {

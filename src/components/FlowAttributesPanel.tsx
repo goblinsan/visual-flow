@@ -17,11 +17,13 @@ export interface FlowAttributesPanelProps {
 const ANIMATION_OPTIONS = [
   { value: "none", label: "None" },
   { value: "fade", label: "Fade" },
-  { value: "slide-left", label: "Slide Left" },
-  { value: "slide-right", label: "Slide Right" },
-  { value: "slide-up", label: "Slide Up" },
-  { value: "slide-down", label: "Slide Down" },
+  { value: "slide", label: "Slide" },
 ];
+
+const normalizeAnimation = (value: string) => {
+  if (value.startsWith("slide")) return "slide";
+  return value;
+};
 
 const EASING_OPTIONS = [
   { value: "linear", label: "Linear" },
@@ -170,7 +172,11 @@ export const FlowAttributesPanel: React.FC<FlowAttributesPanelProps> = ({
                   className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-[11px]"
                 />
                 <div className="grid grid-cols-2 gap-2">
-                  <Select value={t.animation} onChange={(val) => updateTransition(t.id, { animation: val as FlowTransition["animation"] })} options={ANIMATION_OPTIONS} />
+                  <Select
+                    value={normalizeAnimation(t.animation)}
+                    onChange={(val) => updateTransition(t.id, { animation: val as FlowTransition["animation"] })}
+                    options={ANIMATION_OPTIONS}
+                  />
                   <button type="button" onClick={() => removeTransition(t.id)} className="px-2 py-1.5 rounded border border-red-200 text-[11px] text-red-600 hover:bg-red-50">Remove</button>
                 </div>
                 <div className="grid grid-cols-2 gap-2">

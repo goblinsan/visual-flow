@@ -246,7 +246,7 @@ export default function CanvasApp() {
   const [attributeTab, setAttributeTab] = useState<'element' | 'flow'>('element');
   const [draggingGroupIndex, setDraggingGroupIndex] = useState<number | null>(null);
   const [dragOverGroupIndex, setDragOverGroupIndex] = useState<number | null>(null);
-  const [flowPreview, setFlowPreview] = useState<null | (FlowTransition & { _key: string })>(null);
+  const [viewportTransition, setViewportTransition] = useState<null | { targetId: string; durationMs?: number; easing?: FlowTransition["easing"]; _key: string }>(null);
   const [newDialogOpen, setNewDialogOpen] = useState(false); // New design template dialog
   const [openDialogOpen, setOpenDialogOpen] = useState(false); // Open design dialog
   const [currentDesignName, setCurrentDesignNameState] = useState<string | null>(getCurrentDesignName);
@@ -266,20 +266,18 @@ export default function CanvasApp() {
     setFocusNodeId(screenId);
   }, [setSelection]);
 
-  const playTransitionPreview = useCallback((transition?: FlowTransition) => {
+  const playTransitionPreview = useCallback((toId: string, transition?: FlowTransition) => {
     if (!transition || transition.animation === 'none') {
-      setFlowPreview(null);
+      setViewportTransition(null);
       return;
     }
-    setFlowPreview({ ...transition, _key: `${transition.id}_${Date.now().toString(36)}` });
+    setViewportTransition({
+      targetId: toId,
+      durationMs: transition.durationMs,
+      easing: transition.easing,
+      _key: `${transition.id}_${Date.now().toString(36)}`,
+    });
   }, []);
-
-  useEffect(() => {
-    if (!flowPreview) return;
-    const duration = Math.max(0, flowPreview.durationMs ?? 300);
-    const t = window.setTimeout(() => setFlowPreview(null), duration);
-    return () => window.clearTimeout(t);
-  }, [flowPreview]);
 
   // Clear curve point selection when selection changes
   useEffect(() => {
@@ -782,57 +780,42 @@ export default function CanvasApp() {
         <main className="flex-1 relative min-w-0">
           <div ref={canvasRef} className="absolute inset-0">
             {stageWidth > 0 && stageHeight > 0 && (
-              <div
-                key={flowPreview?._key || 'no-transition'}
-                className={
-                  flowPreview?.animation === 'fade' ? 'flow-transition-fade'
-                    : flowPreview?.animation === 'slide-left' ? 'flow-transition-slide-left'
-                    : flowPreview?.animation === 'slide-right' ? 'flow-transition-slide-right'
-                    : flowPreview?.animation === 'slide-up' ? 'flow-transition-slide-up'
-                    : flowPreview?.animation === 'slide-down' ? 'flow-transition-slide-down'
-                    : ''
-                }
-                style={flowPreview ? {
-                  animationDuration: `${flowPreview.durationMs ?? 300}ms`,
-                  animationTimingFunction: flowPreview.easing ?? 'ease-out',
-                } : undefined}
-              >
-                <CanvasStage
-                  tool={tool}
-                  spec={spec}
-                  setSpec={setSpec}
-                  width={stageWidth}
-                  height={stageHeight}
-                  onToolChange={setTool}
-                  onUndo={undo}
-                  onRedo={redo}
-                  focusNodeId={focusNodeId}
-                  onUngroup={(ids) => {
-                    if (!spec.flows || ids.length === 0) return;
-                    const nextFlows = spec.flows
-                      .map(f => ({
-                        ...f,
-                        screenIds: f.screenIds.filter(id => !ids.includes(id)),
-                        transitions: f.transitions.filter(t => !ids.includes(t.from) && !ids.includes(t.to)),
-                      }))
-                      .filter(f => f.screenIds.length > 0);
-                    setSpec(prev => ({ ...prev, flows: nextFlows }));
-                  }}
-                  selectedIconId={selectedIconId}
-                  selectedComponentId={selectedComponentId}
-                  selection={selectedIds}
-                  setSelection={setSelection}
-                  fitToContentKey={fitToContentKey}
-                  rectDefaults={{
-                    fill: rectDefaults.fill,
-                    stroke: rectDefaults.stroke,
-                    strokeWidth: rectDefaults.strokeWidth ?? 1,
-                    radius: rectDefaults.radius ?? 0,
-                    opacity: rectDefaults.opacity ?? 1,
-                    strokeDash: rectDefaults.strokeDash,
-                  }}
-                />
-              </div>
+              <CanvasStage
+                tool={tool}
+                spec={spec}
+                setSpec={setSpec}
+                width={stageWidth}
+                height={stageHeight}
+                onToolChange={setTool}
+                onUndo={undo}
+                onRedo={redo}
+                focusNodeId={focusNodeId}
+                onUngroup={(ids) => {
+                  if (!spec.flows || ids.length === 0) return;
+                  const nextFlows = spec.flows
+                    .map(f => ({
+                      ...f,
+                      screenIds: f.screenIds.filter(id => !ids.includes(id)),
+                      transitions: f.transitions.filter(t => !ids.includes(t.from) && !ids.includes(t.to)),
+                    }))
+                    .filter(f => f.screenIds.length > 0);
+                  setSpec(prev => ({ ...prev, flows: nextFlows }));
+                }}
+                selectedIconId={selectedIconId}
+                selectedComponentId={selectedComponentId}
+                selection={selectedIds}
+                setSelection={setSelection}
+                fitToContentKey={fitToContentKey}
+                rectDefaults={{
+                  fill: rectDefaults.fill,
+                  stroke: rectDefaults.stroke,
+                  strokeWidth: rectDefaults.strokeWidth ?? 1,
+                  radius: rectDefaults.radius ?? 0,
+                  opacity: rectDefaults.opacity ?? 1,
+                  strokeDash: rectDefaults.strokeDash,
+                }}
+                viewportTransition={viewportTransition}
+              />
             )}
           </div>
         </main>
@@ -928,7 +911,7 @@ export default function CanvasApp() {
                   onSelectScreen={focusScreen}
                   onTriggerTransition={(toId, transition) => {
                     focusScreen(toId);
-                    playTransitionPreview(transition);
+                    playTransitionPreview(toId, transition);
                   }}
                 />
               ) : null;
