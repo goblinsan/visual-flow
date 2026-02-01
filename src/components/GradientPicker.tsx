@@ -1,38 +1,5 @@
 import React, { useState, useEffect } from 'react';
-
-export interface GradientFill {
-  type: 'linear' | 'radial';
-  colors: string[];
-  angle?: number;
-}
-
-export interface GradientPickerProps {
-  gradient: GradientFill | undefined;
-  onGradientChange: (gradient: GradientFill | undefined) => void;
-  solidColor: string | undefined;
-  onSolidColorChange: (color: string | undefined) => void;
-}
-
-const PRESET_GRADIENTS: GradientFill[] = [
-  { type: 'linear', colors: ['#667eea', '#764ba2'], angle: 135 },
-  { type: 'linear', colors: ['#f093fb', '#f5576c'], angle: 135 },
-  { type: 'linear', colors: ['#4facfe', '#00f2fe'], angle: 135 },
-  { type: 'linear', colors: ['#43e97b', '#38f9d7'], angle: 135 },
-  { type: 'linear', colors: ['#fa709a', '#fee140'], angle: 135 },
-  { type: 'linear', colors: ['#a8edea', '#fed6e3'], angle: 135 },
-  { type: 'linear', colors: ['#ff9a9e', '#fecfef'], angle: 135 },
-  { type: 'linear', colors: ['#667eea', '#f5576c'], angle: 90 },
-  { type: 'radial', colors: ['#667eea', '#764ba2'] },
-  { type: 'radial', colors: ['#4facfe', '#00f2fe'] },
-];
-
-export function gradientToCSS(gradient: GradientFill): string {
-  const { type, colors, angle } = gradient;
-  if (type === 'linear') {
-    return `linear-gradient(${angle ?? 0}deg, ${colors.join(', ')})`;
-  }
-  return `radial-gradient(circle, ${colors.join(', ')})`;
-}
+import { GradientFill, GradientPickerProps, gradientToCSS } from './gradientUtils';
 
 export const GradientPicker: React.FC<GradientPickerProps> = ({
   gradient,

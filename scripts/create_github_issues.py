@@ -2,7 +2,7 @@
 import subprocess
 import json
 
-REPO = "goblinsan/visual-flow"
+REPO = "goblinsan/vizail"
 
 def run_gh(*args):
     result = subprocess.run(
@@ -121,4 +121,4 @@ if m5:
 
 print("\n" + "="*60)
 print("✨ Done! All milestones and issues created.")
-print("📊 Visit: https://github.com/goblinsan/visual-flow/issues")
+print("📊 Visit: https://github.com/goblinsan/vizail/issues")

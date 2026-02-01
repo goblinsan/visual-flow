@@ -1,4 +1,4 @@
-# Visual Flow API Worker
+# Vizail API Worker
 
 Cloudflare Worker providing REST API for canvas persistence and sharing.
 
@@ -61,9 +61,9 @@ Tables:
 
 ## Environment Setup
 
-1. Create D1 database: `wrangler d1 create visual-flow-db`
+1. Create D1 database: `wrangler d1 create vizail-db`
 2. Update `database_id` in `wrangler.toml`
-3. Apply schema: `wrangler d1 execute visual-flow-db --file=schema.sql`
+3. Apply schema: `wrangler d1 execute vizail-db --file=schema.sql`
 4. Deploy: `npm run deploy`
 
 ## Role-Based Access Control

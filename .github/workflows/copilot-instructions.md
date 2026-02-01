@@ -1,6 +1,6 @@
 ## Copilot Refactor Charter
 
-This document establishes the guardrails and execution model for the incremental refactor of the visual-flow editor codebase, beginning with Phase 0 test hardening and proceeding through small, reversible extractions. It is intended for AI pair programming workflows and MUST be treated as enforceable policy during automated or semi-automated edits.
+This document establishes the guardrails and execution model for the incremental refactor of the Vizail editor codebase, beginning with Phase 0 test hardening and proceeding through small, reversible extractions. It is intended for AI pair programming workflows and MUST be treated as enforceable policy during automated or semi-automated edits.
 
 ### Core Principles
 1. Ship Stability First: The working behavior of the editor (rectangle creation, selection, attribute editing incl. fill/stroke disable, swap, outline fallback) must never regress silently.
@@ -74,7 +74,7 @@ Any change to this charter must be its own PR labeled `meta` and cannot bundle c
 Generated: 2025-09-18 (Phase 0 initiation)
 Owner: Maintainers / AI Pair Programming Workflow
 Status: Active
-# visual-flow — revised playbook
+# Vizail — revised playbook
 
 **Main Goal:** The main app is now the canvas editor.
 
@@ -102,4 +102,4 @@ Status: Active
 
 ## Branching
 - All new features: branch `agent/{task-name}`, PR with label `automerge`.
-- Required CI check: `visual-flow-ci`.
+- Required CI check: `vizail-ci`.

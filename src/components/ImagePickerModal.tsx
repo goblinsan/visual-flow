@@ -121,7 +121,7 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
       onImageSelected(previewSrc, width, height);
       handleReset();
     }
-  }, [previewSrc, previewDimensions, onImageSelected]);
+  }, [previewSrc, previewDimensions, onImageSelected, handleReset]);
 
   const handleReset = useCallback(() => {
     setUrlInput('');

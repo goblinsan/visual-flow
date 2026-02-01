@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useCommandExecutor } from './useCommandExecutor';
 import { createUpdateNodePropsCommand } from './updateNodeProps';
+import type { CommandContext } from './types';
 import type { LayoutSpec } from '../layout-schema';
 
 describe('useCommandExecutor', () => {
@@ -85,10 +86,10 @@ describe('useCommandExecutor', () => {
       useCommandExecutor(mockSpec, selection, setSpec)
     );
 
-    let capturedContext;
+    let capturedContext: CommandContext | undefined;
     const command = {
       id: 'test',
-      apply: (ctx: any) => {
+      apply: (ctx: CommandContext) => {
         capturedContext = ctx;
         return ctx.spec;
       },

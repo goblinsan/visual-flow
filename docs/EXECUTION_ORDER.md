@@ -1,4 +1,4 @@
-# Visual Flow Roadmap - Issue & Execution Order
+# Vizail Roadmap - Issue & Execution Order
 
 > Last updated: 2026-02-01  
 > Total Issues: 33 child + 6 epic = 39 total  
@@ -27,9 +27,9 @@ Phase 5 (Week 8-22)    [#50 Epic - #35,#36,#37,#38] (parallel after Phase 2)
 ---
 
 ## Phase 0: Prep & Hardening
-**Epic:** [#45](https://github.com/goblinsan/visual-flow/issues/45)  
+**Epic:** [#45](https://github.com/goblinsan/vizail/issues/45)  
 **Duration:** 2-3 weeks  
-**Milestone:** [Phase 0: Prep & Hardening](https://github.com/goblinsan/visual-flow/milestone/1)
+**Milestone:** [Phase 0: Prep & Hardening](https://github.com/goblinsan/vizail/milestone/1)
 
 ### Execution Order Within Phase 0
 1. **#15** - Lint & Type Safety Pass
@@ -51,9 +51,9 @@ Phase 5 (Week 8-22)    [#50 Epic - #35,#36,#37,#38] (parallel after Phase 2)
 ---
 
 ## Phase 1: Cloud Persistence & Sharing
-**Epic:** [#46](https://github.com/goblinsan/visual-flow/issues/46)  
+**Epic:** [#46](https://github.com/goblinsan/vizail/issues/46)  
 **Duration:** 3-4 weeks  
-**Milestone:** [Phase 1: Cloud Persistence + Sharing](https://github.com/goblinsan/visual-flow/milestone/2)  
+**Milestone:** [Phase 1: Cloud Persistence + Sharing](https://github.com/goblinsan/vizail/milestone/2)  
 **Depends on:** Phase 0 ✓
 
 ### Execution Order Within Phase 1
@@ -81,9 +81,9 @@ Phase 5 (Week 8-22)    [#50 Epic - #35,#36,#37,#38] (parallel after Phase 2)
 ---
 
 ## Phase 2: Real-Time Collaboration MVP
-**Epic:** [#47](https://github.com/goblinsan/visual-flow/issues/47)  
+**Epic:** [#47](https://github.com/goblinsan/vizail/issues/47)  
 **Duration:** 4-5 weeks  
-**Milestone:** [Phase 2: Real-Time Collaboration MVP](https://github.com/goblinsan/visual-flow/milestone/3)  
+**Milestone:** [Phase 2: Real-Time Collaboration MVP](https://github.com/goblinsan/vizail/milestone/3)  
 **Depends on:** Phase 1 ✓
 
 ### Execution Order Within Phase 2
@@ -111,9 +111,9 @@ Phase 5 (Week 8-22)    [#50 Epic - #35,#36,#37,#38] (parallel after Phase 2)
 ---
 
 ## Phase 3: Real-Time Polish
-**Epic:** [#48](https://github.com/goblinsan/visual-flow/issues/48)  
+**Epic:** [#48](https://github.com/goblinsan/vizail/issues/48)  
 **Duration:** 2-3 weeks  
-**Milestone:** [Phase 3: Real-Time Polish](https://github.com/goblinsan/visual-flow/milestone/4)  
+**Milestone:** [Phase 3: Real-Time Polish](https://github.com/goblinsan/vizail/milestone/4)  
 **Depends on:** Phase 2 ✓
 
 ### Execution Order Within Phase 3
@@ -137,9 +137,9 @@ Phase 5 (Week 8-22)    [#50 Epic - #35,#36,#37,#38] (parallel after Phase 2)
 ---
 
 ## Phase 4: Agent Branches & Proposals
-**Epic:** [#49](https://github.com/goblinsan/visual-flow/issues/49)  
+**Epic:** [#49](https://github.com/goblinsan/vizail/issues/49)  
 **Duration:** 4-5 weeks  
-**Milestone:** [Phase 4: Agent Branches + Proposals](https://github.com/goblinsan/visual-flow/milestone/5)  
+**Milestone:** [Phase 4: Agent Branches + Proposals](https://github.com/goblinsan/vizail/milestone/5)  
 **Depends on:** Phase 3 ✓
 
 ### Execution Order Within Phase 4
@@ -167,9 +167,9 @@ Phase 5 (Week 8-22)    [#50 Epic - #35,#36,#37,#38] (parallel after Phase 2)
 ---
 
 ## Phase 5: Export Pipeline
-**Epic:** [#50](https://github.com/goblinsan/visual-flow/issues/50)  
+**Epic:** [#50](https://github.com/goblinsan/vizail/issues/50)  
 **Duration:** 2-3 weeks  
-**Milestone:** [Phase 5: Export Pipeline](https://github.com/goblinsan/visual-flow/milestone/6)  
+**Milestone:** [Phase 5: Export Pipeline](https://github.com/goblinsan/vizail/milestone/6)  
 **Can start:** After Phase 2 (runs parallel to Phase 3/4)
 
 ### Execution Order Within Phase 5
@@ -195,24 +195,24 @@ Phase 5 (Week 8-22)    [#50 Epic - #35,#36,#37,#38] (parallel after Phase 2)
 ## GitHub Links
 
 ### Epics (Track Dependencies)
-- [#45 Phase 0](https://github.com/goblinsan/visual-flow/issues/45)
-- [#46 Phase 1](https://github.com/goblinsan/visual-flow/issues/46)
-- [#47 Phase 2](https://github.com/goblinsan/visual-flow/issues/47)
-- [#48 Phase 3](https://github.com/goblinsan/visual-flow/issues/48)
-- [#49 Phase 4](https://github.com/goblinsan/visual-flow/issues/49)
-- [#50 Phase 5](https://github.com/goblinsan/visual-flow/issues/50)
+- [#45 Phase 0](https://github.com/goblinsan/vizail/issues/45)
+- [#46 Phase 1](https://github.com/goblinsan/vizail/issues/46)
+- [#47 Phase 2](https://github.com/goblinsan/vizail/issues/47)
+- [#48 Phase 3](https://github.com/goblinsan/vizail/issues/48)
+- [#49 Phase 4](https://github.com/goblinsan/vizail/issues/49)
+- [#50 Phase 5](https://github.com/goblinsan/vizail/issues/50)
 
 ### Milestones
-- [All Issues](https://github.com/goblinsan/visual-flow/issues)
-- [Phase 0 Milestone](https://github.com/goblinsan/visual-flow/milestone/1)
-- [Phase 1 Milestone](https://github.com/goblinsan/visual-flow/milestone/2)
-- [Phase 2 Milestone](https://github.com/goblinsan/visual-flow/milestone/3)
-- [Phase 3 Milestone](https://github.com/goblinsan/visual-flow/milestone/4)
-- [Phase 4 Milestone](https://github.com/goblinsan/visual-flow/milestone/5)
-- [Phase 5 Milestone](https://github.com/goblinsan/visual-flow/milestone/6)
+- [All Issues](https://github.com/goblinsan/vizail/issues)
+- [Phase 0 Milestone](https://github.com/goblinsan/vizail/milestone/1)
+- [Phase 1 Milestone](https://github.com/goblinsan/vizail/milestone/2)
+- [Phase 2 Milestone](https://github.com/goblinsan/vizail/milestone/3)
+- [Phase 3 Milestone](https://github.com/goblinsan/vizail/milestone/4)
+- [Phase 4 Milestone](https://github.com/goblinsan/vizail/milestone/5)
+- [Phase 5 Milestone](https://github.com/goblinsan/vizail/milestone/6)
 
 ### Project Board
-- [Visual Flow Roadmap Project](https://github.com/goblinsan/visual-flow/projects/4)
+- [Vizail Roadmap Project](https://github.com/goblinsan/vizail/projects/4)
 
 ---
 
@@ -264,6 +264,6 @@ Most phases have a natural ordering:
 ## Usage Tips
 
 1. **For sprint planning**: Copy the "Execution Order Within Phase X" table to your sprint board
-2. **To track progress**: Use the [Project Board](https://github.com/goblinsan/visual-flow/projects/4) to move issues through columns
+2. **To track progress**: Use the [Project Board](https://github.com/goblinsan/vizail/projects/4) to move issues through columns
 3. **For dependencies**: Check the Epic issue descriptions for "Depends on" notes
 4. **For context**: Read [COLLABORATION_ROADMAP.md](COLLABORATION_ROADMAP.md) for deep technical details

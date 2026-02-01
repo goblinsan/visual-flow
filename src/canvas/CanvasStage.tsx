@@ -2,7 +2,7 @@ import { Stage, Layer, Transformer, Rect, Group, Ellipse, Line, Circle } from "r
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { JSX } from "react";
 import type Konva from "konva";
-import type { LayoutNode, LayoutSpec, TextNode, TextSpan } from "../layout-schema.ts";
+import type { LayoutNode, LayoutSpec, TextNode, TextSpan, Pos, EllipseNode, LineNode, CurveNode, ImageNode } from "../layout-schema.ts";
 import { renderNode, useFontLoading } from "./CanvasRenderer.tsx";
 import { computeClickSelection, computeMarqueeSelection } from "../renderer/interaction";
 import { beginDrag, updateDrag, finalizeDrag } from "../interaction/drag";
@@ -20,6 +20,7 @@ const GRID_SPACING = 20; // Space between dots
 const DOT_RADIUS = 1.5; // Radius of each dot
 const DOT_COLOR = 'rgba(255, 255, 255, 0.5)'; // Whitish dots
 const GRID_BG_COLOR = '#e5e7eb'; // Light gray background (Tailwind gray-200)
+const CAPTURE_OPTIONS: AddEventListenerOptions = { capture: true };
 
 // Props
 interface CanvasStageProps {
@@ -144,8 +145,9 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     }
   }, []);
 
-  const getNodeBounds = useCallback((node: any, accX: number, accY: number): { x: number; y: number; width: number; height: number } | null => {
-    const pos = node.position ?? { x: 0, y: 0 };
+  type Bounds = { x: number; y: number; width: number; height: number };
+  const getNodeBounds = useCallback((node: LayoutNode, accX: number, accY: number): Bounds | null => {
+    const pos = (node as { position?: Pos }).position ?? { x: 0, y: 0 };
     const baseX = accX + (pos.x ?? 0);
     const baseY = accY + (pos.y ?? 0);
     const size = node.size;
@@ -153,7 +155,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     let bounds = hasSize ? { x: baseX, y: baseY, width: size.width, height: size.height } : null;
     if (Array.isArray(node.children) && node.children.length > 0) {
       const childBounds = node.children
-        .map((child: any) => getNodeBounds(child, baseX, baseY))
+        .map((child) => getNodeBounds(child, baseX, baseY))
         .filter(Boolean) as Array<{ x: number; y: number; width: number; height: number }>;
       if (childBounds.length > 0 && !bounds) {
         const minX = Math.min(...childBounds.map(b => b.x));
@@ -166,8 +168,8 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     return bounds;
   }, []);
 
-  const findNodeBoundsById = useCallback((node: any, id: string, accX = 0, accY = 0): { x: number; y: number; width: number; height: number } | null => {
-    const pos = node.position ?? { x: 0, y: 0 };
+  const findNodeBoundsById = useCallback((node: LayoutNode, id: string, accX = 0, accY = 0): Bounds | null => {
+    const pos = (node as { position?: Pos }).position ?? { x: 0, y: 0 };
     const nextX = accX + (pos.x ?? 0);
     const nextY = accY + (pos.y ?? 0);
     if (node.id === id) {
@@ -226,8 +228,8 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   }, [viewportTransition?._key, viewportTransition?.targetId, viewportTransition?.durationMs, viewportTransition?.easing, width, height, scale, spec.root, findNodeBoundsById, easingFn]);
     const getNodeWorldPosition = useCallback((nodeId: string): { x: number; y: number } | null => {
       let result: { x: number; y: number } | null = null;
-      const walk = (node: any, accX: number, accY: number) => {
-        const pos = node.position ?? { x: 0, y: 0 };
+      const walk = (node: LayoutNode, accX: number, accY: number) => {
+        const pos = (node as { position?: Pos }).position ?? { x: 0, y: 0 };
         const nextX = accX + (pos.x ?? 0);
         const nextY = accY + (pos.y ?? 0);
         if (node.id === nodeId) {
@@ -249,8 +251,9 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       const ids = new Set<string>();
       const walk = (node: LayoutNode) => {
         ids.add(node.id);
-        if (Array.isArray((node as any).children)) {
-          (node as any).children.forEach(walk);
+        const children = (node as { children?: LayoutNode[] }).children;
+        if (Array.isArray(children)) {
+          children.forEach(walk);
         }
       };
       walk(root);
@@ -277,17 +280,32 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       const walk = (n: LayoutNode, isRoot: boolean): LayoutNode => {
         const next = cloneNode(n);
         next.id = makeId(next.id);
-        if (isRoot && (next as any).position) {
-          const pos = (next as any).position ?? { x: 0, y: 0 };
-          (next as any).position = { x: (pos.x ?? 0) + offset.x, y: (pos.y ?? 0) + offset.y };
+        if (isRoot) {
+          const posX = next.position?.x ?? 0;
+          const posY = next.position?.y ?? 0;
+          next.position = { x: posX + offset.x, y: posY + offset.y };
         }
-        if (Array.isArray((next as any).children)) {
-          (next as any).children = (next as any).children.map((c: LayoutNode) => walk(c, false));
+        const children = (next as { children?: LayoutNode[] }).children;
+        if (Array.isArray(children)) {
+          next.children = children.map((c) => walk(c, false));
         }
         return next;
       };
       return walk(node, true);
     }, [cloneNode]);
+
+    const findNode = useCallback(function findNodeImpl(node: LayoutNode, targetId: string): LayoutNode | null {
+      if (node.id === targetId) return node;
+      const children = (node as { children?: LayoutNode[] }).children;
+      if (Array.isArray(children)) {
+        for (const child of children) {
+          const found = findNodeImpl(child, targetId);
+          if (found) return found;
+        }
+      }
+      return null;
+    }, []);
+
   const [editingTextValue, setEditingTextValue] = useState<string>('');
   const [editingTextSpans, setEditingTextSpans] = useState<TextSpan[]>([]);
   const richTextEditorRef = useRef<RichTextEditorHandle>(null);
@@ -344,10 +362,10 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       // Calculate bounding box of all children
       minX = Infinity; minY = Infinity; maxX = -Infinity; maxY = -Infinity;
       for (const child of children) {
-        const cx = (child as any).position?.x ?? 0;
-        const cy = (child as any).position?.y ?? 0;
-        const cw = (child as any).size?.width ?? 100;
-        const ch = (child as any).size?.height ?? 100;
+        const cx = child.position?.x ?? 0;
+        const cy = child.position?.y ?? 0;
+        const cw = child.size?.width ?? 100;
+        const ch = child.size?.height ?? 100;
         minX = Math.min(minX, cx);
         minY = Math.min(minY, cy);
         maxX = Math.max(maxX, cx + cw);
@@ -385,7 +403,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
 
   useEffect(() => {
     if (!focusNodeId) return;
-    const node = findNode(spec.root, focusNodeId) as any;
+    const node = findNode(spec.root, focusNodeId);
     if (!node) return;
     const pos = node.position ?? { x: 0, y: 0 };
     const size = node.size ?? { width: 300, height: 200 };
@@ -399,7 +417,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     const centerY = (pos.y ?? 0) + (size.height ?? 0) / 2;
     setScale(newScale);
     setPos({ x: width / 2 - centerX * newScale, y: height / 2 - centerY * newScale });
-  }, [focusNodeId, spec.root, width, height]);
+  }, [focusNodeId, spec.root, width, height, findNode]);
 
   // Utility: world coordinate conversion
   const toWorld = useCallback((stage: Konva.Stage, p: { x: number; y: number }) => ({
@@ -410,12 +428,13 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   // Build selection context
   const selectionContext = useMemo(() => {
     const parentOf: Record<string, string | null> = {};
-    const nodeById: Record<string, any> = {};
-    function walk(node: any, parent: string | null) {
+    const nodeById: Record<string, LayoutNode> = {};
+    const walk = (node: LayoutNode, parent: string | null) => {
       nodeById[node.id] = node;
       parentOf[node.id] = parent;
-      if (Array.isArray(node.children)) node.children.forEach((c: any) => walk(c, node.id));
-    }
+      const children = (node as { children?: LayoutNode[] }).children;
+      if (Array.isArray(children)) children.forEach(child => walk(child, node.id));
+    };
     walk(spec.root, null);
     return { parentOf, nodeById };
   }, [spec]);
@@ -453,7 +472,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   }, [getTopContainerAncestor, spec.root.id]);
 
   // Helper to check if target is transformer-related
-  const isTransformerTarget = useCallback((target: any): boolean => {
+  const isTransformerTarget = useCallback((target: Konva.Node | null): boolean => {
     if (!target) return false;
     
     // Direct transformer check
@@ -549,7 +568,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   setSelection([id]);
     onToolChange?.('select');
     setRectDraft(null);
-  }, [isRectMode, rectDraft, altPressed, shiftPressed, setSpec, onToolChange]);
+  }, [isRectMode, rectDraft, altPressed, shiftPressed, setSpec, onToolChange, rectDefaults, setSelection]);
 
   // Helper: finalize ellipse
   const finalizeEllipse = useCallback(() => {
@@ -575,9 +594,19 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       const isClick = Math.abs(widthF) < 4 && Math.abs(heightF) < 4;
       const sizeFinal = isClick ? { width: 80, height: 80 } : { width: widthF, height: heightF };
       const id = 'ellipse_' + Math.random().toString(36).slice(2, 9);
+      const ellipseNode: EllipseNode = {
+        id,
+        type: 'ellipse',
+        position: topLeft,
+        size: sizeFinal,
+        fill: defaults.fill,
+        stroke: defaults.stroke,
+        strokeWidth: defaults.strokeWidth,
+        opacity: defaults.opacity,
+      };
       setSpec(prev => ({
         ...prev,
-        root: { ...prev.root, children: [...prev.root.children, { id, type: 'ellipse', position: topLeft, size: sizeFinal, fill: defaults.fill, stroke: defaults.stroke, strokeWidth: defaults.strokeWidth, opacity: defaults.opacity } as any] }
+        root: { ...prev.root, children: [...prev.root.children, ellipseNode] }
       }));
       onToolChange?.('select');
       setEllipseDraft(null);
@@ -593,9 +622,19 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     const isClick = Math.abs(widthF) < 4 && Math.abs(heightF) < 4;
     const finalSize = isClick ? { width: 80, height: 80 } : { width: widthF, height: heightF };
     const id = 'ellipse_' + Math.random().toString(36).slice(2, 9);
+    const ellipseNode: EllipseNode = {
+      id,
+      type: 'ellipse',
+      position: { x: x1, y: y1 },
+      size: finalSize,
+      fill: defaults.fill,
+      stroke: defaults.stroke,
+      strokeWidth: defaults.strokeWidth,
+      opacity: defaults.opacity,
+    };
     setSpec(prev => ({
       ...prev,
-      root: { ...prev.root, children: [...prev.root.children, { id, type: 'ellipse', position: { x: x1, y: y1 }, size: finalSize, fill: defaults.fill, stroke: defaults.stroke, strokeWidth: defaults.strokeWidth, opacity: defaults.opacity } as any] }
+      root: { ...prev.root, children: [...prev.root.children, ellipseNode] }
     }));
     setSelection([id]);
     onToolChange?.('select');
@@ -618,9 +657,17 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       : [0, 0, dx, dy];
     
     const id = 'line_' + Math.random().toString(36).slice(2, 9);
+    const lineNode: LineNode = {
+      id,
+      type: 'line',
+      position: { x: start.x, y: start.y },
+      points,
+      stroke: '#334155',
+      strokeWidth: 2,
+    };
     setSpec(prev => ({
       ...prev,
-      root: { ...prev.root, children: [...prev.root.children, { id, type: 'line', position: { x: start.x, y: start.y }, points, stroke: '#334155', strokeWidth: 2 } as any] }
+      root: { ...prev.root, children: [...prev.root.children, lineNode] }
     }));
     setSelection([id]);
     onToolChange?.('select');
@@ -654,9 +701,18 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     }
     
     const id = 'curve_' + Math.random().toString(36).slice(2, 9);
+    const curveNode: CurveNode = {
+      id,
+      type: 'curve',
+      position: { x: origin.x, y: origin.y },
+      points: relativePoints,
+      stroke: '#334155',
+      strokeWidth: 2,
+      tension: 0.5,
+    };
     setSpec(prev => ({
       ...prev,
-      root: { ...prev.root, children: [...prev.root.children, { id, type: 'curve', position: { x: origin.x, y: origin.y }, points: relativePoints, stroke: '#334155', strokeWidth: 2, tension: 0.5 } as any] }
+      root: { ...prev.root, children: [...prev.root.children, curveNode] }
     }));
     setSelection([id]);
     onToolChange?.('select');
@@ -664,16 +720,6 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   }, [isCurveMode, curveDraft, setSpec, onToolChange, setSelection]);
 
   // Helper: create text at click position
-  const createText = useCallback((worldPos: { x: number; y: number }) => {
-    const id = 'text_' + Math.random().toString(36).slice(2, 9);
-    setSpec(prev => ({
-      ...prev,
-      root: { ...prev.root, children: [...prev.root.children, { id, type: 'text', position: worldPos, size: { width: 200, height: 24 }, text: 'Double-click to edit', variant: 'body', color: '#111827' } as any] }
-    }));
-    setSelection([id]);
-    onToolChange?.('select');
-  }, [setSpec, onToolChange, setSelection]);
-
   // Helper: open image picker at click position
   const createImage = useCallback((worldPos: { x: number; y: number }) => {
     setPendingImagePosition(worldPos);
@@ -690,21 +736,22 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     const path = Array.isArray(d) ? d.join(' ') : d;
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" fill="#111827"><path d="${path}"/></svg>`;
     const src = `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+    const iconNode: ImageNode = {
+      id,
+      type: 'image',
+      position: worldPos,
+      size: { width: 32, height: 32 },
+      src,
+      alt: icon.label,
+      objectFit: 'contain',
+    };
     setSpec(prev => ({
       ...prev,
       root: {
         ...prev.root,
         children: [
           ...prev.root.children,
-          {
-            id,
-            type: 'image',
-            position: worldPos,
-            size: { width: 32, height: 32 },
-            src,
-            alt: icon.label,
-            objectFit: 'contain',
-          } as any,
+          iconNode,
         ],
       },
     }));
@@ -731,9 +778,18 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   const handleImageSelected = useCallback((src: string, width: number, height: number) => {
     if (!pendingImagePosition) return;
     const id = 'image_' + Math.random().toString(36).slice(2, 9);
+    const imageNode: ImageNode = {
+      id,
+      type: 'image',
+      position: pendingImagePosition,
+      size: { width, height },
+      src,
+      alt: 'Image',
+      objectFit: 'contain',
+    };
     setSpec(prev => ({
       ...prev,
-      root: { ...prev.root, children: [...prev.root.children, { id, type: 'image', position: pendingImagePosition, size: { width, height }, src, alt: 'Image', objectFit: 'contain' } as any] }
+      root: { ...prev.root, children: [...prev.root.children, imageNode] }
     }));
     setSelection([id]);
     onToolChange?.('select');
@@ -803,14 +859,20 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       const world = toWorld(stage, pointer);
       
       const id = 'text_' + Math.random().toString(36).slice(2, 9);
-      // Create empty text placeholder
+      const placeholderText: TextNode = {
+        id,
+        type: 'text',
+        position: world,
+        size: { width: 200, height: 24 },
+        text: ' ',
+        fontSize: 14,
+        fontFamily: 'Arial',
+        color: '#000000',
+        spans: [],
+      };
       setSpec(prev => ({
         ...prev,
-        root: { ...prev.root, children: [...prev.root.children, { 
-          id, type: 'text', position: world, text: ' ', 
-          fontSize: 14, fontFamily: 'Arial', color: '#000000',
-          spans: [] // Ensure we start with empty spans
-        } as any] }
+        root: { ...prev.root, children: [...prev.root.children, placeholderText] }
       }));
       setSelection([id]);
       onToolChange?.('select');
@@ -927,10 +989,11 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
         const nodesToDrag = newSelection.includes(nodeId) ? newSelection : [nodeId];
         
         // Build a fresh node lookup from spec to get current locked state
-        const freshNodeById: Record<string, any> = {};
-        function walkFresh(node: any) {
+        const freshNodeById: Record<string, LayoutNode> = {};
+        function walkFresh(node: LayoutNode) {
           freshNodeById[node.id] = node;
-          if (Array.isArray(node.children)) node.children.forEach(walkFresh);
+          const children = (node as { children?: LayoutNode[] }).children;
+          if (Array.isArray(children)) children.forEach(walkFresh);
         }
         walkFresh(spec.root);
         
@@ -960,7 +1023,34 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     if (!e.evt.shiftKey && !e.evt.ctrlKey) { setSelection([]); }
     
     setMenu(null);
-  }, [isSelectMode, isPanMode, isZoomMode, scale, spacePan, spec.root.id, toWorld, selected, getTopContainerAncestor, normalizeSelection, isTransformerTarget, isEllipseMode, isLineMode, isCurveMode, isTextMode, isImageMode, isIconMode, isComponentMode, curveDraft, createText, createImage, createIcon, createComponent]);
+  }, [
+    isSelectMode,
+    isRectMode,
+    isPanMode,
+    isZoomMode,
+    scale,
+    spacePan,
+    spec.root,
+    toWorld,
+    selected,
+    getTopContainerAncestor,
+    normalizeSelection,
+    isTransformerTarget,
+    isEllipseMode,
+    isLineMode,
+    isCurveMode,
+    isTextMode,
+    isImageMode,
+    isIconMode,
+    isComponentMode,
+    curveDraft,
+    createImage,
+    createIcon,
+    createComponent,
+    setSelection,
+    setSpec,
+    onToolChange,
+  ]);
 
   const onMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     const stage = e.target.getStage();
@@ -1106,7 +1196,25 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       if (rect) { rect.visible(false); rect.getLayer()?.batchDraw(); }
       setMarqueeSession(null);
     }
-  }, [panning, dragSession, marqueeSession, spec.root.id, getTopContainerAncestor, normalizeSelection, setSpec, isRectMode, rectDraft, finalizeRect, isEllipseMode, ellipseDraft, finalizeEllipse, isLineMode, lineDraft, finalizeLine]);
+  }, [
+    panning,
+    dragSession,
+    marqueeSession,
+    spec.root.id,
+    getTopContainerAncestor,
+    normalizeSelection,
+    setSpec,
+    isRectMode,
+    rectDraft,
+    finalizeRect,
+    isEllipseMode,
+    ellipseDraft,
+    finalizeEllipse,
+    isLineMode,
+    lineDraft,
+    finalizeLine,
+    setSelection,
+  ]);
 
   // Global listeners for rectangle draft (supports dragging outside stage bounds)
   useEffect(() => {
@@ -1136,8 +1244,8 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { setRectDraft(null); }
     };
-    window.addEventListener('keydown', onKey, { capture: true });
-    return () => window.removeEventListener('keydown', onKey, { capture: true } as any);
+    window.addEventListener('keydown', onKey, CAPTURE_OPTIONS);
+    return () => window.removeEventListener('keydown', onKey, CAPTURE_OPTIONS);
   }, [isRectMode, rectDraft]);
 
   // Global listeners for ellipse draft
@@ -1166,8 +1274,8 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { setEllipseDraft(null); }
     };
-    window.addEventListener('keydown', onKey, { capture: true });
-    return () => window.removeEventListener('keydown', onKey, { capture: true } as any);
+    window.addEventListener('keydown', onKey, CAPTURE_OPTIONS);
+    return () => window.removeEventListener('keydown', onKey, CAPTURE_OPTIONS);
   }, [isEllipseMode, ellipseDraft]);
 
   // Global listeners for line draft
@@ -1196,8 +1304,8 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { setLineDraft(null); }
     };
-    window.addEventListener('keydown', onKey, { capture: true });
-    return () => window.removeEventListener('keydown', onKey, { capture: true } as any);
+    window.addEventListener('keydown', onKey, CAPTURE_OPTIONS);
+    return () => window.removeEventListener('keydown', onKey, CAPTURE_OPTIONS);
   }, [isLineMode, lineDraft]);
 
   // Curve: finalize on Enter, cancel on Escape
@@ -1207,8 +1315,8 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       if (e.key === 'Escape') { setCurveDraft(null); }
       if (e.key === 'Enter' && curveDraft && curveDraft.points.length >= 1) { finalizeCurve(); }
     };
-    window.addEventListener('keydown', onKey, { capture: true });
-    return () => window.removeEventListener('keydown', onKey, { capture: true } as any);
+    window.addEventListener('keydown', onKey, CAPTURE_OPTIONS);
+    return () => window.removeEventListener('keydown', onKey, CAPTURE_OPTIONS);
   }, [isCurveMode, curveDraft, finalizeCurve]);
 
   // Double-click: finalize curve OR enter text editing mode
@@ -1257,13 +1365,13 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
         }
       }
     }
-  }, [isCurveMode, curveDraft, finalizeCurve, isSelectMode, spec.root]);
+  }, [isCurveMode, curveDraft, finalizeCurve, isSelectMode, spec.root, findNode]);
 
   // Commit text edit and close editor
   const commitTextEdit = useCallback(() => {
     if (!editingTextId) return;
     
-    const newRoot = mapNode(spec.root, editingTextId, (n: any) => ({
+    const newRoot = mapNode(spec.root, editingTextId, (n) => ({
       ...n,
       text: editingTextValue,
       spans: editingTextSpans.length > 0 ? editingTextSpans : undefined,
@@ -1276,16 +1384,16 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     setEditingTextValue('');
     setEditingTextSpans([]);
     setTextSelection(null);
-  }, [editingTextId, editingTextValue, editingTextSpans, spec, setSpec]);
+  }, [editingTextId, editingTextValue, editingTextSpans, spec, setSpec, mapNode, onToolChange, setSelection]);
 
   // Cancel text edit without saving
-  const cancelTextEdit = useCallback(() => {
-    setEditingTextId(null);
-    setEditingTextValue('');
-    setEditingTextSpans([]);
-    setTextSelection(null);
-    onToolChange?.('select');
-  }, []);
+    const cancelTextEdit = useCallback(() => {
+      setEditingTextId(null);
+      setEditingTextValue('');
+      setEditingTextSpans([]);
+      setTextSelection(null);
+      onToolChange?.('select');
+    }, [onToolChange]);
 
   // Handle text/spans change from rich text editor
   const handleTextChange = useCallback((text: string, spans: TextSpan[]) => {
@@ -1301,18 +1409,19 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
 
   // Hide Konva text node while editing (so textarea appears to replace it)
   useEffect(() => {
-    if (!stageRef.current || !editingTextId) return;
+    const stage = stageRef.current;
+    if (!stage || !editingTextId) return;
     
-    const konvaNode = stageRef.current.findOne(`#${CSS.escape(editingTextId)}`);
+    const konvaNode = stage.findOne(`#${CSS.escape(editingTextId)}`);
     if (konvaNode) {
       konvaNode.visible(false);
-      stageRef.current.batchDraw();
+      stage.batchDraw();
     }
     
     return () => {
       if (konvaNode) {
         konvaNode.visible(true);
-        stageRef.current?.batchDraw();
+        stage.batchDraw();
       }
     };
   }, [editingTextId]);
@@ -1372,11 +1481,11 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       transform: `rotate(${textNode.rotation ?? 0}deg) scale(${textNode.textScaleX ?? 1}, ${textNode.textScaleY ?? 1})`,
       zIndex: 1000,
       lineHeight: 1.2,
-      textAlign: align as any,
+      textAlign: align,
       caretColor: '#3b82f6',
       whiteSpace: 'pre',
     };
-  }, [editingTextId, spec.root, scale, pos, getNodeWorldPosition]);
+  }, [editingTextId, spec.root, scale, pos, getNodeWorldPosition, findNode]);
 
   // Single click handler for empty canvas
   const onClick = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -1410,7 +1519,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   setSelection([]);
       setMenu(null);
     }
-  }, [isSelectMode, dragSession, marqueeSession, isTransformerTarget, editingTextId, commitTextEdit]);
+  }, [isSelectMode, dragSession, marqueeSession, isTransformerTarget, editingTextId, commitTextEdit, setSelection]);
 
   // Wheel zoom
   const onWheel = useCallback((e: Konva.KonvaEventObject<WheelEvent>) => {
@@ -1449,11 +1558,11 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       if (e.key === 'Shift') setShiftPressed(false);
       if (e.key === 'Alt') setAltPressed(false);
     };
-    window.addEventListener('keydown', down, { capture: true });
-    window.addEventListener('keyup', up, { capture: true });
+    window.addEventListener('keydown', down, CAPTURE_OPTIONS);
+    window.addEventListener('keyup', up, CAPTURE_OPTIONS);
     return () => {
-      window.removeEventListener('keydown', down, { capture: true } as any);
-      window.removeEventListener('keyup', up, { capture: true } as any);
+      window.removeEventListener('keydown', down, CAPTURE_OPTIONS);
+      window.removeEventListener('keyup', up, CAPTURE_OPTIONS);
     };
   }, []);
 
@@ -1473,7 +1582,10 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     const wrap = wrapperRef.current;
     if (!stage || !wrap) return;
     
-    try { (stage as any).setPointersPositions(e.nativeEvent); } catch { /* ignore */ }
+    try {
+      const stageWithPointerSupport = stage as Konva.Stage & { setPointersPositions?: (evt: Event) => void };
+      stageWithPointerSupport.setPointersPositions?.(e.nativeEvent as Event);
+    } catch { /* ignore */ }
     const pointer = stage.getPointerPosition();
     const shape = pointer ? stage.getIntersection(pointer) : null;
     
@@ -1492,7 +1604,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     // Position menu at raw client coords relative to wrapper
     const rect = wrap.getBoundingClientRect();
     setMenu({ x: e.clientX - rect.left, y: e.clientY - rect.top });
-  }, [isSelectMode, spec.root.id, selected, getTopContainerAncestor, normalizeSelection]);
+  }, [isSelectMode, spec.root.id, selected, getTopContainerAncestor, normalizeSelection, setSelection]);
 
   // Close menu on outside clicks
   useEffect(() => {
@@ -1543,18 +1655,19 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     const before = new Set(selected);
     const next = groupNodes(spec, before);
     let newGroup: string | null = null;
-    (function scan(n: any) {
+    (function scan(n: LayoutNode) {
       if (newGroup) return;
-      if (n.type === 'group' && Array.isArray(n.children)) {
-        const childIds = n.children.map((c: any) => c.id);
+      const children = (n as { children?: LayoutNode[] }).children;
+      if (n.type === 'group' && Array.isArray(children)) {
+        const childIds = children.map((c) => c.id);
         const matches = [...before].every(id => childIds.includes(id)) && !before.has(n.id);
         if (matches) newGroup = n.id;
       }
-      if (Array.isArray(n.children)) n.children.forEach(scan);
+      if (Array.isArray(children)) children.forEach(scan);
     })(next.root);
     setSpec(next);
   if (newGroup) setSelection([newGroup]);
-  }, [canGroup, selected, spec, setSpec]);
+  }, [canGroup, selected, spec, setSpec, setSelection]);
 
   const performUngroup = useCallback(() => {
     if (!canUngroup) { setMenu(null); return; }
@@ -1567,7 +1680,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     if (gNode) {
       const gPos = gNode.position();
       gNode.getChildren((n: Konva.Node) => Boolean(n.id())).forEach((c: Konva.Node) => {
-        const cp = (c as any).position ? (c as any).position() : { x: (c as any).x?.() ?? 0, y: (c as any).y?.() ?? 0 };
+        const cp = c.position ? c.position() : { x: c.x?.() ?? 0, y: c.y?.() ?? 0 };
         childAbs.push({ id: c.id(), abs: { x: gPos.x + cp.x, y: gPos.y + cp.y } });
       });
     }
@@ -1682,7 +1795,26 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [isSelectMode, canGroup, canUngroup, selected, performGroup, performUngroup, setSpec, setSelection, editingTextId, spec.root, collectExistingIds, createUniqueIdFactory, remapIdsAndOffset, cloneNode, onUndo, onRedo]);
+  }, [
+    isSelectMode,
+    canGroup,
+    canUngroup,
+    selected,
+    performGroup,
+    performUngroup,
+    setSpec,
+    setSelection,
+    editingTextId,
+    spec.root,
+    collectExistingIds,
+    createUniqueIdFactory,
+    remapIdsAndOffset,
+    cloneNode,
+    onUndo,
+    onRedo,
+    findNode,
+    selectionContext.nodeById,
+  ]);
 
   // Normalize selection on changes
   useEffect(() => {
@@ -1731,7 +1863,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     nodes.forEach(n => {
       const id = n.id(); if (!id) return;
       // Derive untransformed size from spec (source of truth)
-      const specNode = (function find(node:any, id:string):any|null { if (node.id===id) return node; if (node.children) { for (const c of node.children) { const f=find(c,id); if (f) return f; } } return null; })(spec.root, id);
+      const specNode = findNode(spec.root, id);
       let width = 0, height = 0;
       if (specNode?.size) { width = specNode.size.width; height = specNode.size.height; }
       else {
@@ -1753,19 +1885,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     }
 
     setTransformSession(snapshot);
-  }, []);
-
-  // Find a node in the spec by its ID
-  const findNode = (node: any, id: string): any | null => {
-    if (node.id === id) return node;
-    if (node.children) {
-      for (const child of node.children) {
-        const found = findNode(child, id);
-        if (found) return found;
-      }
-    }
-    return null;
-  };
+  }, [transformSession, spec.root, findNode]);
 
   // Commit transform (resize, scale, rotate)
   const onTransformEnd = useCallback(() => {
@@ -1792,7 +1912,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
         // Store absolute rotation (no cumulative addition)
         setSpec(prev => ({
           ...prev,
-            root: mapNode(prev.root, nodeId, (n: any) => ({
+            root: mapNode(prev.root, nodeId, (n) => ({
               ...n,
               rotation: rotationDeg
             }))
@@ -1805,7 +1925,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
             const absY = Math.max(0.05, node.scaleY());
             setSpec(prev => ({
               ...prev,
-              root: mapNode(prev.root, nodeId, (n: any) => n.type === 'text' ? { ...n, textScaleX: absX, textScaleY: absY } : n)
+              root: mapNode(prev.root, nodeId, (n) => n.type === 'text' ? { ...n, textScaleX: absX, textScaleY: absY } : n)
             }));
           } else if (currentNode.size) {
             const newSize = {
@@ -1816,7 +1936,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
               const nonUniform = Math.abs(scaleX - scaleY) > 0.0001;
               setSpec(prev => ({
                 ...prev,
-                root: mapNode(prev.root, nodeId, (n: any) => {
+                root: mapNode(prev.root, nodeId, (n) => {
                   if (n.type !== 'image') return n;
                   return {
                     ...n,
@@ -1857,7 +1977,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       // Set absolute rotation (no cumulative add)
       setSpec(prev => ({
         ...prev,
-        root: mapNode(prev.root, nodeId, (n: any) => ({
+        root: mapNode(prev.root, nodeId, (n) => ({
           ...n,
           rotation: rotationDeg
         }))
@@ -1871,9 +1991,9 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
           
           setSpec(prev => ({
             ...prev,
-            root: mapNode(prev.root, nodeId, (groupNode: any) => {
+            root: mapNode(prev.root, nodeId, (groupNode) => {
               if (groupNode.type !== 'group') return groupNode;
-              
+            
               // Scale the group's size if it has one
               let newGroupSize = groupNode.size;
               if (groupNode.size) {
@@ -1882,30 +2002,29 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
                   height: Math.round(groupNode.size.height * scaleY)
                 };
               }
-              
+            
               // Scale all children positions and sizes
-              const scaledChildren = groupNode.children.map((child: any) => {
+              const children = (groupNode as { children?: LayoutNode[] }).children ?? [];
+              const scaledChildren = children.map((child) => {
                 const scaledChild = { ...child };
-                
-                // Scale position
+              
                 if (child.position) {
                   scaledChild.position = {
                     x: Math.round(child.position.x * scaleX),
                     y: Math.round(child.position.y * scaleY)
                   };
                 }
-                
-                // Scale size
+              
                 if (child.size) {
                   scaledChild.size = {
                     width: Math.round(child.size.width * scaleX),
                     height: Math.round(child.size.height * scaleY)
                   };
                 }
-                
+              
                 return scaledChild;
               });
-              
+            
               return {
                 ...groupNode,
                 size: newGroupSize,
@@ -1913,13 +2032,12 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
               };
             })
           }));
-        } else if (currentNode.type === 'text') {
           // Persist absolute Konva scale as glyph scale
           const absX = Math.max(0.05, node.scaleX());
           const absY = Math.max(0.05, node.scaleY());
           setSpec(prev => ({
             ...prev,
-            root: mapNode(prev.root, nodeId, (n: any) => n.type === 'text' ? { ...n, textScaleX: absX, textScaleY: absY } : n)
+            root: mapNode(prev.root, nodeId, (n) => n.type === 'text' ? { ...n, textScaleX: absX, textScaleY: absY } : n)
           }));
         } else {
           // For individual non-text nodes: scale size
@@ -1932,7 +2050,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
               const nonUniform = Math.abs(scaleX - scaleY) > 0.0001;
               setSpec(prev => ({
                 ...prev,
-                root: mapNode(prev.root, nodeId, (n: any) => {
+                root: mapNode(prev.root, nodeId, (n) => {
                   if (n.type !== 'image') return n;
                   return {
                     ...n,
@@ -1973,17 +2091,18 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       tr.forceUpdate();
       tr.getLayer()?.batchDraw();
     }, 0);
-  }, [setSpec, spec.root, selected, transformSession]);
+  }, [setSpec, spec.root, selected, findNode, mapNode]);
 
   // Helper function to map nodes (from stage-internal.ts pattern)
-  const mapNode = (n: any, id: string, f: (n: any) => any): any => {
+  const mapNode = useCallback(function mapNodeImpl(n: LayoutNode, id: string, f: (node: LayoutNode) => LayoutNode): LayoutNode {
     if (n.id === id) return f(n);
-    if (n.children && Array.isArray(n.children)) {
-      const children = n.children.map((c: any) => mapNode(c, id, f));
-      return { ...n, children };
+    const children = (n as { children?: LayoutNode[] }).children;
+    if (Array.isArray(children)) {
+      const mappedChildren = children.map(child => mapNodeImpl(child, id, f));
+      return { ...n, children: mappedChildren };
     }
     return n;
-  };
+  }, []);
 
   return (
   <div ref={wrapperRef} style={{ position: 'relative', width, height, cursor: isRectMode ? 'crosshair' : undefined, backgroundColor: GRID_BG_COLOR }} onContextMenu={onWrapperContextMenu}>
@@ -2231,7 +2350,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
                         
                         setSpec(prev => ({
                           ...prev,
-                          root: mapNode(prev.root, curveNode.id, (n: any) => ({
+                          root: mapNode(prev.root, curveNode.id, (n) => ({
                             ...n,
                             points: newPoints
                           }))
@@ -2349,43 +2468,41 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
               const applyReorder = (mode: 'forward'|'lower'|'top'|'bottom') => {
                 setSpec(prev => ({
                   ...prev,
-                  root: (function walk(n: any): any {
-                    if (parentMap[n.id]) {
+                  root: (function walk(n: LayoutNode): LayoutNode {
+                    const children = (n as { children?: LayoutNode[] }).children ?? [];
+                    if (parentMap[n.id] && children.length > 0) {
                       const selectedChildren = new Set(parentMap[n.id]);
-                      const orig = n.children || [];
-                      let newChildren = orig.slice();
+                      let newChildren = children.slice();
                       if (mode === 'forward') {
-                        // iterate right-to-left swapping with next non-selected
                         for (let i = newChildren.length - 2; i >= 0; i--) {
-                          if (selectedChildren.has(newChildren[i].id) && !selectedChildren.has(newChildren[i+1].id)) {
-                            const tmp = newChildren[i+1];
-                            newChildren[i+1] = newChildren[i];
+                          if (selectedChildren.has(newChildren[i].id) && !selectedChildren.has(newChildren[i + 1].id)) {
+                            const tmp = newChildren[i + 1];
+                            newChildren[i + 1] = newChildren[i];
                             newChildren[i] = tmp;
                           }
                         }
                       } else if (mode === 'lower') {
-                        // iterate left-to-right swapping with previous non-selected
                         for (let i = 1; i < newChildren.length; i++) {
-                          if (selectedChildren.has(newChildren[i].id) && !selectedChildren.has(newChildren[i-1].id)) {
-                            const tmp = newChildren[i-1];
-                            newChildren[i-1] = newChildren[i];
+                          if (selectedChildren.has(newChildren[i].id) && !selectedChildren.has(newChildren[i - 1].id)) {
+                            const tmp = newChildren[i - 1];
+                            newChildren[i - 1] = newChildren[i];
                             newChildren[i] = tmp;
                           }
                         }
                       } else if (mode === 'top') {
-                        const moving = newChildren.filter((c: any) => selectedChildren.has(c.id));
-                        const staying = newChildren.filter((c: any) => !selectedChildren.has(c.id));
+                        const moving = newChildren.filter((c) => selectedChildren.has(c.id));
+                        const staying = newChildren.filter((c) => !selectedChildren.has(c.id));
                         newChildren = [...staying, ...moving];
                       } else if (mode === 'bottom') {
-                        const moving = newChildren.filter((c: any) => selectedChildren.has(c.id));
-                        const staying = newChildren.filter((c: any) => !selectedChildren.has(c.id));
+                        const moving = newChildren.filter((c) => selectedChildren.has(c.id));
+                        const staying = newChildren.filter((c) => !selectedChildren.has(c.id));
                         newChildren = [...moving, ...staying];
                       }
-                      n = { ...n, children: newChildren.map((c: any) => walk(c)) };
+                      n = { ...n, children: newChildren.map((c) => walk(c)) };
                       return n;
                     }
-                    if (Array.isArray(n.children)) {
-                      return { ...n, children: n.children.map((c: any) => walk(c)) };
+                    if (children.length > 0) {
+                      return { ...n, children: children.map((c) => walk(c)) };
                     }
                     return n;
                   })(prev.root)
@@ -2465,21 +2582,24 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
               onClick={() => {
                 setSpec(prev => ({
                   ...prev,
-                  root: mapNode(prev.root, '__bulk__', (n: any) => n) // placeholder (we'll map individually below)
+                  root: mapNode(prev.root, '__bulk__', (n) => n)
                 }));
-                // Apply per node update
-                setSpec(prev => ({
-                  ...prev,
-                  root: (function mapAll(n: any): any {
+                setSpec(prev => {
+                  const mapAll = (n: LayoutNode): LayoutNode => {
                     if (selected.includes(n.id) && n.type === 'image' && n.preserveAspect === false) {
                       return { ...n, preserveAspect: true, objectFit: n.objectFit || 'contain' };
                     }
-                    if (Array.isArray(n.children)) {
-                      return { ...n, children: n.children.map(mapAll) };
+                    const children = (n as { children?: LayoutNode[] }).children;
+                    if (Array.isArray(children)) {
+                      return { ...n, children: children.map(mapAll) };
                     }
                     return n;
-                  })(prev.root)
-                }));
+                  };
+                  return {
+                    ...prev,
+                    root: mapAll(prev.root)
+                  };
+                });
                 setMenu(null);
               }}
               className="px-3 py-1.5 w-full text-left hover:bg-gray-100"
@@ -2497,16 +2617,22 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
           })() && (
             <button
               onClick={() => {
-                setSpec(prev => ({
-                  ...prev,
-                  root: (function mapAll(n: any): any {
+                setSpec(prev => {
+                  const mapAll = (n: LayoutNode): LayoutNode => {
                     if (selected.includes(n.id) && n.type === 'text') {
                       return { ...n, textScaleX: 1, textScaleY: 1 };
                     }
-                    if (Array.isArray(n.children)) return { ...n, children: n.children.map(mapAll) };
+                    const children = (n as { children?: LayoutNode[] }).children;
+                    if (Array.isArray(children)) {
+                      return { ...n, children: children.map(mapAll) };
+                    }
                     return n;
-                  })(prev.root)
-                }));
+                  };
+                  return {
+                    ...prev,
+                    root: mapAll(prev.root)
+                  };
+                });
                 setMenu(null);
               }}
               className="px-3 py-1.5 w-full text-left hover:bg-gray-100"
@@ -2534,16 +2660,19 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
                   <button
                     onClick={() => {
                       const lockedIds = [...selected];
-                      setSpec(prev => ({
-                        ...prev,
-                        root: (function mapAll(n: any): any {
+                      setSpec(prev => {
+                        const mapAll = (n: LayoutNode): LayoutNode => {
                           if (lockedIds.includes(n.id)) {
                             return { ...n, locked: true };
                           }
-                          if (Array.isArray(n.children)) return { ...n, children: n.children.map(mapAll) };
+                          const children = (n as { children?: LayoutNode[] }).children;
+                          if (Array.isArray(children)) {
+                            return { ...n, children: children.map(mapAll) };
+                          }
                           return n;
-                        })(prev.root)
-                      }));
+                        };
+                        return { ...prev, root: mapAll(prev.root) };
+                      });
                       // Clear selection so the locked state takes effect immediately
                       setSelection([]);
                       setMenu(null);
@@ -2557,16 +2686,19 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
                 {anyLocked && (
                   <button
                     onClick={() => {
-                      setSpec(prev => ({
-                        ...prev,
-                        root: (function mapAll(n: any): any {
+                      setSpec(prev => {
+                        const mapAll = (n: LayoutNode): LayoutNode => {
                           if (selected.includes(n.id)) {
                             return { ...n, locked: false };
                           }
-                          if (Array.isArray(n.children)) return { ...n, children: n.children.map(mapAll) };
+                          const children = (n as { children?: LayoutNode[] }).children;
+                          if (Array.isArray(children)) {
+                            return { ...n, children: children.map(mapAll) };
+                          }
                           return n;
-                        })(prev.root)
-                      }));
+                        };
+                        return { ...prev, root: mapAll(prev.root) };
+                      });
                       setMenu(null);
                     }}
                     className="px-3 py-1.5 w-full text-left hover:bg-gray-100 flex items-center gap-2"

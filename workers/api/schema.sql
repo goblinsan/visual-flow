@@ -1,4 +1,4 @@
--- Visual Flow Database Schema
+-- Vizail Database Schema
 -- Phase 1: Cloud Persistence & Sharing
 
 -- Users table (Phase 1 uses Cloudflare Access, but we store basic info)

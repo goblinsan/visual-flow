@@ -1,28 +1,35 @@
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react';
-import RectAttributesPanel, { RectNode, RectPatch } from './RectAttributesPanel';
+import RectAttributesPanel, { type RectAttributesPanelProps, type RectNode, type RectPatch } from './RectAttributesPanel';
 import { describe, it, expect } from 'vitest';
 
-function setup(overrides: Partial<Record<string, unknown>> = {}) {
+function setup(overrides: Partial<RectAttributesPanelProps> = {}) {
   const rect: RectNode = { id: 'r1', type: 'rect', fill: '#ffffff', stroke: '#222222', strokeWidth: 2, radius: 4, opacity: 1, strokeDash: [4,2] };
   const updateRectCalls: RectPatch[] = [];
-  const props = {
+  const noopDispatch: RectAttributesPanelProps['setLastFillById'] = () => {};
+  const noopStrokeDispatch: RectAttributesPanelProps['setLastStrokeById'] = () => {};
+  const noopDashSetter: RectAttributesPanelProps['setRawDashInput'] = () => {};
+  const noopBeginRecent: RectAttributesPanelProps['beginRecentSession'] = () => {};
+  const noopPreviewRecent: RectAttributesPanelProps['previewRecent'] = () => {};
+  const noopCommitRecent: RectAttributesPanelProps['commitRecent'] = () => {};
+  const noopPushRecent: RectAttributesPanelProps['pushRecent'] = () => {};
+  const props: RectAttributesPanelProps = {
     rect,
-    lastFillById: {} as Record<string,string>,
-    lastStrokeById: {} as Record<string,string>,
-    setLastFillById: () => {},
-    setLastStrokeById: () => {},
+    lastFillById: {},
+    lastStrokeById: {},
+    setLastFillById: noopDispatch,
+    setLastStrokeById: noopStrokeDispatch,
     updateRect: (p: RectPatch) => { updateRectCalls.push(p); Object.assign(rect, p); },
     rawDashInput: rect.strokeDash?.join(' ') || '',
-    setRawDashInput: () => {},
-    beginRecentSession: () => {},
-    previewRecent: () => {},
-    commitRecent: () => {},
-    pushRecent: () => {},
+    setRawDashInput: noopDashSetter,
+    beginRecentSession: noopBeginRecent,
+    previewRecent: noopPreviewRecent,
+    commitRecent: noopCommitRecent,
+    pushRecent: noopPushRecent,
     recentColors: ['#ffffff', '#000000'],
     ...overrides,
   };
-  const utils = render(<RectAttributesPanel {...(props as any)} />);
+  const utils = render(<RectAttributesPanel {...props} />);
   return { ...utils, rect, updateRectCalls };
 }
 

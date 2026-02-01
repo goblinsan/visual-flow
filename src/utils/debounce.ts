@@ -1,4 +1,4 @@
-export interface Debounced<T extends any[]> {
+export interface Debounced<T extends readonly unknown[]> {
   (...args: T): void;
   flush(): void;
   cancel(): void;
@@ -8,27 +8,27 @@ export interface Debounced<T extends any[]> {
  * Simple trailing-edge debounce. Only the last call within the interval is executed.
  * Returns a debounced function with `flush` and `cancel` helpers.
  */
-export function debounce<T extends any[]>(fn: (...args: T) => void, ms: number): Debounced<T> {
-  let t: number | undefined;
+export function debounce<T extends readonly unknown[]>(fn: (...args: T) => void, ms: number): Debounced<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
   let lastArgs: T | undefined;
   const run = () => {
     if (lastArgs) fn(...lastArgs);
     lastArgs = undefined;
-    t = undefined;
+    timer = undefined;
   };
-  const d: any = (...args: T) => {
+  const debounced = ((...args: T) => {
     lastArgs = args;
-    if (t !== undefined) clearTimeout(t);
-    t = setTimeout(run, ms) as unknown as number;
-  };
-  d.flush = () => { if (t !== undefined) { clearTimeout(t); run(); } };
-  d.cancel = () => { if (t !== undefined) { clearTimeout(t); t = undefined; lastArgs = undefined; } };
-  return d as Debounced<T>;
+    if (timer !== undefined) clearTimeout(timer);
+    timer = setTimeout(run, ms);
+  }) as Debounced<T>;
+  debounced.flush = () => { if (timer !== undefined) { clearTimeout(timer); run(); } };
+  debounced.cancel = () => { if (timer !== undefined) { clearTimeout(timer); timer = undefined; lastArgs = undefined; } };
+  return debounced;
 }
 
 /** Specialized helper for recent color commits: commit only after user pauses. */
 export function createRecentColorCommitter(commit: (color: string) => void, delay = 180) {
-  const d = debounce((c: string) => commit(c), delay) as Debounced<[string]>;
+  const d = debounce<[string]>((color) => commit(color), delay);
   return {
     queue(color: string) { d(color); },
     flush() { d.flush(); },

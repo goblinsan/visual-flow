@@ -4,7 +4,7 @@ import { normalizePaint, deriveStrokeVisual, dashArrayToInput, inputToDashArray 
 describe('normalizePaint', () => {
   it('returns undefined for undefined/null', () => {
     expect(normalizePaint(undefined)).toBeUndefined();
-    expect(normalizePaint(null as any)).toBeUndefined();
+    expect(normalizePaint(null)).toBeUndefined();
   });
   it('returns undefined for empty or whitespace', () => {
     expect(normalizePaint('')).toBeUndefined();

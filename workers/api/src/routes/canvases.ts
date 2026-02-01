@@ -2,9 +2,54 @@
  * Canvas CRUD routes
  */
 
-import type { Env, User, Canvas, Membership } from '../types';
+import type { Env, User, Canvas } from '../types';
+import type { LayoutSpec } from '../../src/layout-schema';
 import { generateId, jsonResponse, errorResponse } from '../utils';
 import { checkCanvasAccess } from '../auth';
+
+interface CreateCanvasBody {
+  name: string;
+  spec: LayoutSpec;
+}
+
+interface UpdateCanvasBody {
+  name?: string;
+  spec?: LayoutSpec;
+}
+
+function isLayoutSpec(value: unknown): value is LayoutSpec {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'root' in value &&
+    typeof (value as { root?: unknown }).root === 'object' &&
+    (value as { root?: unknown }).root !== null
+  );
+}
+
+function isCreateCanvasBody(value: unknown): value is CreateCanvasBody {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as { name?: unknown }).name === 'string' &&
+    isLayoutSpec((value as { spec?: unknown }).spec)
+  );
+}
+
+function isUpdateCanvasBody(value: unknown): value is UpdateCanvasBody {
+  if (typeof value !== 'object' || value === null) return false;
+  const { name, spec } = value as { name?: unknown; spec?: unknown };
+  const hasName = name !== undefined;
+  const hasSpec = spec !== undefined;
+  if (!hasName && !hasSpec) return false;
+  const nameValid = !hasName || typeof name === 'string';
+  const specValid = !hasSpec || isLayoutSpec(spec);
+  return nameValid && specValid;
+}
+
+function normalizeSpec(value: string | LayoutSpec): LayoutSpec {
+  return typeof value === 'string' ? (JSON.parse(value) as LayoutSpec) : value;
+}
 
 /**
  * GET /api/canvases
@@ -25,7 +70,7 @@ export async function listCanvases(user: User, env: Env): Promise<Response> {
     // Parse spec JSON for each canvas
     const canvases = result.results?.map(c => ({
       ...c,
-      spec: typeof c.spec === 'string' ? JSON.parse(c.spec) : c.spec,
+      spec: normalizeSpec(c.spec as string | LayoutSpec),
     })) || [];
 
     return jsonResponse(canvases);
@@ -41,11 +86,12 @@ export async function listCanvases(user: User, env: Env): Promise<Response> {
  */
 export async function createCanvas(user: User, env: Env, request: Request): Promise<Response> {
   try {
-    const body = await request.json() as { name: string; spec: any };
-    
-    if (!body.name || !body.spec) {
+    const body = await request.json();
+    if (!isCreateCanvasBody(body)) {
       return errorResponse('Missing required fields: name, spec');
     }
+
+    const { name, spec } = body;
 
     const now = Date.now();
     const canvasId = generateId();
@@ -57,7 +103,7 @@ export async function createCanvas(user: User, env: Env, request: Request): Prom
       env.DB.prepare(`
         INSERT INTO canvases (id, owner_id, name, spec, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).bind(canvasId, user.id, body.name, JSON.stringify(body.spec), now, now),
+      `).bind(canvasId, user.id, name, JSON.stringify(spec), now, now),
       
       // Create owner membership
       env.DB.prepare(`
@@ -71,8 +117,8 @@ export async function createCanvas(user: User, env: Env, request: Request): Prom
     const canvas: Canvas = {
       id: canvasId,
       owner_id: user.id,
-      name: body.name,
-      spec: body.spec,
+      name,
+      spec,
       created_at: now,
       updated_at: now,
     };
@@ -107,7 +153,7 @@ export async function getCanvas(user: User, env: Env, canvasId: string): Promise
 
     return jsonResponse({
       ...canvas,
-      spec: typeof canvas.spec === 'string' ? JSON.parse(canvas.spec) : canvas.spec,
+      spec: normalizeSpec(canvas.spec as string | LayoutSpec),
       user_role: access.role,
     });
   } catch (error) {
@@ -133,23 +179,25 @@ export async function updateCanvas(
       return errorResponse('Access denied - editor or owner role required', 403);
     }
 
-    const body = await request.json() as { name?: string; spec?: any };
+    const body = await request.json();
     
-    if (!body.name && !body.spec) {
+    if (!isUpdateCanvasBody(body)) {
       return errorResponse('At least one field required: name or spec');
     }
 
-    const updates: string[] = [];
-    const values: any[] = [];
+    const { name, spec } = body;
 
-    if (body.name !== undefined) {
+    const updates: string[] = [];
+    const values: Array<string | number> = [];
+
+    if (name !== undefined) {
       updates.push('name = ?');
-      values.push(body.name);
+      values.push(name);
     }
 
-    if (body.spec !== undefined) {
+    if (spec !== undefined) {
       updates.push('spec = ?');
-      values.push(JSON.stringify(body.spec));
+      values.push(JSON.stringify(spec));
     }
 
     updates.push('updated_at = ?');
@@ -168,9 +216,13 @@ export async function updateCanvas(
       .bind(canvasId)
       .first<Canvas>();
 
+    if (!canvas) {
+      return errorResponse('Canvas not found', 404);
+    }
+
     return jsonResponse({
       ...canvas,
-      spec: typeof canvas?.spec === 'string' ? JSON.parse(canvas.spec) : canvas?.spec,
+      spec: normalizeSpec(canvas.spec as string | LayoutSpec),
     });
   } catch (error) {
     console.error('Error updating canvas:', error);

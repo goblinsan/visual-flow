@@ -1,4 +1,4 @@
-# Visual Flow Collaboration + AI Agent + Export Roadmap
+# Vizail Collaboration + AI Agent + Export Roadmap
 
 > Generated: 2026-02-01
 > Author: Staff Engineer / Technical PM

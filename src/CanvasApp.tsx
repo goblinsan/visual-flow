@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState, useEffect } from "react";
 import type { JSX } from "react";
-import { findNode, updateNode } from './utils/specUtils';
+import { findNode, updateNode, type SpecPatch } from './utils/specUtils';
 import RectAttributesPanel from './components/RectAttributesPanel';
 import EllipseAttributesPanel from './components/EllipseAttributesPanel';
 import LineAttributesPanel from './components/LineAttributesPanel';
@@ -17,7 +17,18 @@ import { Modal } from "./components/Modal";
 import { logger } from "./utils/logger";
 import { dashArrayToInput } from './utils/paint';
 import CanvasStage from "./canvas/CanvasStage.tsx";
-import type { LayoutSpec, FlowTransition } from "./layout-schema.ts";
+import type {
+  LayoutSpec,
+  LayoutNode,
+  RectNode,
+  EllipseNode,
+  LineNode,
+  CurveNode,
+  TextNode,
+  ImageNode,
+  FlowTransition,
+  Flow,
+} from "./layout-schema.ts";
 import { saveNamedDesign, getSavedDesigns, getCurrentDesignName, setCurrentDesignName, type SavedDesign } from './utils/persistence';
 import useElementSize from './hooks/useElementSize';
 import { COMPONENT_LIBRARY, ICON_LIBRARY } from "./library";
@@ -254,11 +265,11 @@ export default function CanvasApp() {
   const [fitToContentKey, setFitToContentKey] = useState(0); // Increment to trigger fit-to-content in CanvasStage
   // Curve control point selection
   const [selectedCurvePointIndex, setSelectedCurvePointIndex] = useState<number | null>(null);
-  const appVersion = (import.meta as any).env?.VITE_APP_VERSION || '0.0.0';
+  const appVersion = import.meta.env.VITE_APP_VERSION ?? '0.0.0';
 
   const pushRecent = useCallback((col: string) => { commitRecent(col); }, [commitRecent]);
 
-  const updateFlows = useCallback((nextFlows: any[]) => {
+  const updateFlows = useCallback((nextFlows: Flow[]) => {
     setSpec(prev => ({ ...prev, flows: nextFlows }));
   }, [setSpec]);
 
@@ -293,12 +304,12 @@ export default function CanvasApp() {
 
   // Debug: log spec on mount
   useEffect(() => {
-    logger.debug('CanvasApp mount: root children', spec.root.children.map(c => c.id));
+    logger.debug('CanvasApp mount');
   }, []);
 
   useEffect(() => {
     logger.debug('CanvasApp size', canvasSize.width, canvasSize.height);
-  }, [canvasSize.width, canvasSize.height]);
+  }, [canvasSize.width, canvasSize.height, setSpec]);
 
   // Load persisted defaults once
   // (Removed legacy load of rect defaults – handled in hook)
@@ -313,15 +324,14 @@ export default function CanvasApp() {
       if (!need) return prev;
       return { ...prev, root: { ...root, size: { width: canvasSize.width, height: canvasSize.height } } };
     });
-  }, [canvasSize.width, canvasSize.height]);
+  }, [canvasSize.width, canvasSize.height, setSpec]);
 
   // Sync raw dash input based on selection / tool changes
   useEffect(() => {
-    // If exactly one rectangle selected, mirror its strokeDash
     if (selectedIds.length === 1) {
-      const node = findNode(spec.root as any, selectedIds[0]) as any;
+      const node = findNode(spec.root, selectedIds[0]) as LayoutNode | null;
       if (node && node.type === 'rect') {
-        const dashStr = dashArrayToInput(node.strokeDash as number[] | undefined);
+        const dashStr = dashArrayToInput(node.strokeDash);
         setRawDashInput(prev => prev === dashStr ? prev : dashStr);
         return;
       }
@@ -529,9 +539,9 @@ export default function CanvasApp() {
       </header>
       {/* Modals */}
       <Modal open={aboutOpen} onClose={() => setAboutOpen(false)} title="About Vizail" size="sm" variant="light">
-        <p><strong>visual-flow</strong> version <code>{appVersion}</code></p>
+        <p><strong>Vizail</strong> version <code>{appVersion}</code></p>
         <p className="mt-2">Experimental canvas + layout editor. Transforms are baked to schema on release.</p>
-        <p className="mt-4 opacity-70 text-[10px]">© {new Date().getFullYear()} visual-flow</p>
+        <p className="mt-4 opacity-70 text-[10px]">© {new Date().getFullYear()} Vizail</p>
       </Modal>
       <Modal open={cheatOpen} onClose={() => setCheatOpen(false)} title="Interaction Cheatsheet" size="sm" variant="light">
         <ul className="space-y-1 list-disc pl-4 pr-1 max-h-72 overflow-auto text-xs">
@@ -840,15 +850,18 @@ export default function CanvasApp() {
             </div>
             {selectedIds.length === 1 && (() => {
               // Find node
-              const node = findNode(spec.root as any, selectedIds[0]);
+              const node = findNode(spec.root, selectedIds[0]) as LayoutNode | null;
               if (!node) return <div className="text-[11px] text-gray-400">Node not found.</div>;
               
-              const createUpdateFn = (nodeId: string) => (patch: Record<string, any>) => {
-                setSpec(prev => ({ ...prev, root: updateNode(prev.root as any, nodeId, patch) as any }));
+              const createUpdateFn = (nodeId: string) => (patch: SpecPatch) => {
+                setSpec(prev => ({
+                  ...prev,
+                  root: updateNode(prev.root, nodeId, patch) as LayoutNode
+                }));
               };
 
               const isScreenEligible = ['group', 'frame', 'stack', 'grid', 'box'].includes(node.type);
-              const screenMeta = (node as any).screen as { id: string; name: string } | undefined;
+              const screenMeta = node.screen;
               const flows = spec.flows ?? [];
 
               const removeScreenFromFlows = (screenId: string) => {
@@ -926,9 +939,9 @@ export default function CanvasApp() {
                 <div className="text-[11px] text-gray-400">Screen/flow attributes are available for groups, frames, stacks, grids, and boxes.</div>
               );
 
-              const renderElementPanelFor = (targetNode: any): JSX.Element => {
+              const renderElementPanelFor = (targetNode: LayoutNode): JSX.Element => {
                 if (targetNode.type === 'rect') {
-                  const rect = targetNode as any;
+                  const rect = targetNode as RectNode;
                   const updateRect = createUpdateFn(rect.id);
                   return (
                     <RectAttributesPanel
@@ -950,7 +963,7 @@ export default function CanvasApp() {
                 }
 
                 if (targetNode.type === 'ellipse') {
-                  const ellipse = targetNode as any;
+                  const ellipse = targetNode as EllipseNode;
                   const updateEllipse = createUpdateFn(ellipse.id);
                   return (
                     <EllipseAttributesPanel
@@ -970,7 +983,7 @@ export default function CanvasApp() {
                 }
 
                 if (targetNode.type === 'line') {
-                  const line = targetNode as any;
+                  const line = targetNode as LineNode;
                   const updateLine = createUpdateFn(line.id);
                   return (
                     <LineAttributesPanel
@@ -986,7 +999,7 @@ export default function CanvasApp() {
                 }
 
                 if (targetNode.type === 'curve') {
-                  const curve = targetNode as any;
+                  const curve = targetNode as CurveNode;
                   const updateCurve = createUpdateFn(curve.id);
                   return (
                     <CurveAttributesPanel
@@ -1004,7 +1017,7 @@ export default function CanvasApp() {
                 }
 
                 if (targetNode.type === 'text') {
-                  const textNode = targetNode as any;
+                  const textNode = targetNode as TextNode;
                   const updateText = createUpdateFn(textNode.id);
                   return (
                     <TextAttributesPanel
@@ -1020,7 +1033,7 @@ export default function CanvasApp() {
                 }
 
                 if (targetNode.type === 'image') {
-                  const imageNode = targetNode as any;
+                  const imageNode = targetNode as ImageNode;
                   const updateImage = createUpdateFn(imageNode.id);
                   return (
                     <ImageAttributesPanel
@@ -1034,7 +1047,7 @@ export default function CanvasApp() {
               };
 
               const elementPanel = renderElementPanelFor(node);
-              const groupChildren = (node as any).children as any[] | undefined;
+              const groupChildren = node.children;
               const hasChildren = Array.isArray(groupChildren) && groupChildren.length > 0;
               const moveChild = (fromIndex: number, toIndex: number) => {
                 if (!groupChildren) return;

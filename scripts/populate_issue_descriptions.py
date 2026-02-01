@@ -5,7 +5,7 @@ Populate GitHub issues with detailed descriptions from COLLABORATION_ROADMAP.md
 import subprocess
 import json
 
-REPO = "goblinsan/visual-flow"
+REPO = "goblinsan/vizail"
 
 # Map issue number to detailed description
 ISSUE_DETAILS = {

@@ -1,9 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import { fontSizeForVariant, approxTextHeight, estimateNodeHeight } from './measurement';
-import type { LayoutNode, TextNode, StackNode } from '../layout-schema';
+import type { TextNode, StackNode, GroupNode } from '../layout-schema';
 
-function text(id: string, variant?: string, h?: number): TextNode {
-  return { id, type: 'text', text: 'X', variant: variant as any, position: { x:0,y:0 }, size: { width: 10, height: h ?? 10 }, color: '#000' } as TextNode;
+function text(id: string, variant: TextNode['variant'] = 'body', h?: number): TextNode {
+  return {
+    id,
+    type: 'text',
+    text: 'X',
+    variant,
+    position: { x: 0, y: 0 },
+    size: { width: 10, height: h ?? 10 },
+    color: '#000',
+  };
 }
 
 describe('fontSizeForVariant', () => {
@@ -28,13 +36,30 @@ describe('estimateNodeHeight', () => {
     expect(estimateNodeHeight(t)).toBe(28+8);
   });
   it('aggregates stack children with gap', () => {
-    const stack: StackNode = { id: 's', type: 'stack', direction: 'column', gap: 4, position: {x:0,y:0}, children: [text('a','h1'), text('b','h3')] } as any;
+    const stack: StackNode = {
+      id: 's',
+      type: 'stack',
+      direction: 'column',
+      gap: 4,
+      position: { x: 0, y: 0 },
+      children: [text('a', 'h1'), text('b', 'h3')],
+    };
     const expected = (28+8) + 4 + (18+8) + 4; // note original logic adds gap after each child including last; preserve that
     expect(estimateNodeHeight(stack)).toBe(expected);
   });
   it('returns placeholder for grid and group (non-empty vs empty)', () => {
-    const groupNonEmpty: LayoutNode = { id:'g1', type:'group', position:{x:0,y:0}, children:[text('gx')] } as any;
-    const groupEmpty: LayoutNode = { id:'g2', type:'group', position:{x:0,y:0}, children:[] } as any;
+    const groupNonEmpty: GroupNode = {
+      id: 'g1',
+      type: 'group',
+      position: { x: 0, y: 0 },
+      children: [text('gx')],
+    };
+    const groupEmpty: GroupNode = {
+      id: 'g2',
+      type: 'group',
+      position: { x: 0, y: 0 },
+      children: [],
+    };
     expect(estimateNodeHeight(groupNonEmpty)).toBe(200);
     expect(estimateNodeHeight(groupEmpty)).toBe(100);
   });

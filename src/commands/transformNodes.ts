@@ -1,5 +1,6 @@
 import type { Command, CommandContext } from './types';
 import { findNode, mapNode } from './types';
+import type { LayoutNode, Pos, Size } from '../layout-schema';
 
 export interface TransformUpdate {
   id: string;
@@ -14,35 +15,44 @@ export interface TransformNodesPayload {
   updates: TransformUpdate[];
 }
 
+interface TransformSnapshot {
+  position?: Pos;
+  size?: Size;
+  rotation?: number;
+  textScaleX?: number;
+  textScaleY?: number;
+}
+
 export function createTransformNodesCommand(payload: TransformNodesPayload): Command {
+  let cachedInverse: Command | null = null;
+
   return {
     id: 'transform-nodes',
-    description: `Transform ${payload.updates.map(u=>u.id).join(',')}`,
+    description: `Transform ${payload.updates.map((u) => u.id).join(',')}`,
     apply(ctx: CommandContext) {
       if (!payload.updates.length) return ctx.spec;
-      const prev: Record<string, any> = {};
-      const toApply = payload.updates.filter(u => u.id !== ctx.spec.root.id);
+      const toApply = payload.updates.filter((u) => u.id !== ctx.spec.root.id);
       if (!toApply.length) return ctx.spec;
 
-      // capture previous state for each node (only fields we might mutate)
-      toApply.forEach(u => {
-        const node = findNode(ctx.spec.root as any, u.id);
+      const prev = new Map<string, TransformSnapshot>();
+      toApply.forEach((u) => {
+        const node = findNode(ctx.spec.root, u.id);
         if (!node) return;
-        const snap: any = {};
+        const snap: TransformSnapshot = {};
         if (u.position && node.position) snap.position = { ...node.position };
         if (u.size && node.size) snap.size = { ...node.size };
-        if (typeof u.rotation === 'number' && typeof (node as any).rotation === 'number') snap.rotation = (node as any).rotation;
-        if (typeof u.textScaleX === 'number' && typeof (node as any).textScaleX === 'number') snap.textScaleX = (node as any).textScaleX;
-        if (typeof u.textScaleY === 'number' && typeof (node as any).textScaleY === 'number') snap.textScaleY = (node as any).textScaleY;
-        prev[u.id] = snap;
+        if (typeof node.rotation === 'number') snap.rotation = node.rotation;
+        if (typeof node.textScaleX === 'number') snap.textScaleX = node.textScaleX;
+        if (typeof node.textScaleY === 'number') snap.textScaleY = node.textScaleY;
+        prev.set(u.id, snap);
       });
 
-      let nextRoot: any = ctx.spec.root;
-      toApply.forEach(u => {
-        nextRoot = mapNode(nextRoot, u.id, (n: any) => {
-          const patch: any = { ...n };
-          if (u.position && n.position) patch.position = { ...n.position, ...u.position };
-          if (u.size && n.size) patch.size = { ...n.size, ...u.size };
+      let nextRoot: LayoutNode = ctx.spec.root;
+      toApply.forEach((u) => {
+        nextRoot = mapNode(nextRoot, u.id, (node) => {
+          const patch: LayoutNode = { ...node };
+          if (u.position && patch.position) patch.position = { ...patch.position, ...u.position };
+          if (u.size && patch.size) patch.size = { ...patch.size, ...u.size };
           if (typeof u.rotation === 'number') patch.rotation = u.rotation;
           if (typeof u.textScaleX === 'number') patch.textScaleX = u.textScaleX;
           if (typeof u.textScaleY === 'number') patch.textScaleY = u.textScaleY;
@@ -54,14 +64,14 @@ export function createTransformNodesCommand(payload: TransformNodesPayload): Com
 
       const inverse: Command = {
         id: 'transform-nodes',
-        description: `Revert transforms ${toApply.map(u=>u.id).join(',')}`,
+        description: `Revert transforms ${toApply.map((u) => u.id).join(',')}`,
         apply(inner) {
-          let root2: any = inner.spec.root;
-          toApply.forEach(u => {
-            const snap = prev[u.id];
+          let root2: LayoutNode = inner.spec.root;
+          toApply.forEach((u) => {
+            const snap = prev.get(u.id);
             if (!snap) return;
-            root2 = mapNode(root2, u.id, (n: any) => {
-              const patch: any = { ...n };
+            root2 = mapNode(root2, u.id, (node) => {
+              const patch: LayoutNode = { ...node };
               if (snap.position) patch.position = { ...snap.position };
               if (snap.size) patch.size = { ...snap.size };
               if ('rotation' in snap) patch.rotation = snap.rotation;
@@ -71,11 +81,13 @@ export function createTransformNodesCommand(payload: TransformNodesPayload): Com
             });
           });
           return { ...inner.spec, root: root2 };
-        }
+        },
       };
-      (this as any)._inverse = inverse;
+      cachedInverse = inverse;
       return { ...ctx.spec, root: nextRoot };
     },
-    invert() { return (this as any)._inverse || null; }
+    invert() {
+      return cachedInverse;
+    },
   };
 }

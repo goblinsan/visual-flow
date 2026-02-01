@@ -49,8 +49,9 @@ export function parseColor(input: string): RGBA | null {
   // hsl/hsla fallback via canvas
   if (/^hsla?\(/i.test(str)) {
     try {
-      // Use browser to normalize (will fail in non-browser test env unless JSDOM present)
-      const ctx = (globalThis as any).document?.createElement?.('canvas')?.getContext?.('2d');
+      const doc = typeof document !== 'undefined' ? document : undefined;
+      const canvas = doc?.createElement('canvas');
+      const ctx = canvas?.getContext?.('2d');
       if (!ctx) return null;
       ctx.fillStyle = str;
       const v = ctx.fillStyle; // returns in rgb(a) form

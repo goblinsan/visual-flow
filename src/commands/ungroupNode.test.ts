@@ -2,20 +2,46 @@ import { describe, it, expect } from 'vitest';
 import { createUngroupNodeCommand } from './ungroupNode';
 import type { CommandContext } from './types';
 import { cloneSpec } from './types';
+import type { FrameNode, GroupNode, LayoutNode, LayoutSpec, RectNode } from '../layout-schema';
 
-function makeSpec() {
+function rectNode(id: string, x: number): RectNode {
   return {
-    root: { id: 'root', type: 'frame', children: [
-      { id: 'g1', type: 'group', children: [
-        { id: 'a', type: 'rect', position:{x:0,y:0}, size:{width:10,height:10}},
-        { id: 'b', type: 'rect', position:{x:10,y:0}, size:{width:10,height:10}},
-      ]},
-      { id: 'c', type: 'rect', position:{x:40,y:0}, size:{width:10,height:10} }
-    ] }
-  } as any;
+    id,
+    type: 'rect',
+    position: { x, y: 0 },
+    size: { width: 10, height: 10 },
+  };
 }
 
-function ctx(spec: any): CommandContext { return { spec, selection: [] }; }
+function groupNode(id: string, children: LayoutNode[]): GroupNode {
+  return { id, type: 'group', children };
+}
+
+function makeSpec(): LayoutSpec {
+  return {
+    root: {
+      id: 'root',
+      type: 'frame',
+      size: { width: 400, height: 200 },
+      children: [
+        groupNode('g1', [rectNode('a', 0), rectNode('b', 10)]),
+        rectNode('c', 40),
+      ],
+    },
+  };
+}
+
+function ctx(spec: LayoutSpec): CommandContext {
+  return { spec, selection: [] };
+}
+
+function listChildIds(root: FrameNode): string[] {
+  return root.children.map((child) => child.id);
+}
+
+function findGroup(root: FrameNode, id: string): GroupNode | undefined {
+  return root.children.find((child): child is GroupNode => child.type === 'group' && child.id === id);
+}
 
 describe('UngroupNodeCommand', () => {
   it('ungroups a group node and inverts to recreate it', () => {
@@ -23,14 +49,16 @@ describe('UngroupNodeCommand', () => {
     const before = cloneSpec(spec);
     const cmd = createUngroupNodeCommand({ id: 'g1' });
     const after = cmd.apply(ctx(spec));
-    const ids = after.root.children.map((c:any)=>c.id);
-    expect(ids).toEqual(['a','b','c']);
+    const ids = listChildIds(after.root);
+    expect(ids).toEqual(['a', 'b', 'c']);
+
     const inv = cmd.invert!(before, after)!;
     const reverted = inv.apply(ctx(after));
-    const rIds = reverted.root.children.map((c:any)=>c.id);
-    expect(rIds[0]).toBe('g1');
-    const group = reverted.root.children[0] as any;
-    expect(group.children.map((c:any)=>c.id)).toEqual(['a','b']);
+    const revertedIds = listChildIds(reverted.root);
+    expect(revertedIds[0]).toBe('g1');
+    const group = findGroup(reverted.root, 'g1');
+    expect(group).toBeDefined();
+    expect(group?.children.map((child) => child.id)).toEqual(['a', 'b']);
   });
 
   it('no-ops if target not group', () => {

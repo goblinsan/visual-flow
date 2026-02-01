@@ -27,7 +27,7 @@ function setLevel(l: LogLevel) {
   try { localStorage.setItem('vf:logLevel', l); } catch { /* ignore */ }
 }
 
-function fmt(level: string, parts: any[]) {
+function fmt(level: string, parts: unknown[]) {
   const ts = new Date().toISOString();
   return [`%c[${ts}]%c ${level}%c`, 'color:gray;font-size:10px', 'color:#2563eb;font-weight:bold', 'color:inherit', ...parts];
 }
@@ -35,14 +35,14 @@ function fmt(level: string, parts: any[]) {
 export const logger = {
   setLevel,
   get level() { return currentLevel; },
-  error: (...args: any[]) => { if (should('error')) console.error(...fmt('ERROR', args)); },
-  warn:  (...args: any[]) => { if (should('warn')) console.warn(...fmt('WARN', args)); },
-  info:  (...args: any[]) => { if (should('info')) console.log(...fmt('INFO', args)); },
-  debug: (...args: any[]) => { if (should('debug')) console.log(...fmt('DEBUG', args)); },
+  error: (...args: unknown[]) => { if (should('error')) console.error(...fmt('ERROR', args)); },
+  warn:  (...args: unknown[]) => { if (should('warn')) console.warn(...fmt('WARN', args)); },
+  info:  (...args: unknown[]) => { if (should('info')) console.log(...fmt('INFO', args)); },
+  debug: (...args: unknown[]) => { if (should('debug')) console.log(...fmt('DEBUG', args)); },
 };
 
 // Helper to log once per key
 const seen = new Set<string>();
-export function debugOnce(key: string, ...args: any[]) {
+export function debugOnce(key: string, ...args: unknown[]) {
   if (seen.has(key)) return; seen.add(key); logger.debug('[once]', key, ...args);
 }

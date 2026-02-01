@@ -2,7 +2,7 @@
  * Utility functions for API responses
  */
 
-export function jsonResponse(data: any, status = 200, env?: { ALLOWED_ORIGINS?: string }): Response {
+export function jsonResponse(data: unknown, status = 200, env?: { ALLOWED_ORIGINS?: string }): Response {
   // In production, restrict CORS to specific origins
   const allowedOrigin = env?.ALLOWED_ORIGINS || '*';
   

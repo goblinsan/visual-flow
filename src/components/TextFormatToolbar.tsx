@@ -20,7 +20,7 @@ const COLORS = [
   '#3B82F6', '#8B5CF6', '#EC4899', '#FFFFFF',
 ];
 
-const WEIGHTS = [
+const WEIGHTS: { label: string; value: TextSpan['fontWeight'] }[] = [
   { label: 'Light', value: '300' },
   { label: 'Normal', value: '400' },
   { label: 'Medium', value: '500' },
@@ -57,8 +57,8 @@ export const TextFormatToolbar: React.FC<TextFormatToolbarProps> = ({
     setShowColorPicker(false);
   };
   
-  const handleWeight = (weight: string) => {
-    onApplyFormat({ fontWeight: weight as any });
+  const handleWeight = (weight: TextSpan['fontWeight']) => {
+    onApplyFormat({ fontWeight: weight });
   };
   
   // Position adjustments to keep toolbar in viewport

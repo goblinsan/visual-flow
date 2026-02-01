@@ -2,6 +2,7 @@
  * Persistence helpers (Phase 0): encapsulate localStorage key usage for rectangle defaults & recent colors.
  * Intentionally mirrors current CanvasApp behavior without altering semantics.
  */
+import type { LayoutSpec } from '../layout-schema';
 
 export const LS_KEYS = {
   rectDefaults: 'vf_rect_defaults',
@@ -14,7 +15,7 @@ export const LS_KEYS = {
 
 export interface SavedDesign {
   name: string;
-  spec: any;
+  spec: LayoutSpec;
   savedAt: number;
 }
 
@@ -57,7 +58,7 @@ export function saveRecentColors(colors: string[]): void {
 // --- Design Spec Persistence (Phase 3 extraction) ---
 // We persist the entire LayoutSpec root object with versioning & migration support.
 
-export function loadDesignSpec<T = any>(): T | null {
+export function loadDesignSpec<T = LayoutSpec>(): T | null {
   try {
     const raw = localStorage.getItem(LS_KEYS.designSpec);
     if (!raw) return null;
@@ -70,7 +71,7 @@ export function loadDesignSpec<T = any>(): T | null {
   return null;
 }
 
-export function saveDesignSpec<T = any>(spec: T): void {
+export function saveDesignSpec<T = LayoutSpec>(spec: T): void {
   try {
     localStorage.setItem(LS_KEYS.designSpec, JSON.stringify(spec));
   } catch (err) {
@@ -99,7 +100,7 @@ export function getSavedDesigns(): SavedDesign[] {
 }
 
 /** Save a design with a name (creates new or updates existing) */
-export function saveNamedDesign(name: string, spec: any): void {
+export function saveNamedDesign(name: string, spec: LayoutSpec): void {
   try {
     const designs = getSavedDesigns();
     const existingIndex = designs.findIndex(d => d.name === name);

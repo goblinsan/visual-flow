@@ -1,10 +1,10 @@
 import type { Command, CommandContext } from './types';
 import { findNode, mapNode } from './types';
-import type { LayoutSpec } from '../layout-schema';
+import type { LayoutNode, LayoutSpec } from '../layout-schema';
 
 export interface UpdateNodePropsPayload {
   id: string;
-  props: Record<string, any>; // TODO: tighten typing with node shape discriminants
+  props: Record<string, unknown>;
 }
 
 /**
@@ -12,50 +12,56 @@ export interface UpdateNodePropsPayload {
  * Captures previous values for inversion.
  */
 export function createUpdateNodePropsCommand(payload: UpdateNodePropsPayload): Command {
+  let cachedInverse: Command | null = null;
+
   return {
     id: 'update-node-props',
     description: `Update props of node ${payload.id}`,
     apply(ctx: CommandContext): LayoutSpec {
       const beforeNode = findNode(ctx.spec.root, payload.id);
       if (!beforeNode) return ctx.spec; // no-op if missing
-      const prevValues: Record<string, any> = {};
-      const addedKeys: string[] = [];
-      for (const k of Object.keys(payload.props)) {
-        if (k in beforeNode) {
-          prevValues[k] = (beforeNode as any)[k];
+      const prevValues = new Map<string, unknown>();
+      const addedKeys = new Set<string>();
+      for (const key of Object.keys(payload.props)) {
+        if (key in beforeNode) {
+          prevValues.set(key, (beforeNode as Record<string, unknown>)[key]);
         } else {
-          addedKeys.push(k); // track keys to delete on invert
+          addedKeys.add(key); // track keys to delete on invert
         }
       }
-      const next = {
-        ...ctx.spec,
-        root: mapNode(ctx.spec.root, payload.id, (n: any) => ({ ...n, ...payload.props }))
-      };
-      // Attach invert closure via dynamic property capture
+      const nextRoot = mapNode(ctx.spec.root, payload.id, (node) => applyProps(node, payload.props));
+      if (nextRoot === ctx.spec.root) return ctx.spec;
+      const next = { ...ctx.spec, root: nextRoot };
       const inverse: Command = {
         id: 'update-node-props',
         description: `Revert props of node ${payload.id}`,
         apply(innerCtx: CommandContext): LayoutSpec {
           return {
             ...innerCtx.spec,
-            root: mapNode(innerCtx.spec.root, payload.id, (n: any) => {
-              const restored = { ...n, ...prevValues };
-              // Remove keys that were added (did not exist previously)
-              for (const k of addedKeys) {
-                delete (restored as any)[k];
-              }
-              return restored;
-            })
+            root: mapNode(innerCtx.spec.root, payload.id, (node) => restoreNode(node, prevValues, addedKeys)),
           };
-        }
+        },
       };
-      // Provide invert implementation
-      (this as any)._inverse = inverse; // ephemeral attach
+      cachedInverse = inverse;
       return next;
     },
-  invert(): Command | null {
-      // Prefer the captured inverse if present
-      return (this as any)._inverse || null;
-    }
+    invert() {
+      return cachedInverse;
+    },
   };
+}
+
+function applyProps(node: LayoutNode, props: Record<string, unknown>): LayoutNode {
+  return { ...node, ...props } as LayoutNode;
+}
+
+function restoreNode(node: LayoutNode, prevValues: Map<string, unknown>, addedKeys: Set<string>): LayoutNode {
+  const restored = { ...node } as Record<string, unknown>;
+  for (const [key, value] of prevValues) {
+    restored[key] = value;
+  }
+  for (const key of addedKeys) {
+    delete restored[key];
+  }
+  return restored as LayoutNode;
 }

@@ -14,18 +14,23 @@ export interface MigrationResult {
  * Migrate a LayoutSpec to the current version.
  * Handles legacy specs without version field.
  */
-export function migrateSpec(spec: any): MigrationResult {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object');
+}
+
+export function migrateSpec(spec: unknown): MigrationResult {
   try {
     // Validate basic structure
-    if (!spec || typeof spec !== 'object') {
+    if (!isRecord(spec)) {
       return { success: false, error: 'Invalid spec: not an object' };
     }
 
-    if (!spec.root || typeof spec.root !== 'object') {
+    if (!isRecord(spec.root)) {
       return { success: false, error: 'Invalid spec: missing or invalid root' };
     }
 
-    const currentVersion = spec.version;
+    const versionValue = spec.version;
+    const currentVersion = typeof versionValue === 'string' ? versionValue : undefined;
 
     // Legacy spec without version field
     if (!currentVersion) {
@@ -49,7 +54,7 @@ export function migrateSpec(spec: any): MigrationResult {
 /**
  * Migrate legacy spec (no version field) to v1.0.0
  */
-function migrateLegacyToV1(spec: any): MigrationResult {
+function migrateLegacyToV1(spec: Record<string, unknown>): MigrationResult {
   try {
     // Legacy specs are assumed to be compatible with v1.0.0
     // Just add the version field
@@ -67,10 +72,10 @@ function migrateLegacyToV1(spec: any): MigrationResult {
 /**
  * Validate that a spec has valid basic structure
  */
-export function isValidSpecStructure(spec: any): boolean {
-  if (!spec || typeof spec !== 'object') return false;
-  if (!spec.root || typeof spec.root !== 'object') return false;
-  if (!spec.root.id || typeof spec.root.id !== 'string') return false;
-  if (!spec.root.type || typeof spec.root.type !== 'string') return false;
+export function isValidSpecStructure(spec: unknown): boolean {
+  if (!isRecord(spec)) return false;
+  if (!isRecord(spec.root)) return false;
+  if (typeof spec.root.id !== 'string') return false;
+  if (typeof spec.root.type !== 'string') return false;
   return true;
 }

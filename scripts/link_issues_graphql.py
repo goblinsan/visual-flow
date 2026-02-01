@@ -5,7 +5,7 @@ Link child issues to parent epics using GraphQL addSubIssue mutation.
 import subprocess
 import json
 
-REPO = "goblinsan/visual-flow"
+REPO = "goblinsan/vizail"
 
 # Map: parent epic → child issues
 phase_map = {
@@ -21,7 +21,7 @@ def get_issue_id(issue_num):
     """Get the global ID for an issue number"""
     query = f"""
     query {{
-      repository(owner: "goblinsan", name: "visual-flow") {{
+    repository(owner: "goblinsan", name: "vizail") {{
         issue(number: {issue_num}) {{
           id
         }}

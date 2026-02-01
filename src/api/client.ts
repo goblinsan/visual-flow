@@ -1,5 +1,5 @@
 /**
- * API Client for Visual Flow Cloud Backend
+ * API Client for Vizail Cloud Backend
  * Phase 1: Cloud Persistence & Sharing
  */
 

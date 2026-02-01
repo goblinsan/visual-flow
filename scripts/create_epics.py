@@ -2,7 +2,7 @@
 import subprocess
 import json
 
-REPO = "goblinsan/visual-flow"
+REPO = "goblinsan/vizail"
 
 def create_epic(title, body, *labels):
     result = subprocess.run(

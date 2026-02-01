@@ -111,7 +111,7 @@ export function useCloudPersistence(
       try {
         if (currentCanvasId) {
           // Update existing canvas
-          const { data, error } = await apiClient.updateCanvas(currentCanvasId, {
+          const { error } = await apiClient.updateCanvas(currentCanvasId, {
             spec: nextSpec,
           });
 

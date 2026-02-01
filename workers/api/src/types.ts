@@ -1,5 +1,7 @@
+import type { LayoutSpec } from '../../src/layout-schema';
+
 /**
- * Type definitions for Visual Flow API Worker
+ * Type definitions for Vizail API Worker
  */
 
 export interface Env {
@@ -19,7 +21,7 @@ export interface Canvas {
   id: string;
   owner_id: string;
   name: string;
-  spec: any; // LayoutSpec
+  spec: LayoutSpec;
   created_at: number;
   updated_at: number;
 }

@@ -1,5 +1,5 @@
 /**
- * Visual Flow API Worker
+ * Vizail API Worker
  * Phase 1: Cloud Persistence & Sharing
  */
 
@@ -18,6 +18,10 @@ import {
   addMember,
   removeMember,
 } from './routes/memberships';
+
+const CANVAS_ID_ROUTE = new RegExp('^/api/canvases/([^/]+)$');
+const CANVAS_MEMBERS_ROUTE = new RegExp('^/api/canvases/([^/]+)/members$');
+const CANVAS_MEMBER_ROUTE = new RegExp('^/api/canvases/([^/]+)/members/([^/]+)$');
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -54,7 +58,7 @@ export default {
         return await createCanvas(user, env, request);
       }
 
-      const canvasMatch = path.match(/^\/api\/canvases\/([^\/]+)$/);
+      const canvasMatch = path.match(CANVAS_ID_ROUTE);
       if (canvasMatch) {
         const canvasId = canvasMatch[1];
         
@@ -72,7 +76,7 @@ export default {
       }
 
       // Membership routes
-      const membersMatch = path.match(/^\/api\/canvases\/([^\/]+)\/members$/);
+      const membersMatch = path.match(CANVAS_MEMBERS_ROUTE);
       if (membersMatch) {
         const canvasId = membersMatch[1];
         
@@ -85,7 +89,7 @@ export default {
         }
       }
 
-      const memberMatch = path.match(/^\/api\/canvases\/([^\/]+)\/members\/([^\/]+)$/);
+      const memberMatch = path.match(CANVAS_MEMBER_ROUTE);
       if (memberMatch) {
         const [, canvasId, userId] = memberMatch;
         

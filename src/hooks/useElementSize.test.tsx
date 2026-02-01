@@ -4,26 +4,32 @@ import React from 'react';
 import { useElementSize } from './useElementSize';
 
 // Mock ResizeObserver
-class MockRO {
+class MockRO implements ResizeObserver {
   callback: ResizeObserverCallback;
-  elements: Set<Element> = new Set();
+  elements = new Set<Element>();
   constructor(cb: ResizeObserverCallback) { this.callback = cb; }
   observe(el: Element) { this.elements.add(el); }
   unobserve(el: Element) { this.elements.delete(el); }
   disconnect() { this.elements.clear(); }
   trigger(width: number, height: number) {
-    const entries: ResizeObserverEntry[] = Array.from(this.elements).map(el => ({
-      target: el as Element,
-      contentRect: { width, height, x:0, y:0, top:0, left:0, bottom:height, right:width, toJSON(){} }
-    } as any));
-    this.callback(entries, this as any);
+    const entries: ResizeObserverEntry[] = Array.from(this.elements).map((el) => ({
+      target: el,
+      contentRect: new DOMRectReadOnly(0, 0, width, height),
+    }));
+    this.callback(entries, this as ResizeObserver);
   }
 }
 
 declare global { var __mockRO__: MockRO | undefined; }
 
 beforeEach(() => {
-  (global as any).ResizeObserver = class extends MockRO { constructor(cb: ResizeObserverCallback) { super(cb); globalThis.__mockRO__ = this; } } as any;
+  class TestRO extends MockRO {
+    constructor(cb: ResizeObserverCallback) {
+      super(cb);
+      globalThis.__mockRO__ = this;
+    }
+  }
+  globalThis.ResizeObserver = TestRO as unknown as typeof ResizeObserver;
 });
 
 function TestComponent() {

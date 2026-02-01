@@ -1,4 +1,4 @@
-name: visual-flow-ci
+name: vizail-ci
 on:
   pull_request:
   push:

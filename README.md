@@ -1,4 +1,4 @@
-# Visual Flow (Interactive Canvas Editor)
+# Vizail (Interactive Canvas Editor)
 
 An experimental visual canvas editor built with **React**, **TypeScript**, **Vite**, and **Konva**. It focuses on incremental, test‑driven refactors toward a clean interaction model and future undo/redo support.
 

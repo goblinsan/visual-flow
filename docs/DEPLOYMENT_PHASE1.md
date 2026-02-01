@@ -16,13 +16,13 @@ cd workers/api
 npm install
 
 # Create D1 database
-wrangler d1 create visual-flow-db
+wrangler d1 create vizail-db
 
 # Note the database_id from output and update wrangler.toml
 # Replace "placeholder-id" with the actual database_id
 
 # Run migrations
-wrangler d1 execute visual-flow-db --file=schema.sql
+wrangler d1 execute vizail-db --file=schema.sql
 ```
 
 ## Step 2: Deploy Worker API
@@ -34,7 +34,7 @@ wrangler d1 execute visual-flow-db --file=schema.sql
 npm run deploy:staging
 
 # Test the deployment
-curl https://visual-flow-api.<your-subdomain>.workers.dev/health
+curl https://vizail-api.<your-subdomain>.workers.dev/health
 
 # Deploy to production
 npm run deploy:production
@@ -47,7 +47,7 @@ npm run deploy:production
 3. Click "Add an application"
 4. Choose "Self-hosted"
 5. Configure:
-   - **Application name**: Visual Flow
+  - **Application name**: Vizail
    - **Session duration**: 24 hours
    - **Application domain**: your-app.pages.dev (or custom domain)
 6. Add policy:
@@ -66,7 +66,7 @@ cd ../..
 npm run build
 
 # Deploy to Cloudflare Pages (first time setup)
-npx wrangler pages deploy dist --project-name=visual-flow
+npx wrangler pages deploy dist --project-name=vizail
 
 # For subsequent deploys (automated via GitHub Actions recommended)
 git push origin main
@@ -78,7 +78,7 @@ In Cloudflare Pages dashboard:
 
 1. Go to Settings > Environment Variables
 2. Add for both Production and Preview:
-   - `API_BASE_URL`: Your Worker API URL (e.g., `https://visual-flow-api.<your-subdomain>.workers.dev/api`)
+  - `API_BASE_URL`: Your Worker API URL (e.g., `https://vizail-api.<your-subdomain>.workers.dev/api`)
 
 ## Step 6: Set Up GitHub Actions (Optional but Recommended)
 
@@ -113,7 +113,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          projectName: visual-flow
+          projectName: vizail
           directory: dist
 ```
 
@@ -143,7 +143,7 @@ jobs:
 
 - Verify D1 database is created and schema is applied
 - Check `database_id` in `wrangler.toml` matches actual database
-- Review Worker logs: `wrangler tail visual-flow-api`
+- Review Worker logs: `wrangler tail vizail-api`
 
 ### Offline mode not working
 

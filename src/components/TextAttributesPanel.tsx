@@ -2,21 +2,7 @@ import React from 'react';
 import { parseColor } from '../utils/color';
 import { GoogleFontPicker } from './GoogleFontPicker';
 import { Select } from './Select';
-import type { TextSpan } from '../layout-schema';
-
-export interface TextNode {
-  id: string;
-  type: 'text';
-  text: string;
-  variant?: 'h1' | 'h2' | 'h3' | 'body' | 'caption';
-  color?: string;
-  align?: 'left' | 'center' | 'right';
-  fontFamily?: string;
-  fontSize?: number;
-  fontWeight?: 'normal' | 'bold' | '100' | '200' | '300' | '400' | '500' | '600' | '700' | '800' | '900';
-  fontStyle?: 'normal' | 'italic';
-  opacity?: number;
-}
+import type { TextNode, TextSpan } from '../layout-schema';
 
 export interface TextAttributesPanelProps {
   textNode: TextNode;
@@ -51,18 +37,12 @@ export const TextAttributesPanel: React.FC<TextAttributesPanelProps> = ({
 }) => {
   const { text, color, fontFamily, fontSize, fontWeight, fontStyle, align, variant, opacity } = textNode;
 
-  // Helper to update node AND its spans if they exist
-  // This ensures that when the user changes a top-level attribute, it cascades to existing characters
-  // unless they have been explicitly formatted differently. For simplicity/consistency in this "fix",
-  // we will propagate the top-level property to all spans to ensure the visual update happens.
+  // Ensure span-level formatting tracks the top-level node when the user updates a shared attribute.
   const handleUpdate = (patch: Partial<TextNode>) => {
     const nextPatch: Partial<TextNode> & { spans?: TextSpan[] } = { ...patch };
-    // If the node has spans (rich text), we need to update them too to keep things in sync
-    // otherwise the spans will keep rendering with their old values
-    const textNodeWithSpans = textNode as any;
-    if (textNodeWithSpans.spans && textNodeWithSpans.spans.length > 0) {
-      const updatedSpans = textNodeWithSpans.spans.map((span: any) => {
-        const newSpan = { ...span };
+    if (textNode.spans && textNode.spans.length > 0) {
+      const updatedSpans = textNode.spans.map((span) => {
+        const newSpan: TextSpan = { ...span };
         if (patch.fontSize !== undefined) newSpan.fontSize = patch.fontSize;
         if (patch.fontFamily !== undefined) newSpan.fontFamily = patch.fontFamily;
         if (patch.fontWeight !== undefined) newSpan.fontWeight = patch.fontWeight;

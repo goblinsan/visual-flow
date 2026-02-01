@@ -1,11 +1,11 @@
-name = "visual-flow-api"
+name = "vizail-api"
 main = "src/index.ts"
 compatibility_date = "2024-01-01"
 
 # D1 Database binding
 [[d1_databases]]
 binding = "DB"
-database_name = "visual-flow-db"
+database_name = "vizail-db"
 database_id = "placeholder-id" # Will be set during deployment
 
 # Environment configuration

@@ -492,7 +492,7 @@ export function renderNode(n: LayoutNode): ReactNode {
     case "line": return renderLine(n as LineNode);
     case "curve": return renderCurve(n as CurveNode);
     default:
-      logger.warn('Unknown node type', (n as any).type, n);
+      logger.warn('Unknown node type', n.type, n);
       return null;
   }
 }

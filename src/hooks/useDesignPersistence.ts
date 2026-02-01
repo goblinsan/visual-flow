@@ -8,7 +8,7 @@ export interface UseDesignPersistenceOptions {
   /** Autosave debounce ms (default microtask via 0). */
   debounceMs?: number;
   /** Optional migration step for older saved blobs. */
-  migrate?: (raw: any) => LayoutSpec;
+  migrate?: (raw: unknown) => LayoutSpec;
 }
 
 interface UseDesignPersistenceResult {

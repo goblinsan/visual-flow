@@ -1,6 +1,31 @@
 import { describe, it, expect } from 'vitest';
 import { renderNode } from './CanvasRenderer';
+import type { ReactElement, ReactNode } from 'react';
 import type { RectNode } from '../layout-schema';
+
+type TestRectProps = {
+  fill?: string;
+  stroke?: string;
+  strokeEnabled?: boolean;
+  fillEnabled?: boolean;
+  strokeWidth?: number;
+  opacity?: number;
+  dash?: number[];
+};
+
+function unwrapRectElement(node: RectNode): ReactElement<TestRectProps> {
+  const tree = renderNode(node);
+  if (!tree || typeof tree === 'string' || typeof tree === 'number') {
+    throw new Error('Expected renderNode to return an element tree');
+  }
+  const groupElement = tree as ReactElement<{ children: ReactNode }>;
+  const children = groupElement.props.children;
+  const child = Array.isArray(children) ? children[0] : children;
+  if (!child || typeof child === 'string' || typeof child === 'number') {
+    throw new Error('Rect child missing');
+  }
+  return child as ReactElement<TestRectProps>;
+}
 
 // Helper: mount a single rect via a faux frame root if needed (direct renderNode returns Group wrapper)
 
@@ -17,19 +42,15 @@ describe('CanvasRenderer rect fill/stroke disabling', () => {
 
   it('renders with fill and stroke when provided (props intact)', () => {
     const node = mkRect({ fill: '#123456', stroke: '#654321', strokeWidth: 2 });
-    const tree = renderNode(node) as any;
-    const child = Array.isArray(tree.props.children) ? tree.props.children[0] : tree.props.children;
-    expect(child.props.fill).toBe('#123456');
-    expect(child.props.stroke).toBe('#654321');
-    expect(child.props.strokeEnabled).toBe(true);
+    const rectEl = unwrapRectElement(node);
+    expect(rectEl.props.fill).toBe('#123456');
+    expect(rectEl.props.stroke).toBe('#654321');
+    expect(rectEl.props.strokeEnabled).toBe(true);
   });
 
   it('disables fill when fill undefined', () => {
     const node = mkRect({ fill: undefined, stroke: '#222', strokeWidth: 1 });
-    const tree = renderNode(node) as any;
-    // Dive into props: Group -> Rect child is at tree.props.children.props.children (Group>Rect)
-    const groupChildren = tree.props.children;
-    const rectEl = Array.isArray(groupChildren) ? groupChildren[0] : groupChildren;
+    const rectEl = unwrapRectElement(node);
     expect(rectEl.props.fillEnabled).toBe(false);
     expect(rectEl.props.fill).toBeUndefined();
     expect(rectEl.props.stroke).toBe('#222');
@@ -37,9 +58,7 @@ describe('CanvasRenderer rect fill/stroke disabling', () => {
 
   it('disables stroke when stroke undefined', () => {
     const node = mkRect({ fill: '#333', stroke: undefined });
-    const tree = renderNode(node) as any;
-    const groupChildren = tree.props.children;
-    const rectEl = Array.isArray(groupChildren) ? groupChildren[0] : groupChildren;
+    const rectEl = unwrapRectElement(node);
     expect(rectEl.props.strokeEnabled).toBe(false);
     expect(rectEl.props.strokeWidth).toBe(0);
     expect(rectEl.props.fill).toBe('#333');
@@ -47,9 +66,7 @@ describe('CanvasRenderer rect fill/stroke disabling', () => {
 
   it('draws faint outline when both disabled', () => {
     const node = mkRect({ fill: undefined, stroke: undefined });
-    const tree = renderNode(node) as any;
-    const groupChildren = tree.props.children;
-    const rectEl = Array.isArray(groupChildren) ? groupChildren[0] : groupChildren;
+    const rectEl = unwrapRectElement(node);
     expect(rectEl.props.fillEnabled).toBe(false);
     // Fallback outline should be enabled with low opacity and dashed
     expect(rectEl.props.strokeEnabled).toBe(true);

@@ -1,6 +1,27 @@
 import React, { useRef, useEffect, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
 import type { TextSpan } from '../layout-schema';
 
+const FONT_WEIGHT_VALUES: TextSpan['fontWeight'][] = [
+  'normal', 'bold', '100', '200', '300', '400', '500', '600', '700', '800', '900',
+];
+
+const normalizeFontWeight = (value?: string): TextSpan['fontWeight'] | undefined => {
+  if (!value) return undefined;
+  const cleaned = value.trim().toLowerCase();
+  if (cleaned === 'bold' || cleaned === 'bolder') return 'bold';
+  if (cleaned === 'normal' || cleaned === 'lighter') return 'normal';
+  if (FONT_WEIGHT_VALUES.includes(cleaned as TextSpan['fontWeight'])) return cleaned as TextSpan['fontWeight'];
+  return undefined;
+};
+
+const normalizeFontStyle = (value?: string): TextSpan['fontStyle'] | undefined => {
+  if (!value) return undefined;
+  const cleaned = value.trim().toLowerCase();
+  if (cleaned === 'italic' || cleaned === 'oblique') return 'italic';
+  if (cleaned === 'normal') return 'normal';
+  return undefined;
+};
+
 export interface RichTextEditorProps {
   /** Plain text value (used if spans is empty or not provided) */
   value: string;
@@ -94,8 +115,8 @@ function htmlToSpans(html: string, baseStyles: RichTextEditorProps['baseStyles']
         
         const span: TextSpan = { text };
         if (inheritedStyle.color && inheritedStyle.color !== baseStyles.color) span.color = inheritedStyle.color;
-        if (inheritedStyle.fontWeight && inheritedStyle.fontWeight !== baseStyles.fontWeight) span.fontWeight = inheritedStyle.fontWeight as any;
-        if (inheritedStyle.fontStyle && inheritedStyle.fontStyle !== baseStyles.fontStyle) span.fontStyle = inheritedStyle.fontStyle as any;
+        if (inheritedStyle.fontWeight && inheritedStyle.fontWeight !== baseStyles.fontWeight) span.fontWeight = inheritedStyle.fontWeight;
+        if (inheritedStyle.fontStyle && inheritedStyle.fontStyle !== baseStyles.fontStyle) span.fontStyle = inheritedStyle.fontStyle;
         if (inheritedStyle.fontFamily && inheritedStyle.fontFamily !== baseStyles.fontFamily) span.fontFamily = inheritedStyle.fontFamily;
         if (inheritedStyle.fontSize && inheritedStyle.fontSize !== baseStyles.fontSize) span.fontSize = inheritedStyle.fontSize;
         
@@ -126,13 +147,10 @@ function htmlToSpans(html: string, baseStyles: RichTextEditorProps['baseStyles']
       
       // Extract inline styles
       if (style.color) newStyle.color = style.color;
-      if (style.fontWeight) {
-        const w = style.fontWeight;
-        if (w === 'bold' || w === '700') newStyle.fontWeight = 'bold';
-        else if (w === 'normal' || w === '400') newStyle.fontWeight = 'normal';
-        else newStyle.fontWeight = w as any;
-      }
-      if (style.fontStyle) newStyle.fontStyle = style.fontStyle as any;
+      const normalizedWeight = normalizeFontWeight(style.fontWeight);
+      if (normalizedWeight) newStyle.fontWeight = normalizedWeight;
+      const normalizedStyle = normalizeFontStyle(style.fontStyle);
+      if (normalizedStyle) newStyle.fontStyle = normalizedStyle;
       if (style.fontFamily) newStyle.fontFamily = style.fontFamily.replace(/['"]/g, '');
       if (style.fontSize) newStyle.fontSize = parseFloat(style.fontSize);
       
@@ -202,7 +220,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
         sel?.addRange(range);
       }, 0);
     }
-  }, []); // Only on mount
+  }, [autoFocus, baseStyles, spans, value]);
   
   const handleInput = useCallback(() => {
     if (!editorRef.current || isComposing) return;

@@ -56,7 +56,7 @@ export function VisualFlowEditor({ initial }: EditorProps) {
   const [helpOpen, setHelpOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [cheatOpen, setCheatOpen] = useState(false);
-  const appVersion = (import.meta as any).env?.VITE_APP_VERSION || '0.0.0';
+  const appVersion = import.meta.env?.VITE_APP_VERSION || '0.0.0';
 
   const onSelectNode = (path: string, node: NodeSpec) => setSelected({ path, node });
 
@@ -355,10 +355,10 @@ export function VisualFlowEditor({ initial }: EditorProps) {
         </div>
         {/* Modals */}
         <Modal open={aboutOpen} onClose={() => setAboutOpen(false)} title="About Vizail" size="sm">
-          <p><strong>visual-flow</strong> version <code>{appVersion}</code></p>
+          <p><strong>Vizail</strong> version <code>{appVersion}</code></p>
           <p className="mt-2">A lightweight experimental visual layout & canvas transform playground built with React, Konva & Tailwind.</p>
           <p className="mt-2">Transforms use a bake & reset pattern: live manipulations are applied via Konva, then persisted to a schema on release.</p>
-          <p className="mt-4 opacity-70">© {new Date().getFullYear()} visual-flow (experimental)</p>
+          <p className="mt-4 opacity-70">© {new Date().getFullYear()} Vizail (experimental)</p>
         </Modal>
         <Modal open={cheatOpen} onClose={() => setCheatOpen(false)} title="Interaction Cheatsheet" size="md">
           <ul className="space-y-2 list-disc pl-4">

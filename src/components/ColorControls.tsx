@@ -16,7 +16,7 @@ export interface ColorControlsProps {
   lastStrokeById: Record<string,string>;
   setLastFillById: React.Dispatch<React.SetStateAction<Record<string,string>>>;
   setLastStrokeById: React.Dispatch<React.SetStateAction<Record<string,string>>>;
-  updateRect: (patch: Record<string, any>) => void;
+  updateRect: (patch: Record<string, unknown>) => void;
   beginRecentSession: (current?: string) => void;
   previewRecent: (value: string) => void;
   commitRecent: (value?: string) => void;

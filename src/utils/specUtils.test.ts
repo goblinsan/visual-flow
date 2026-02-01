@@ -37,8 +37,11 @@ describe('specUtils.updateNode', () => {
     const bOld = tree.children![1];
     const bNew = updated.children![1];
     expect(bNew).not.toBe(bOld); // group changed due to child change
-    const b1Old = (bOld as any).children[0];
-    const b1New = (bNew as any).children[0];
+    if (!bOld.children || !bNew.children) {
+      throw new Error('Group children missing in fixture');
+    }
+    const b1Old = bOld.children[0];
+    const b1New = bNew.children[0];
     expect(b1New).toBe(b1Old); // untouched child reference stable
   });
   it('returns same root reference when id not found', () => {

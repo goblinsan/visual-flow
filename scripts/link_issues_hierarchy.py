@@ -18,11 +18,11 @@ phase_map = {
 print("Linking child issues to parent epics via PATCH...\n")
 for epic_num, child_issues in phase_map.items():
     print(f"Linking to epic #{epic_num}...")
-    parent_url = f"https://api.github.com/repos/goblinsan/visual-flow/issues/{epic_num}"
+    parent_url = f"https://api.github.com/repos/goblinsan/vizail/issues/{epic_num}"
     for child_num in child_issues:
         result = subprocess.run(
             ["gh", "api",
-             f"/repos/goblinsan/visual-flow/issues/{child_num}",
+             f"/repos/goblinsan/vizail/issues/{child_num}",
              "--method", "PATCH",
              "-f", f"parent_issue_url={parent_url}"],
             capture_output=True,

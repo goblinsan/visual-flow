@@ -1,5 +1,6 @@
+import type { LayoutNode } from '../layout-schema';
 import type { Command, CommandContext } from './types';
-import { cloneSpec, findNode } from './types';
+import { cloneSpec, findNode, nodeHasChildren } from './types';
 
 export interface DuplicateNodesPayload { ids: string[]; }
 
@@ -15,13 +16,18 @@ function generateId(base: string, attempt: number, existing: Set<string>): strin
 }
 
 export function createDuplicateNodesCommand(payload: DuplicateNodesPayload): Command {
+  let cachedInverse: Command | null = null;
+
   return {
     id: 'duplicate-nodes',
     description: `Duplicate nodes ${payload.ids.join(',')}`,
     apply(ctx: CommandContext) {
       const root = ctx.spec.root;
       const allIds = new Set<string>();
-      (function collect(n: any) { allIds.add(n.id); if (Array.isArray(n.children)) n.children.forEach(collect); })(root);
+      (function collect(node: LayoutNode) {
+        allIds.add(node.id);
+        if (nodeHasChildren(node)) node.children.forEach(collect);
+      })(root);
       const createdIds: string[] = [];
 
       let nextRoot = root;
@@ -35,21 +41,17 @@ export function createDuplicateNodesCommand(payload: DuplicateNodesPayload): Com
         allIds.add(clone.id);
         createdIds.push(clone.id);
         // insert sibling after original (same parent index+1)
-        function insert(node: any): any {
-          if (!node.children) return node;
-          const idx = node.children.findIndex((c: any) => c.id === id);
+        function insert(node: LayoutNode): LayoutNode {
+          if (!nodeHasChildren(node)) return node;
+          const idx = node.children.findIndex(child => child.id === id);
           if (idx >= 0) {
             const newChildren = node.children.slice();
             newChildren.splice(idx + 1, 0, clone);
-            return { ...node, children: newChildren };
+            return { ...node, children: newChildren } as LayoutNode;
           }
-          let changed = false;
-            const children = node.children.map((c: any) => {
-              const v = insert(c);
-              if (v !== c) changed = true;
-              return v;
-            });
-            return changed ? { ...node, children } : node;
+          const mapped = node.children.map(child => insert(child));
+          const changed = mapped.some((child, index) => child !== node.children[index]);
+          return changed ? ({ ...node, children: mapped } as LayoutNode) : node;
         }
         nextRoot = insert(nextRoot);
       });
@@ -60,18 +62,19 @@ export function createDuplicateNodesCommand(payload: DuplicateNodesPayload): Com
         id: 'duplicate-nodes',
         description: `Remove duplicated nodes ${createdIds.join(',')}`,
         apply(innerCtx) {
-          function remove(root: any): any {
-            if (!root.children) return root;
-            const filtered = root.children.filter((c: any) => !createdIds.includes(c.id)).map(remove);
-            if (filtered.length === root.children.length) return { ...root, children: filtered.map(remove) }; // only descend
-            return { ...root, children: filtered };
+          function remove(node: LayoutNode): LayoutNode {
+            if (!nodeHasChildren(node)) return node;
+            const filtered = node.children
+              .filter(child => !createdIds.includes(child.id))
+              .map(remove);
+            return { ...node, children: filtered } as LayoutNode;
           }
           return { ...innerCtx.spec, root: remove(innerCtx.spec.root) };
         }
       };
-      (this as any)._inverse = inverse;
+      cachedInverse = inverse;
       return { ...ctx.spec, root: nextRoot };
     },
-    invert() { return (this as any)._inverse || null; }
+    invert() { return cachedInverse; }
   };
 }

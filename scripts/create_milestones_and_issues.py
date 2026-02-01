@@ -8,7 +8,7 @@ import subprocess
 from typing import Optional
 
 REPO_OWNER = "goblinsan"
-REPO_NAME = "visual-flow"
+REPO_NAME = "vizail"
 
 # Phase data extracted from COLLABORATION_ROADMAP.md
 PHASES = {

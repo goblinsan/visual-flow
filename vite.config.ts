@@ -12,7 +12,6 @@ try {
   const pkg = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf-8'))
   if (typeof pkg.version === 'string') pkgVersion = pkg.version
 } catch (e) {
-  // eslint-disable-next-line no-console
   console.warn('[vite config] failed to read package.json version:', e)
 }
 

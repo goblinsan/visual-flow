@@ -2,48 +2,69 @@ import { describe, it, expect } from 'vitest';
 import { createUpdateNodePropsCommand } from './updateNodeProps';
 import type { CommandContext } from './types';
 import { cloneSpec } from './types';
+import type { FrameNode, LayoutSpec, RectNode } from '../layout-schema';
 
-const baseSpec = {
-  root: {
-    id: 'root',
-    type: 'root',
-    children: [
-      { id: 'a', type: 'rect', position: { x: 10, y: 20 }, size: { width: 100, height: 80 }, fill: '#ffffff' },
-      { id: 'b', type: 'rect', position: { x: 50, y: 60 }, size: { width: 120, height: 90 }, stroke: '#000000' }
-    ]
-  }
-} as any;
+function makeRect(id: string, x: number, fill?: string, stroke?: string): RectNode {
+  return {
+    id,
+    type: 'rect',
+    position: { x, y: 0 },
+    size: { width: 100, height: 80 },
+    ...(fill ? { fill } : {}),
+    ...(stroke ? { stroke } : {}),
+  };
+}
 
-function makeCtx(spec = baseSpec): CommandContext {
+function makeSpec(): LayoutSpec {
+  return {
+    root: {
+      id: 'root',
+      type: 'frame',
+      size: { width: 400, height: 300 },
+      children: [
+        makeRect('a', 10, '#ffffff'),
+        makeRect('b', 50, undefined, '#000000'),
+      ],
+    },
+  };
+}
+
+function ctx(spec: LayoutSpec): CommandContext {
   return { spec, selection: [] };
+}
+
+function findRect(root: FrameNode, id: string): RectNode | undefined {
+  return root.children.find((child): child is RectNode => child.type === 'rect' && child.id === id);
 }
 
 describe('UpdateNodePropsCommand', () => {
   it('applies shallow prop updates and produces an invertible command', () => {
-    const specClone = cloneSpec(baseSpec);
+    const spec = makeSpec();
+    const before = cloneSpec(spec);
     const cmd = createUpdateNodePropsCommand({ id: 'a', props: { fill: '#ff0000', opacity: 0.5 } });
-    const before = specClone;
-    const after = cmd.apply(makeCtx(specClone));
-  const nodeA = after.root.children.find((c: any) => c.id === 'a') as any;
-  expect(nodeA).toBeTruthy();
-  expect(nodeA.fill).toBe('#ff0000');
-  expect(nodeA.opacity).toBe(0.5);
+    const after = cmd.apply(ctx(spec));
 
-  const inverse = cmd.invert!(before, after);
-    expect(inverse).toBeTruthy();
+    const nodeA = findRect(after.root, 'a');
+    expect(nodeA).toBeDefined();
+    expect(nodeA?.fill).toBe('#ff0000');
+    expect(nodeA?.opacity).toBe(0.5);
+
+    const inverse = cmd.invert!(before, after);
+    expect(inverse).toBeDefined();
     if (!inverse) return;
     const reverted = inverse.apply({ spec: after, selection: [] });
-  const revertedNodeA = reverted.root.children.find((c: any) => c.id === 'a') as any;
-  expect(revertedNodeA).toBeTruthy();
-  // original had fill #ffffff and no opacity key
-  expect(revertedNodeA.fill).toBe('#ffffff');
-  expect('opacity' in revertedNodeA).toBe(false);
+    const revertedNode = findRect(reverted.root, 'a');
+    expect(revertedNode).toBeDefined();
+    expect(revertedNode?.fill).toBe('#ffffff');
+    expect('opacity' in revertedNode!).toBe(false);
   });
 
   it('no-ops gracefully when node id missing', () => {
-    const specClone = cloneSpec(baseSpec);
+    const spec = makeSpec();
+    const before = cloneSpec(spec);
     const cmd = createUpdateNodePropsCommand({ id: 'missing', props: { foo: 1 } });
-    const after = cmd.apply(makeCtx(specClone));
-    expect(after).toEqual(specClone);
+    const after = cmd.apply(ctx(spec));
+    expect(after).toEqual(spec);
+    expect(cmd.invert!(before, after)).toBeNull();
   });
 });

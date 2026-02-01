@@ -1,4 +1,4 @@
-# Visual Flow Roadmap (Post refactor-baseline-v1)
+# Vizail Roadmap (Post refactor-baseline-v1)
 
 Baseline Tag: `refactor-baseline-v1`
 Date: 2025-09-19

@@ -126,7 +126,7 @@ export default function EditorApp() {
         {/* Toolbar */}
         <div className="flex items-center justify-between px-4 py-2 border-b border-slate-800/70 bg-slate-950/40 sticky top-0 z-10">
           <div className="flex items-center gap-3">
-            <div className="text-sm opacity-80">visual-flow editor</div>
+            <div className="text-sm opacity-80">Vizail editor</div>
             <div className="text-xs opacity-60">{active ? active.name : "No file selected"}</div>
           </div>
           <div className="flex items-center gap-2">
