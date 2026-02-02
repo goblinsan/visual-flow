@@ -142,15 +142,13 @@ export function useRealtimeCanvas(
       });
 
       // Listen for document updates
-      const updateHandler = (update: Uint8Array, origin: any) => {
-        // Only update local spec if change came from remote
-        if (origin !== 'local') {
-          try {
-            const newSpec = yjsToLayoutSpec(ydoc);
-            setSpecState(newSpec);
-          } catch (error) {
-            console.error('Error converting Yjs to spec:', error);
-          }
+      const updateHandler = () => {
+        // Update local spec from Yjs document
+        try {
+          const newSpec = yjsToLayoutSpec(ydoc);
+          setSpecState(newSpec);
+        } catch (error) {
+          console.error('Error converting Yjs to spec:', error);
         }
       };
 
