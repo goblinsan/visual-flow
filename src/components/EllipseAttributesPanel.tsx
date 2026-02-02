@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { parseColor } from '../utils/color';
 import { toggleColor, swapColors } from '../utils/colorEditing';
 import { parseDashPattern } from '../utils/dashPattern';
-import { GradientPicker, gradientToCSS, type GradientFill } from './GradientPicker';
+import { GradientPicker } from './GradientPicker';
+import { gradientToCSS, type GradientFill } from './gradientUtils';
 
 export interface EllipseNode {
   id: string;

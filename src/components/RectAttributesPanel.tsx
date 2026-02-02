@@ -1,7 +1,7 @@
 import React from 'react';
 import ColorControls from './ColorControls';
 import { parseDashPattern } from '../utils/dashPattern';
-import type { GradientFill } from './GradientPicker';
+import type { GradientFill } from './gradientUtils';
 
 // Minimal rect node shape (avoid deep coupling / circular imports). Extend as needed.
 export interface RectNode {

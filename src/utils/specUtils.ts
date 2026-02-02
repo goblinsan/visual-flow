@@ -1,28 +1,20 @@
-/**
- * specUtils: tree traversal helpers for layout spec nodes.
+import type { FrameNode, LayoutNode } from '../layout-schema';
+import { nodeHasChildren } from '../commands/types';
+
+/** specUtils: tree traversal helpers for layout spec nodes.
  * Phase 1 extraction: no behavior change vs inline functions previously embedded in components.
  */
 
-export interface SpecNodeBase {
-  id: string;
-  type: string;
-  children?: SpecNode[];
-  // Flexible additional properties retained, but typed as unknown to avoid opaque any.
-  [key: string]: unknown;
-}
-
-export type SpecNode = SpecNodeBase; // Future: discriminate by type
-
-export interface RootLike { root: SpecNode; }
+export type SpecNode = LayoutNode;
+export interface RootLike { root: FrameNode; }
 
 /** Depth-first search for node by id. */
-export function findNode(root: SpecNode, id: string): SpecNode | null {
+export function findNode(root: LayoutNode, id: string): LayoutNode | null {
   if (root.id === id) return root;
-  if (root.children) {
-    for (const c of root.children) {
-      const found = findNode(c, id);
-      if (found) return found;
-    }
+  if (!nodeHasChildren(root)) return null;
+  for (const child of root.children) {
+    const found = findNode(child, id);
+    if (found) return found;
   }
   return null;
 }
@@ -31,25 +23,19 @@ export function findNode(root: SpecNode, id: string): SpecNode | null {
  * Immutable update: returns new root tree with patch merged into node of matching id.
  * If id not found, original root reference is returned.
  */
-export type SpecPatch = Record<string, unknown>;
+export type SpecPatch = Partial<LayoutNode>;
 
-export function updateNode(root: SpecNode, id: string, patch: SpecPatch): SpecNode {
+export function updateNode(root: FrameNode, id: string, patch: SpecPatch): FrameNode {
   let changed = false;
-  function walk(n: SpecNode): SpecNode {
-    if (n.id === id) {
+  function walk(node: LayoutNode): LayoutNode {
+    if (node.id === id) {
       changed = true;
-      return { ...n, ...patch };
+      return { ...node, ...patch } as LayoutNode;
     }
-    if (!n.children) return n;
-    let childChanged = false;
-    const newChildren = n.children.map(c => {
-      const v = walk(c);
-      if (v !== c) childChanged = true;
-      return v;
-    });
-    if (childChanged) return { ...n, children: newChildren };
-    return n;
+    if (!nodeHasChildren(node)) return node;
+    const children = node.children.map(walk);
+    return node.children === children ? node : { ...node, children };
   }
   const next = walk(root);
-  return changed ? next : root; // ensure stable reference when no change
+  return changed ? (next as FrameNode) : root;
 }

@@ -482,17 +482,17 @@ export function renderNode(n: LayoutNode): ReactNode {
   switch (n.type) {
     case "text": return renderText(n);
     case "box": return renderBox(n);
-    case "stack": return renderStack(n as StackNode);
-    case "frame": return renderFrame(n as FrameNode);
-    case "grid": return renderGrid(n as GridNode);
-    case "group": return renderGroup(n as GroupNode);
-    case "image": return renderImage(n as ImageNode);
-    case "rect": return renderRect(n as RectNode);
-    case "ellipse": return renderEllipse(n as EllipseNode);
-    case "line": return renderLine(n as LineNode);
-    case "curve": return renderCurve(n as CurveNode);
+    case "stack": return renderStack(n);
+    case "frame": return renderFrame(n);
+    case "grid": return renderGrid(n);
+    case "group": return renderGroup(n);
+    case "image": return renderImage(n);
+    case "rect": return renderRect(n);
+    case "ellipse": return renderEllipse(n);
+    case "line": return renderLine(n);
+    case "curve": return renderCurve(n);
     default:
-      logger.warn('Unknown node type', n.type, n);
+      logger.warn('Unknown node type', n);
       return null;
   }
 }

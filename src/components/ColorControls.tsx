@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { parseColor } from '../utils/color';
 import { adjustAlpha, toggleColor, swapColors } from '../utils/colorEditing';
-import { GradientPicker, gradientToCSS, type GradientFill } from './GradientPicker';
+import { GradientPicker } from './GradientPicker';
+import { gradientToCSS, type GradientFill } from './gradientUtils';
 
 export interface ColorControlsProps {
   id: string; // node id

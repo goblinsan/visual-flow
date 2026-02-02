@@ -1,4 +1,4 @@
-import type { LayoutSpec } from '../layout-schema';
+import type { LayoutSpec, FrameNode } from '../layout-schema';
 
 /** Current schema version */
 export const CURRENT_SCHEMA_VERSION = '1.0.0';
@@ -39,7 +39,7 @@ export function migrateSpec(spec: unknown): MigrationResult {
 
     // Already current version
     if (currentVersion === CURRENT_SCHEMA_VERSION) {
-      return { success: true, spec: spec as LayoutSpec };
+      return { success: true, spec: toLayoutSpec(spec) };
     }
 
     // Future: add version-specific migrations here
@@ -59,7 +59,7 @@ function migrateLegacyToV1(spec: Record<string, unknown>): MigrationResult {
     // Legacy specs are assumed to be compatible with v1.0.0
     // Just add the version field
     const migratedSpec: LayoutSpec = {
-      ...spec,
+      ...toLayoutSpec(spec),
       version: CURRENT_SCHEMA_VERSION,
     };
 
@@ -67,6 +67,15 @@ function migrateLegacyToV1(spec: Record<string, unknown>): MigrationResult {
   } catch (err) {
     return { success: false, error: `Legacy migration failed: ${err}` };
   }
+}
+
+function toLayoutSpec(record: Record<string, unknown>): LayoutSpec {
+  const flows = Array.isArray(record.flows) ? (record.flows as LayoutSpec['flows']) : undefined;
+  return {
+    version: (record.version as string | undefined) ?? undefined,
+    root: record.root as FrameNode,
+    flows,
+  };
 }
 
 /**

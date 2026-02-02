@@ -102,7 +102,7 @@ export const TextFormatToolbar: React.FC<TextFormatToolbarProps> = ({
       {/* Font Weight Dropdown */}
       <select
         value={currentFormat?.fontWeight || '400'}
-        onChange={(e) => handleWeight(e.target.value)}
+        onChange={(e) => handleWeight(e.target.value as TextSpan['fontWeight'])}
         className="h-8 px-1.5 rounded border border-gray-200 text-xs hover:border-gray-300 focus:outline-none focus:border-blue-400"
         title="Font Weight"
       >

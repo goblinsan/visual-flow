@@ -1,33 +1,38 @@
-import type { Command, CommandContext } from './types';
-import { cloneSpec, nodeHasChildren } from './types';
-import type { LayoutNode } from '../layout-schema';
+import type { Command, CommandContext, NodeWithChildren } from './types';
+import { cloneNode, nodeHasChildren } from './types';
+import type { LayoutNode, FrameNode } from '../layout-schema';
 
 export interface UngroupNodePayload { id: string; }
 
 interface UngroupSnapshot {
   groupId: string;
   parentId: string;
-  index: number;
   children: LayoutNode[];
 }
 
 function snapshotGroup(root: LayoutNode, id: string): UngroupSnapshot | null {
   if (id === root.id) return null;
-  let parent: LayoutNode | null = null;
-  let group: LayoutNode | null = null;
-  function walk(node: LayoutNode, p: LayoutNode | null) {
+  let parent: NodeWithChildren | null = null;
+  let group: NodeWithChildren | null = null;
+  function walk(node: LayoutNode, p: NodeWithChildren | null) {
     if (node.id === id) {
-      group = node;
-      parent = p;
+      if (nodeHasChildren(node)) {
+        group = node;
+        parent = p;
+      }
       return;
     }
-    if (nodeHasChildren(node)) node.children.forEach((child) => walk(child, node));
+    if (nodeHasChildren(node)) {
+      node.children.forEach((child) => walk(child, node));
+    }
   }
   walk(root, null);
-  if (!group || !parent || !nodeHasChildren(group)) return null;
-  const idx = parent.children.findIndex((child) => child.id === id);
-  if (idx < 0) return null;
-  return { groupId: id, parentId: parent.id, index: idx, children: [...group.children] };
+  if (!group || !parent) return null;
+  const parentNode = parent as NodeWithChildren;
+  const groupNode = group as NodeWithChildren;
+  const hasGroup = parentNode.children.some((child: LayoutNode) => child.id === id);
+  if (!hasGroup) return null;
+  return { groupId: id, parentId: parentNode.id, children: groupNode.children.map((child: LayoutNode) => cloneNode(child)) };
 }
 
 export function createUngroupNodeCommand(payload: UngroupNodePayload): Command {
@@ -39,38 +44,37 @@ export function createUngroupNodeCommand(payload: UngroupNodePayload): Command {
       const snap = snapshotGroup(ctx.spec.root, payload.id);
       if (!snap) return ctx.spec;
       const { parentId, children, groupId } = snap;
+      const root: FrameNode = ctx.spec.root;
 
-      function transform(node: LayoutNode): LayoutNode {
-        if (node.id === parentId && nodeHasChildren(node)) {
+      function transform(node: NodeWithChildren): NodeWithChildren {
+        if (node.id === parentId) {
           const childIdx = node.children.findIndex((child) => child.id === groupId);
           if (childIdx >= 0) {
             const before = node.children.slice(0, childIdx);
             const after = node.children.slice(childIdx + 1);
-            const injected = [...before, ...children.map((child) => cloneLayoutNode(child)), ...after];
-            return { ...node, children: injected };
+            const restored = [...before, ...children.map((child) => cloneNode(child)), ...after];
+            return { ...node, children: restored };
           }
         }
-        if (nodeHasChildren(node)) return { ...node, children: node.children.map(transform) };
-        return node;
+        return { ...node, children: node.children.map((child) => (nodeHasChildren(child) ? transform(child) : child)) };
       }
 
-      const nextRoot = transform(ctx.spec.root);
+      const nextRoot = transform(root);
       if (nextRoot === ctx.spec.root) return ctx.spec;
 
       const inverse: Command = {
         id: 'ungroup-node',
         description: `Recreate group ${groupId}`,
         apply(inner) {
-          function rewrap(node: LayoutNode): LayoutNode {
-            if (node.id === parentId && nodeHasChildren(node)) {
-              // Find start index of first child in original group sequence
-              // We'll need to pull out those exact children by id sequence
+          const currentRoot: FrameNode = inner.spec.root;
+          function rewrap(node: NodeWithChildren): NodeWithChildren {
+            if (node.id === parentId) {
               const origIds = children.map((c) => c.id);
               let start = -1;
-              for (let i=0; i<= node.children.length - origIds.length; i++) {
+              for (let i = 0; i <= node.children.length - origIds.length; i++) {
                 let match = true;
-                for (let j=0; j<origIds.length; j++) {
-                  if (node.children[i+j].id !== origIds[j]) { match = false; break; }
+                for (let j = 0; j < origIds.length; j++) {
+                  if (node.children[i + j].id !== origIds[j]) { match = false; break; }
                 }
                 if (match) { start = i; break; }
               }
@@ -85,26 +89,21 @@ export function createUngroupNodeCommand(payload: UngroupNodePayload): Command {
                     {
                       id: groupId,
                       type: 'group',
-                      children: seq.map((s) => cloneLayoutNode(s)),
+                      children: seq.map((s) => cloneNode(s)),
                     },
                     ...after
-                  ]
+                  ],
                 };
               }
             }
-            if (nodeHasChildren(node)) return { ...node, children: node.children.map(rewrap) };
-            return node;
+            return { ...node, children: node.children.map((child) => (nodeHasChildren(child) ? rewrap(child) : child)) };
           }
-          return { ...inner.spec, root: rewrap(inner.spec.root) };
+          return { ...inner.spec, root: rewrap(currentRoot) as FrameNode };
         }
       };
       cachedInverse = inverse;
-      return { ...ctx.spec, root: nextRoot };
+      return { ...ctx.spec, root: nextRoot as FrameNode };
     },
     invert() { return cachedInverse; }
   };
-}
-
-function cloneLayoutNode<T extends LayoutNode>(node: T): T {
-  return cloneSpec({ root: node }).root as T;
 }

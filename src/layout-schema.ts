@@ -22,6 +22,9 @@ export interface BaseNode {
   opacity?: number;  // 0..1
   zIndex?: number;
   screen?: { id: string; name: string };
+  position?: Pos;
+  size?: Size;
+  children?: LayoutNode[];
 }
 
 export interface Pos {

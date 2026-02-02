@@ -108,6 +108,17 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
     e.stopPropagation();
   }, []);
 
+  const handleReset = useCallback(() => {
+    setUrlInput('');
+    setPreviewSrc(null);
+    setPreviewDimensions(null);
+    setError(null);
+    setIsLoading(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }, []);
+
   const handleInsert = useCallback(() => {
     if (previewSrc && previewDimensions) {
       // Scale down large images to fit reasonably on canvas
@@ -122,17 +133,6 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
       handleReset();
     }
   }, [previewSrc, previewDimensions, onImageSelected, handleReset]);
-
-  const handleReset = useCallback(() => {
-    setUrlInput('');
-    setPreviewSrc(null);
-    setPreviewDimensions(null);
-    setError(null);
-    setIsLoading(false);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  }, []);
 
   const handleClose = useCallback(() => {
     handleReset();

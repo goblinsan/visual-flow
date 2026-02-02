@@ -20,6 +20,11 @@ wrangler d1 create vizail-db
 
 # Note the database_id from output and update wrangler.toml
 # Replace "placeholder-id" with the actual database_id
+To access your new D1 Database in your Worker, add the following snippet to your configuration file:
+[[d1_databases]]
+binding = "vizail_db"
+database_name = "vizail-db"
+database_id = "313e76a2-8864-495d-abe2-5cbc6e419847"
 
 # Run migrations
 wrangler d1 execute vizail-db --file=schema.sql

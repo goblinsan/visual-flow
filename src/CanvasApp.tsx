@@ -856,7 +856,7 @@ export default function CanvasApp() {
               const createUpdateFn = (nodeId: string) => (patch: SpecPatch) => {
                 setSpec(prev => ({
                   ...prev,
-                  root: updateNode(prev.root, nodeId, patch) as LayoutNode
+                  root: updateNode(prev.root, nodeId, patch)
                 }));
               };
 
@@ -1126,7 +1126,9 @@ export default function CanvasApp() {
                           >
                             <i className="fa-solid fa-grip-vertical text-[10px]" />
                           </span>
-                          <span className="font-medium truncate">{child.name || child.text || `Untitled ${child.type}`}</span>
+                          <span className="font-medium truncate">
+                            {child.name ?? (child.type === 'text' ? child.text : undefined) ?? `Untitled ${child.type}`}
+                          </span>
                           <span className="ml-auto text-[10px] uppercase tracking-wide text-gray-400">{child.type}</span>
                         </summary>
                         <div className="px-2 py-2 space-y-2">

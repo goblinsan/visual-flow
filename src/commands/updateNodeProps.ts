@@ -1,6 +1,6 @@
 import type { Command, CommandContext } from './types';
 import { findNode, mapNode } from './types';
-import type { LayoutNode, LayoutSpec } from '../layout-schema';
+import type { LayoutNode, LayoutSpec, FrameNode } from '../layout-schema';
 
 export interface UpdateNodePropsPayload {
   id: string;
@@ -24,22 +24,21 @@ export function createUpdateNodePropsCommand(payload: UpdateNodePropsPayload): C
       const addedKeys = new Set<string>();
       for (const key of Object.keys(payload.props)) {
         if (key in beforeNode) {
-          prevValues.set(key, (beforeNode as Record<string, unknown>)[key]);
+          prevValues.set(key, (beforeNode as LayoutNode & Record<string, unknown>)[key]);
         } else {
           addedKeys.add(key); // track keys to delete on invert
         }
       }
-      const nextRoot = mapNode(ctx.spec.root, payload.id, (node) => applyProps(node, payload.props));
-      if (nextRoot === ctx.spec.root) return ctx.spec;
+      const root: FrameNode = ctx.spec.root;
+      const nextRoot = mapNode(root, payload.id, (node) => applyProps(node, payload.props));
+      if (nextRoot === root) return ctx.spec;
       const next = { ...ctx.spec, root: nextRoot };
       const inverse: Command = {
         id: 'update-node-props',
         description: `Revert props of node ${payload.id}`,
         apply(innerCtx: CommandContext): LayoutSpec {
-          return {
-            ...innerCtx.spec,
-            root: mapNode(innerCtx.spec.root, payload.id, (node) => restoreNode(node, prevValues, addedKeys)),
-          };
+          const root2 = mapNode(innerCtx.spec.root, payload.id, (node) => restoreNode(node, prevValues, addedKeys));
+          return { ...innerCtx.spec, root: root2 };
         },
       };
       cachedInverse = inverse;
@@ -56,7 +55,7 @@ function applyProps(node: LayoutNode, props: Record<string, unknown>): LayoutNod
 }
 
 function restoreNode(node: LayoutNode, prevValues: Map<string, unknown>, addedKeys: Set<string>): LayoutNode {
-  const restored = { ...node } as Record<string, unknown>;
+  const restored = { ...node } as LayoutNode & Record<string, unknown>;
   for (const [key, value] of prevValues) {
     restored[key] = value;
   }

@@ -1,5 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { GradientFill, GradientPickerProps, gradientToCSS } from './gradientUtils';
+import { gradientToCSS } from './gradientUtils';
+import type { GradientFill, GradientPickerProps } from './gradientUtils';
+
+const PRESET_GRADIENTS: GradientFill[] = [
+  { type: 'linear', colors: ['#38bdf8', '#6366f1'], angle: 120 },
+  { type: 'linear', colors: ['#f472b6', '#fb7185'], angle: 60 },
+  { type: 'radial', colors: ['#fef08a', '#f97316'] },
+  { type: 'radial', colors: ['#a5b4fc', '#4c1d95'] },
+];
 
 export const GradientPicker: React.FC<GradientPickerProps> = ({
   gradient,

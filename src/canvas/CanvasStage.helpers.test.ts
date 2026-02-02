@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { LayoutSpec, LayoutNode, FrameNode, GroupNode } from "../layout-schema";
+import type { LayoutSpec, LayoutNode, GroupNode } from "../layout-schema";
 import { deleteNodes, duplicateNodes, nudgeNodes, normalizeRect, rectsIntersect } from "./editing";
 
 function mkSpec(): LayoutSpec {
@@ -33,7 +33,7 @@ describe("CanvasStage helpers", () => {
   it("deleteNodes removes matching ids recursively", () => {
     const spec = mkSpec();
     const next = deleteNodes(spec, new Set(["a", "c"]));
-  const kids = (next.root as FrameNode).children;
+    const kids = next.root.children;
   expect(kids.find(k => k.id === "a")).toBeUndefined();
   const group = kids.find(k => k.id === "group") as GroupNode;
   expect(group.children.find((k) => k.id === "c")).toBeUndefined();
@@ -42,10 +42,10 @@ describe("CanvasStage helpers", () => {
   it("duplicateNodes clones nodes with new ids and offset", () => {
     const spec = mkSpec();
     const next = duplicateNodes(spec, new Set(["b"]));
-  const kids = (next.root as FrameNode).children;
+    const kids = next.root.children;
   const copies = kids.filter(k => k.id.startsWith("b-copy"));
   expect(copies.length).toBe(1);
-  const origB = ((spec.root as FrameNode).children.find(k => k.id === "b") as LayoutNode & { position: { x: number; y: number } }).position;
+    const origB = (spec.root.children.find(k => k.id === "b") as LayoutNode & { position: { x: number; y: number } }).position;
   const copyPos = (copies[0] as LayoutNode & { position: { x: number; y: number } }).position;
   expect(copyPos.x).toBe(origB.x + 16);
   });
@@ -53,7 +53,7 @@ describe("CanvasStage helpers", () => {
   it("nudgeNodes adjusts positions by dx/dy", () => {
     const spec = mkSpec();
     const next = nudgeNodes(spec, new Set(["a", "c"]), 3, -2);
-  const kids = (next.root as FrameNode).children;
+    const kids = next.root.children;
   const aPos = (kids.find(k => k.id === "a") as LayoutNode & { position: { x: number; y: number } }).position;
   expect(aPos).toEqual({ x: 13, y: 8 });
   const group = kids.find(k => k.id === "group") as GroupNode;

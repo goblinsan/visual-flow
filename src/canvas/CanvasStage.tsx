@@ -2,7 +2,7 @@ import { Stage, Layer, Transformer, Rect, Group, Ellipse, Line, Circle } from "r
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { JSX } from "react";
 import type Konva from "konva";
-import type { LayoutNode, LayoutSpec, TextNode, TextSpan, Pos, EllipseNode, LineNode, CurveNode, ImageNode } from "../layout-schema.ts";
+import type { LayoutNode, LayoutSpec, TextNode, TextSpan, Pos, EllipseNode, LineNode, CurveNode, ImageNode, FrameNode, Size } from "../layout-schema.ts";
 import { renderNode, useFontLoading } from "./CanvasRenderer.tsx";
 import { computeClickSelection, computeMarqueeSelection } from "../renderer/interaction";
 import { beginDrag, updateDrag, finalizeDrag } from "../interaction/drag";
@@ -10,6 +10,7 @@ import type { DragSession } from "../interaction/types";
 import { beginMarquee, updateMarquee, finalizeMarquee, type MarqueeSession } from "../interaction/marquee";
 import { deleteNodes, duplicateNodes, nudgeNodes } from "./editing";
 import { applyPosition, applyPositionAndSize, groupNodes, ungroupNodes } from "./stage-internal";
+import { mapNode, nodeHasChildren } from "../commands/types";
 import { RichTextEditor, type RichTextEditorHandle } from "../components/RichTextEditor";
 import { TextEditToolbar } from "../components/TextEditToolbar";
 import { ImagePickerModal } from "../components/ImagePickerModal";
@@ -21,6 +22,25 @@ const DOT_RADIUS = 1.5; // Radius of each dot
 const DOT_COLOR = 'rgba(255, 255, 255, 0.5)'; // Whitish dots
 const GRID_BG_COLOR = '#e5e7eb'; // Light gray background (Tailwind gray-200)
 const CAPTURE_OPTIONS: AddEventListenerOptions = { capture: true };
+
+const updateRootChildren = (spec: LayoutSpec, updater: (children: LayoutNode[]) => LayoutNode[]): LayoutSpec => {
+  const root = spec.root;
+  return {
+    ...spec,
+    root: {
+      ...root,
+      children: updater(root.children),
+    },
+  };
+};
+
+const appendNodesToRoot = (spec: LayoutSpec, nodes: LayoutNode[]): LayoutSpec => {
+  if (!nodes.length) return spec;
+  return updateRootChildren(spec, (children) => [...children, ...nodes]);
+};
+
+const nodeHasSize = (node: LayoutNode): node is LayoutNode & { size: Size } =>
+  'size' in node && Boolean((node as { size?: Size }).size);
 
 // Props
 interface CanvasStageProps {
@@ -251,9 +271,8 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       const ids = new Set<string>();
       const walk = (node: LayoutNode) => {
         ids.add(node.id);
-        const children = (node as { children?: LayoutNode[] }).children;
-        if (Array.isArray(children)) {
-          children.forEach(walk);
+        if (nodeHasChildren(node)) {
+          node.children.forEach(walk);
         }
       };
       walk(root);
@@ -285,9 +304,8 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
           const posY = next.position?.y ?? 0;
           next.position = { x: posX + offset.x, y: posY + offset.y };
         }
-        const children = (next as { children?: LayoutNode[] }).children;
-        if (Array.isArray(children)) {
-          next.children = children.map((c) => walk(c, false));
+        if (nodeHasChildren(next)) {
+          next.children = next.children.map((c) => walk(c, false));
         }
         return next;
       };
@@ -296,9 +314,8 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
 
     const findNode = useCallback(function findNodeImpl(node: LayoutNode, targetId: string): LayoutNode | null {
       if (node.id === targetId) return node;
-      const children = (node as { children?: LayoutNode[] }).children;
-      if (Array.isArray(children)) {
-        for (const child of children) {
+      if (nodeHasChildren(node)) {
+        for (const child of node.children) {
           const found = findNodeImpl(child, targetId);
           if (found) return found;
         }
@@ -432,8 +449,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     const walk = (node: LayoutNode, parent: string | null) => {
       nodeById[node.id] = node;
       parentOf[node.id] = parent;
-      const children = (node as { children?: LayoutNode[] }).children;
-      if (Array.isArray(children)) children.forEach(child => walk(child, node.id));
+      if (nodeHasChildren(node)) node.children.forEach(child => walk(child, node.id));
     };
     walk(spec.root, null);
     return { parentOf, nodeById };
@@ -542,10 +558,18 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       const isClick = Math.abs(widthF) < 4 && Math.abs(heightF) < 4;
       const sizeFinal = isClick ? { width: 80, height: 60 } : { width: widthF, height: heightF };
       const id = 'rect_' + Math.random().toString(36).slice(2, 9);
-      setSpec(prev => ({
-        ...prev,
-        root: { ...prev.root, children: [...prev.root.children, { id, type: 'rect', position: topLeft, size: sizeFinal, fill: defaults.fill, stroke: defaults.stroke, strokeWidth: defaults.strokeWidth, radius: defaults.radius, opacity: defaults.opacity, strokeDash: defaults.strokeDash }] }
-      }));
+      setSpec(prev => appendNodesToRoot(prev, [{
+        id,
+        type: 'rect',
+        position: topLeft,
+        size: sizeFinal,
+        fill: defaults.fill,
+        stroke: defaults.stroke,
+        strokeWidth: defaults.strokeWidth,
+        radius: defaults.radius,
+        opacity: defaults.opacity,
+        strokeDash: defaults.strokeDash,
+      }]));
   setSelection([id]);
       // Stay in text mode while editing; switch to select on commit.
       setRectDraft(null);
@@ -561,10 +585,18 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     const isClick = Math.abs(widthF) < 4 && Math.abs(heightF) < 4;
     const finalSize = isClick ? { width: 80, height: 60 } : { width: widthF, height: heightF };
     const id = 'rect_' + Math.random().toString(36).slice(2, 9);
-    setSpec(prev => ({
-      ...prev,
-      root: { ...prev.root, children: [...prev.root.children, { id, type: 'rect', position: { x: x1, y: y1 }, size: finalSize, fill: defaults.fill, stroke: defaults.stroke, strokeWidth: defaults.strokeWidth, radius: defaults.radius, opacity: defaults.opacity, strokeDash: defaults.strokeDash }] }
-    }));
+    setSpec(prev => appendNodesToRoot(prev, [{
+      id,
+      type: 'rect',
+      position: { x: x1, y: y1 },
+      size: finalSize,
+      fill: defaults.fill,
+      stroke: defaults.stroke,
+      strokeWidth: defaults.strokeWidth,
+      radius: defaults.radius,
+      opacity: defaults.opacity,
+      strokeDash: defaults.strokeDash,
+    }]));
   setSelection([id]);
     onToolChange?.('select');
     setRectDraft(null);
@@ -604,10 +636,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
         strokeWidth: defaults.strokeWidth,
         opacity: defaults.opacity,
       };
-      setSpec(prev => ({
-        ...prev,
-        root: { ...prev.root, children: [...prev.root.children, ellipseNode] }
-      }));
+      setSpec(prev => appendNodesToRoot(prev, [ellipseNode]));
       onToolChange?.('select');
       setEllipseDraft(null);
       return;
@@ -632,10 +661,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       strokeWidth: defaults.strokeWidth,
       opacity: defaults.opacity,
     };
-    setSpec(prev => ({
-      ...prev,
-      root: { ...prev.root, children: [...prev.root.children, ellipseNode] }
-    }));
+    setSpec(prev => appendNodesToRoot(prev, [ellipseNode]));
     setSelection([id]);
     onToolChange?.('select');
     setEllipseDraft(null);
@@ -665,10 +691,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       stroke: '#334155',
       strokeWidth: 2,
     };
-    setSpec(prev => ({
-      ...prev,
-      root: { ...prev.root, children: [...prev.root.children, lineNode] }
-    }));
+    setSpec(prev => appendNodesToRoot(prev, [lineNode]));
     setSelection([id]);
     onToolChange?.('select');
     setLineDraft(null);
@@ -710,10 +733,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       strokeWidth: 2,
       tension: 0.5,
     };
-    setSpec(prev => ({
-      ...prev,
-      root: { ...prev.root, children: [...prev.root.children, curveNode] }
-    }));
+    setSpec(prev => appendNodesToRoot(prev, [curveNode]));
     setSelection([id]);
     onToolChange?.('select');
     setCurveDraft(null);
@@ -745,16 +765,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       alt: icon.label,
       objectFit: 'contain',
     };
-    setSpec(prev => ({
-      ...prev,
-      root: {
-        ...prev.root,
-        children: [
-          ...prev.root.children,
-          iconNode,
-        ],
-      },
-    }));
+    setSpec(prev => appendNodesToRoot(prev, [iconNode]));
     setSelection([id]);
     onToolChange?.('select');
   }, [makeId, onToolChange, selectedIconId, setSelection, setSpec]);
@@ -763,13 +774,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     const template = COMPONENT_LIBRARY.find(c => c.id === selectedComponentId) ?? COMPONENT_LIBRARY[0];
     if (!template) return;
     const groupNode = template.build(worldPos, makeId);
-    setSpec(prev => ({
-      ...prev,
-      root: {
-        ...prev.root,
-        children: [...prev.root.children, groupNode],
-      },
-    }));
+    setSpec(prev => appendNodesToRoot(prev, [groupNode]));
     setSelection([groupNode.id]);
     onToolChange?.('select');
   }, [makeId, onToolChange, selectedComponentId, setSelection, setSpec]);
@@ -787,10 +792,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       alt: 'Image',
       objectFit: 'contain',
     };
-    setSpec(prev => ({
-      ...prev,
-      root: { ...prev.root, children: [...prev.root.children, imageNode] }
-    }));
+    setSpec(prev => appendNodesToRoot(prev, [imageNode]));
     setSelection([id]);
     onToolChange?.('select');
     setImagePickerOpen(false);
@@ -870,10 +872,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
         color: '#000000',
         spans: [],
       };
-      setSpec(prev => ({
-        ...prev,
-        root: { ...prev.root, children: [...prev.root.children, placeholderText] }
-      }));
+      setSpec(prev => appendNodesToRoot(prev, [placeholderText]));
       setSelection([id]);
       onToolChange?.('select');
       
@@ -992,8 +991,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
         const freshNodeById: Record<string, LayoutNode> = {};
         function walkFresh(node: LayoutNode) {
           freshNodeById[node.id] = node;
-          const children = (node as { children?: LayoutNode[] }).children;
-          if (Array.isArray(children)) children.forEach(walkFresh);
+          if (nodeHasChildren(node)) node.children.forEach(walkFresh);
         }
         walkFresh(spec.root);
         
@@ -1371,7 +1369,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   const commitTextEdit = useCallback(() => {
     if (!editingTextId) return;
     
-    const newRoot = mapNode(spec.root, editingTextId, (n) => ({
+    const newRoot = mapNode<FrameNode>(spec.root, editingTextId, (n) => ({
       ...n,
       text: editingTextValue,
       spans: editingTextSpans.length > 0 ? editingTextSpans : undefined,
@@ -1384,7 +1382,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     setEditingTextValue('');
     setEditingTextSpans([]);
     setTextSelection(null);
-  }, [editingTextId, editingTextValue, editingTextSpans, spec, setSpec, mapNode, onToolChange, setSelection]);
+  }, [editingTextId, editingTextValue, editingTextSpans, spec, setSpec, onToolChange, setSelection]);
 
   // Cancel text edit without saving
     const cancelTextEdit = useCallback(() => {
@@ -1657,13 +1655,14 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     let newGroup: string | null = null;
     (function scan(n: LayoutNode) {
       if (newGroup) return;
-      const children = (n as { children?: LayoutNode[] }).children;
-      if (n.type === 'group' && Array.isArray(children)) {
-        const childIds = children.map((c) => c.id);
-        const matches = [...before].every(id => childIds.includes(id)) && !before.has(n.id);
-        if (matches) newGroup = n.id;
+      if (nodeHasChildren(n)) {
+        if (n.type === 'group') {
+          const childIds = n.children.map((c) => c.id);
+          const matches = [...before].every(id => childIds.includes(id)) && !before.has(n.id);
+          if (matches) newGroup = n.id;
+        }
+        n.children.forEach(scan);
       }
-      if (Array.isArray(children)) children.forEach(scan);
     })(next.root);
     setSpec(next);
   if (newGroup) setSelection([newGroup]);
@@ -1731,10 +1730,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
         const existing = collectExistingIds(spec.root as LayoutNode);
         const makeId = createUniqueIdFactory(existing);
         const clones = clipboardRef.current.map(n => remapIdsAndOffset(cloneNode(n), { x: offset, y: offset }, makeId));
-        setSpec(prev => ({
-          ...prev,
-          root: { ...prev.root, children: [...prev.root.children, ...clones] },
-        }));
+        setSpec(prev => appendNodesToRoot(prev, clones));
         setSelection(clones.map(n => n.id));
         pasteOffsetRef.current += 1;
         return;
@@ -1865,7 +1861,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       // Derive untransformed size from spec (source of truth)
       const specNode = findNode(spec.root, id);
       let width = 0, height = 0;
-      if (specNode?.size) { width = specNode.size.width; height = specNode.size.height; }
+      if (specNode && nodeHasSize(specNode)) { width = specNode.size.width; height = specNode.size.height; }
       else {
         // Fallback to Konva bounding box (approx for text/etc.)
         const bb = n.getClientRect({ relativeTo: stage });
@@ -1912,7 +1908,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
         // Store absolute rotation (no cumulative addition)
         setSpec(prev => ({
           ...prev,
-            root: mapNode(prev.root, nodeId, (n) => ({
+                          root: mapNode<FrameNode>(prev.root, nodeId, (n) => ({
               ...n,
               rotation: rotationDeg
             }))
@@ -1925,9 +1921,9 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
             const absY = Math.max(0.05, node.scaleY());
             setSpec(prev => ({
               ...prev,
-              root: mapNode(prev.root, nodeId, (n) => n.type === 'text' ? { ...n, textScaleX: absX, textScaleY: absY } : n)
+              root: mapNode<FrameNode>(prev.root, nodeId, (n) => n.type === 'text' ? { ...n, textScaleX: absX, textScaleY: absY } : n)
             }));
-          } else if (currentNode.size) {
+          } else if (nodeHasSize(currentNode)) {
             const newSize = {
               width: Math.round(currentNode.size.width * scaleX),
               height: Math.round(currentNode.size.height * scaleY)
@@ -1936,7 +1932,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
               const nonUniform = Math.abs(scaleX - scaleY) > 0.0001;
               setSpec(prev => ({
                 ...prev,
-                root: mapNode(prev.root, nodeId, (n) => {
+                root: mapNode<FrameNode>(prev.root, nodeId, (n) => {
                   if (n.type !== 'image') return n;
                   return {
                     ...n,
@@ -1977,7 +1973,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       // Set absolute rotation (no cumulative add)
       setSpec(prev => ({
         ...prev,
-        root: mapNode(prev.root, nodeId, (n) => ({
+        root: mapNode<FrameNode>(prev.root, nodeId, (n) => ({
           ...n,
           rotation: rotationDeg
         }))
@@ -1991,7 +1987,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
           
           setSpec(prev => ({
             ...prev,
-            root: mapNode(prev.root, nodeId, (groupNode) => {
+            root: mapNode<FrameNode>(prev.root, nodeId, (groupNode) => {
               if (groupNode.type !== 'group') return groupNode;
             
               // Scale the group's size if it has one
@@ -2004,8 +2000,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
               }
             
               // Scale all children positions and sizes
-              const children = (groupNode as { children?: LayoutNode[] }).children ?? [];
-              const scaledChildren = children.map((child) => {
+              const scaledChildren = groupNode.children.map((child) => {
                 const scaledChild = { ...child };
               
                 if (child.position) {
@@ -2014,8 +2009,8 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
                     y: Math.round(child.position.y * scaleY)
                   };
                 }
-              
-                if (child.size) {
+                
+                if (nodeHasSize(child)) {
                   scaledChild.size = {
                     width: Math.round(child.size.width * scaleX),
                     height: Math.round(child.size.height * scaleY)
@@ -2037,11 +2032,11 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
           const absY = Math.max(0.05, node.scaleY());
           setSpec(prev => ({
             ...prev,
-            root: mapNode(prev.root, nodeId, (n) => n.type === 'text' ? { ...n, textScaleX: absX, textScaleY: absY } : n)
+            root: mapNode<FrameNode>(prev.root, nodeId, (n) => n.type === 'text' ? { ...n, textScaleX: absX, textScaleY: absY } : n)
           }));
         } else {
           // For individual non-text nodes: scale size
-          if (currentNode && currentNode.size) {
+          if (currentNode && nodeHasSize(currentNode)) {
             const newSize = {
               width: Math.round(currentNode.size.width * scaleX),
               height: Math.round(currentNode.size.height * scaleY)
@@ -2050,7 +2045,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
               const nonUniform = Math.abs(scaleX - scaleY) > 0.0001;
               setSpec(prev => ({
                 ...prev,
-                root: mapNode(prev.root, nodeId, (n) => {
+                root: mapNode<FrameNode>(prev.root, nodeId, (n) => {
                   if (n.type !== 'image') return n;
                   return {
                     ...n,
@@ -2091,18 +2086,8 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       tr.forceUpdate();
       tr.getLayer()?.batchDraw();
     }, 0);
-  }, [setSpec, spec.root, selected, findNode, mapNode]);
+  }, [setSpec, spec.root, selected, findNode]);
 
-  // Helper function to map nodes (from stage-internal.ts pattern)
-  const mapNode = useCallback(function mapNodeImpl(n: LayoutNode, id: string, f: (node: LayoutNode) => LayoutNode): LayoutNode {
-    if (n.id === id) return f(n);
-    const children = (n as { children?: LayoutNode[] }).children;
-    if (Array.isArray(children)) {
-      const mappedChildren = children.map(child => mapNodeImpl(child, id, f));
-      return { ...n, children: mappedChildren };
-    }
-    return n;
-  }, []);
 
   return (
   <div ref={wrapperRef} style={{ position: 'relative', width, height, cursor: isRectMode ? 'crosshair' : undefined, backgroundColor: GRID_BG_COLOR }} onContextMenu={onWrapperContextMenu}>
@@ -2350,10 +2335,10 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
                         
                         setSpec(prev => ({
                           ...prev,
-                          root: mapNode(prev.root, curveNode.id, (n) => ({
-                            ...n,
-                            points: newPoints
-                          }))
+                          root: mapNode<FrameNode>(prev.root, curveNode.id, (n) => {
+                            if (n.type !== 'curve') return n;
+                            return { ...n, points: newPoints };
+                          })
                         }));
                       }}
                       onMouseEnter={(e) => {
@@ -2466,10 +2451,10 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
                 }
               }
               const applyReorder = (mode: 'forward'|'lower'|'top'|'bottom') => {
-                setSpec(prev => ({
-                  ...prev,
-                  root: (function walk(n: LayoutNode): LayoutNode {
-                    const children = (n as { children?: LayoutNode[] }).children ?? [];
+                setSpec(prev => {
+                  const nextRoot = (function walk(n: LayoutNode): LayoutNode {
+                    if (!nodeHasChildren(n)) return n;
+                    const children = n.children;
                     if (parentMap[n.id] && children.length > 0) {
                       const selectedChildren = new Set(parentMap[n.id]);
                       let newChildren = children.slice();
@@ -2505,8 +2490,12 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
                       return { ...n, children: children.map((c) => walk(c)) };
                     }
                     return n;
-                  })(prev.root)
-                }));
+                  })(prev.root);
+                  return {
+                    ...prev,
+                    root: nextRoot as FrameNode
+                  };
+                });
                 setMenu(null);
               };
               return (
@@ -2543,10 +2532,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
               const existing = collectExistingIds(spec.root as LayoutNode);
               const makeId = createUniqueIdFactory(existing);
               const clones = clipboardRef.current.map(n => remapIdsAndOffset(cloneNode(n), { x: offset, y: offset }, makeId));
-              setSpec(prev => ({
-                ...prev,
-                root: { ...prev.root, children: [...prev.root.children, ...clones] },
-              }));
+              setSpec(prev => appendNodesToRoot(prev, clones));
               setSelection(clones.map(n => n.id));
               pasteOffsetRef.current += 1;
               setMenu(null);
@@ -2582,22 +2568,23 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
               onClick={() => {
                 setSpec(prev => ({
                   ...prev,
-                  root: mapNode(prev.root, '__bulk__', (n) => n)
+                  root: mapNode<FrameNode>(prev.root, '__bulk__', (n) => n)
                 }));
                 setSpec(prev => {
-                  const mapAll = (n: LayoutNode): LayoutNode => {
+                  const mapAll = <T extends LayoutNode>(n: T): T => {
                     if (selected.includes(n.id) && n.type === 'image' && n.preserveAspect === false) {
-                      return { ...n, preserveAspect: true, objectFit: n.objectFit || 'contain' };
+                      return { ...n, preserveAspect: true, objectFit: n.objectFit || 'contain' } as T;
                     }
-                    const children = (n as { children?: LayoutNode[] }).children;
-                    if (Array.isArray(children)) {
-                      return { ...n, children: children.map(mapAll) };
+                    if (nodeHasChildren(n)) {
+                      const mappedChildren = n.children.map((child) => mapAll(child));
+                      return { ...n, children: mappedChildren } as T;
                     }
                     return n;
                   };
+                  const nextRoot = mapAll(prev.root);
                   return {
                     ...prev,
-                    root: mapAll(prev.root)
+                    root: nextRoot
                   };
                 });
                 setMenu(null);
@@ -2618,19 +2605,20 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
             <button
               onClick={() => {
                 setSpec(prev => {
-                  const mapAll = (n: LayoutNode): LayoutNode => {
+                  const mapAll = <T extends LayoutNode>(n: T): T => {
                     if (selected.includes(n.id) && n.type === 'text') {
-                      return { ...n, textScaleX: 1, textScaleY: 1 };
+                      return { ...n, textScaleX: 1, textScaleY: 1 } as T;
                     }
-                    const children = (n as { children?: LayoutNode[] }).children;
-                    if (Array.isArray(children)) {
-                      return { ...n, children: children.map(mapAll) };
+                    if (nodeHasChildren(n)) {
+                      const mappedChildren = n.children.map((child) => mapAll(child));
+                      return { ...n, children: mappedChildren } as T;
                     }
                     return n;
                   };
+                  const nextRoot = mapAll(prev.root);
                   return {
                     ...prev,
-                    root: mapAll(prev.root)
+                    root: nextRoot
                   };
                 });
                 setMenu(null);
@@ -2661,17 +2649,18 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
                     onClick={() => {
                       const lockedIds = [...selected];
                       setSpec(prev => {
-                        const mapAll = (n: LayoutNode): LayoutNode => {
+                        const mapAll = <T extends LayoutNode>(n: T): T => {
                           if (lockedIds.includes(n.id)) {
-                            return { ...n, locked: true };
+                            return { ...n, locked: true } as T;
                           }
-                          const children = (n as { children?: LayoutNode[] }).children;
-                          if (Array.isArray(children)) {
-                            return { ...n, children: children.map(mapAll) };
+                          if (nodeHasChildren(n)) {
+                            const mappedChildren = n.children.map((child) => mapAll(child));
+                            return { ...n, children: mappedChildren } as T;
                           }
                           return n;
                         };
-                        return { ...prev, root: mapAll(prev.root) };
+                        const nextRoot = mapAll(prev.root);
+                        return { ...prev, root: nextRoot };
                       });
                       // Clear selection so the locked state takes effect immediately
                       setSelection([]);
@@ -2687,17 +2676,18 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
                   <button
                     onClick={() => {
                       setSpec(prev => {
-                        const mapAll = (n: LayoutNode): LayoutNode => {
+                        const mapAll = <T extends LayoutNode>(n: T): T => {
                           if (selected.includes(n.id)) {
-                            return { ...n, locked: false };
+                            return { ...n, locked: false } as T;
                           }
-                          const children = (n as { children?: LayoutNode[] }).children;
-                          if (Array.isArray(children)) {
-                            return { ...n, children: children.map(mapAll) };
+                          if (nodeHasChildren(n)) {
+                            const mappedChildren = n.children.map((child) => mapAll(child));
+                            return { ...n, children: mappedChildren } as T;
                           }
                           return n;
                         };
-                        return { ...prev, root: mapAll(prev.root) };
+                        const nextRoot = mapAll(prev.root);
+                        return { ...prev, root: nextRoot };
                       });
                       setMenu(null);
                     }}

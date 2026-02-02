@@ -1,6 +1,6 @@
-import type { Command, CommandContext } from './types';
-import { findNode, nodeHasChildren } from './types';
-import type { LayoutNode, GroupNode } from '../layout-schema';
+import type { Command, CommandContext, NodeWithChildren } from './types';
+import { findNode, nodeHasChildren, cloneNode } from './types';
+import type { LayoutNode, GroupNode, FrameNode } from '../layout-schema';
 
 export interface GroupNodesPayload { ids: string[]; }
 
@@ -55,74 +55,79 @@ export function createGroupNodesCommand(payload: GroupNodesPayload): Command {
     id: 'group-nodes',
     description: `Group nodes ${payload.ids.join(',')}`,
     apply(ctx: CommandContext) {
-        const snapshot = validateAndSnapshot(ctx.spec.root, payload.ids);
-        if (!snapshot) return ctx.spec;
-        const { parentId, indices } = snapshot;
+      const snapshot = validateAndSnapshot(ctx.spec.root, payload.ids);
+      if (!snapshot) return ctx.spec;
+      const { parentId, indices, nodes } = snapshot;
+      const root = ctx.spec.root;
       const groupId = `group_${Math.random().toString(36).slice(2,9)}`;
 
-      function transform(node: LayoutNode): LayoutNode {
-        if (node.id === parentId && nodeHasChildren(node)) {
-          const newChildren: LayoutNode[] = [];
+      function transform(node: NodeWithChildren): NodeWithChildren {
+        if (node.id === parentId) {
           const selectedSet = new Set(payload.ids);
-          const groupChildren: LayoutNode[] = [];
-          node.children.forEach((c) => {
-            if (selectedSet.has(c.id)) {
-              groupChildren.push(c);
+          const newChildren: LayoutNode[] = [];
+          const groupedChildren: LayoutNode[] = [];
+          node.children.forEach((child) => {
+            if (selectedSet.has(child.id)) {
+              groupedChildren.push(child);
             } else {
-              newChildren.push(c);
+              newChildren.push(child);
             }
           });
-          // insert group at position of first selected index
-          const insertAt = Math.min(...indices);
           const groupedNode: GroupNode = {
             id: groupId,
             type: 'group',
-            children: groupChildren.map((n) => n),
+            children: groupedChildren,
           };
+          const insertAt = Math.min(...indices);
           newChildren.splice(insertAt, 0, groupedNode);
           return { ...node, children: newChildren };
         }
-        if (nodeHasChildren(node)) return { ...node, children: node.children.map(transform) };
-        return node;
+        return { ...node, children: node.children.map(child => nodeHasChildren(child) ? transform(child) : child) };
       }
 
-      const nextRoot = transform(ctx.spec.root);
-      if (nextRoot === ctx.spec.root) return ctx.spec;
+      const nextRoot = transform(root);
+      if (nextRoot === root) return ctx.spec;
 
-      const snapCopy = snapshot; // close over for inverse without TS nullable complaint
+      const inverseNodes = nodes.map(n => cloneNode(n));
       const inverse: Command = {
         id: 'group-nodes',
         description: `Ungroup ${groupId}`,
-        apply(inner) {
-          function ungroup(node: LayoutNode): LayoutNode {
-            if (node.id === parentId && nodeHasChildren(node)) {
-              const idx = node.children.findIndex((c) => c.id === groupId);
+        apply(innerCtx) {
+          const currentRoot = innerCtx.spec.root;
+
+          function ungroup(node: NodeWithChildren): NodeWithChildren {
+            if (node.id === parentId) {
+              const idx = node.children.findIndex(child => child.id === groupId);
               if (idx >= 0) {
-                const before = node.children.slice(0, idx);
-                const after = node.children.slice(idx + 1);
-                const restored = [...before];
-                // reinsert originals at original relative order using snapshot.indices ordering
-                const zipped = snapCopy.indices
-                  .map((i, j) => ({ i, node: cloneLayoutNode(snapCopy.nodes[j]) }))
-                  .sort((a,b) => a.i - b.i);
-                zipped.forEach((z) => restored.push(z.node));
-                restored.push(...after);
+                const filtered = node.children.filter((child) => child.id !== groupId);
+                const zipped = indices
+                  .map((i, j) => ({ i, node: cloneNode(inverseNodes[j]) }))
+                  .sort((a, b) => a.i - b.i);
+                const restored: LayoutNode[] = [];
+                let nextInsert = 0;
+                filtered.forEach((child) => {
+                  while (nextInsert < zipped.length && zipped[nextInsert].i === restored.length) {
+                    restored.push(zipped[nextInsert].node);
+                    nextInsert += 1;
+                  }
+                  restored.push(child);
+                });
+                while (nextInsert < zipped.length) {
+                  restored.push(zipped[nextInsert].node);
+                  nextInsert += 1;
+                }
                 return { ...node, children: restored };
               }
             }
-            if (nodeHasChildren(node)) return { ...node, children: node.children.map(ungroup) };
-            return node;
+            return { ...node, children: node.children.map(child => nodeHasChildren(child) ? ungroup(child) : child) };
           }
-          return { ...inner.spec, root: ungroup(inner.spec.root) };
+
+          return { ...innerCtx.spec, root: ungroup(currentRoot) as FrameNode };
         }
       };
       cachedInverse = inverse;
-      return { ...ctx.spec, root: nextRoot };
+      return { ...ctx.spec, root: nextRoot as FrameNode };
     },
-    invert() { return cachedInverse; }
+    invert() { return cachedInverse; },
   };
-}
-
-function cloneLayoutNode<T extends LayoutNode>(node: T): T {
-  return JSON.parse(JSON.stringify(node)) as T;
 }

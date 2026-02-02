@@ -1,6 +1,6 @@
-import type { LayoutNode } from '../layout-schema';
+import type { LayoutNode, FrameNode } from '../layout-schema';
 import type { Command, CommandContext, NodeWithChildren } from './types';
-import { cloneSpec, nodeHasChildren } from './types';
+import { cloneNode, nodeHasChildren } from './types';
 
 export interface DeleteNodesPayload { ids: string[]; }
 
@@ -12,10 +12,9 @@ interface RemovedNodeInfo {
 }
 
 /** Find parent and remove children; returns {nextRoot, removed[]} */
-function removeNodes(root: LayoutNode, ids: Set<string>): { root: LayoutNode; removed: RemovedNodeInfo[] } {
+function removeNodes(root: NodeWithChildren, ids: Set<string>): { root: NodeWithChildren; removed: RemovedNodeInfo[] } {
   const removed: RemovedNodeInfo[] = [];
-  function walk(node: LayoutNode): LayoutNode {
-    if (!nodeHasChildren(node)) return node;
+  function walk(node: NodeWithChildren): NodeWithChildren {
     let changed = false;
     const nextChildren: LayoutNode[] = [];
     node.children.forEach((child, idx) => {
@@ -24,9 +23,13 @@ function removeNodes(root: LayoutNode, ids: Set<string>): { root: LayoutNode; re
         changed = true;
         return;
       }
-      const newChild = walk(child);
-      if (newChild !== child) changed = true;
-      nextChildren.push(newChild);
+      if (nodeHasChildren(child)) {
+        const newChild = walk(child);
+        if (newChild !== child) changed = true;
+        nextChildren.push(newChild);
+      } else {
+        nextChildren.push(child);
+      }
     });
     if (!changed) return node;
     return { ...node, children: nextChildren } as NodeWithChildren;
@@ -46,12 +49,10 @@ export function createDeleteNodesCommand(payload: DeleteNodesPayload): Command {
       if (!idSet.size) return ctx.spec;
       const { root, removed } = removeNodes(ctx.spec.root, idSet);
       if (!removed.length) return ctx.spec;
-      // capture inverse data
       const inverse: Command = {
         id: 'delete-nodes',
-        description: `Restore nodes ${removed.map(r=>r.id).join(',')}`,
+        description: `Restore nodes ${removed.map(r => r.id).join(',')}`,
         apply(innerCtx) {
-          // Reinsert nodes at original parent + index
           const byParent = new Map<string, RemovedNodeInfo[]>();
           removed.forEach(r => {
             const list = byParent.get(r.parentId) || [];
@@ -69,7 +70,7 @@ export function createDeleteNodesCommand(payload: DeleteNodesPayload): Command {
             let originalPos = 0;
             for (const child of existing) {
               while (insertIdx < inserts.length && inserts[insertIdx].index === originalPos) {
-                const restored = cloneSpec({ root: inserts[insertIdx].node }).root;
+                const restored = cloneNode(inserts[insertIdx].node);
                 result.push(restore(restored));
                 insertIdx++;
                 originalPos++;
@@ -78,7 +79,7 @@ export function createDeleteNodesCommand(payload: DeleteNodesPayload): Command {
               originalPos++;
             }
             while (insertIdx < inserts.length) {
-              const restored = cloneSpec({ root: inserts[insertIdx].node }).root;
+              const restored = cloneNode(inserts[insertIdx].node);
               result.push(restore(restored));
               insertIdx++;
               originalPos++;
@@ -86,14 +87,14 @@ export function createDeleteNodesCommand(payload: DeleteNodesPayload): Command {
             return { ...node, children: result } as NodeWithChildren;
           }
 
-          return { ...innerCtx.spec, root: restore(innerCtx.spec.root) };
-        }
+          return { ...innerCtx.spec, root: restore(innerCtx.spec.root) as FrameNode };
+        },
       };
-          cachedInverse = inverse;
-      return { ...ctx.spec, root };
+      cachedInverse = inverse;
+      return { ...ctx.spec, root: root as FrameNode };
     },
     invert() {
       return cachedInverse;
-    }
+    },
   };
 }
