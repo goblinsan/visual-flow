@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState, useEffect, useMemo } from "react";
 import type { JSX } from "react";
-import { findNode, updateNode, type SpecPatch } from './utils/specUtils';
+import { findNode, findParentNode, updateNode, type SpecPatch } from './utils/specUtils';
 import RectAttributesPanel from './components/RectAttributesPanel';
 import EllipseAttributesPanel from './components/EllipseAttributesPanel';
 import LineAttributesPanel from './components/LineAttributesPanel';
@@ -320,6 +320,7 @@ export default function CanvasApp() {
   }, [setSpecRaw]);
   const [tool, setTool] = useState<string>("select");
   const { selection: selectedIds, setSelection } = useSelection();
+  
   // Rectangle default attributes (persisted)
   const { defaults: rectDefaults, update: updateRectDefaults } = usePersistentRectDefaults({ fill: '#ffffff', stroke: '#334155', strokeWidth: 1, radius: 0, opacity: 1, strokeDash: undefined });
   // Remember last non-undefined colors so toggling off/on restores previous value
@@ -352,6 +353,10 @@ export default function CanvasApp() {
   const [fitToContentKey, setFitToContentKey] = useState(0); // Increment to trigger fit-to-content in CanvasStage
   // Curve control point selection
   const [selectedCurvePointIndex, setSelectedCurvePointIndex] = useState<number | null>(null);
+  const [sidebarVisible, setSidebarVisible] = useState(true);
+  const [editingCurveId, setEditingCurveId] = useState<string | null>(null);
+  const blockCanvasClicksRef = useRef(false);
+  const skipNormalizationRef = useRef(false);
   const appVersion = import.meta.env.VITE_APP_VERSION ?? '0.0.0';
 
   const pushRecent = useCallback((col: string) => { commitRecent(col); }, [commitRecent]);
@@ -359,6 +364,10 @@ export default function CanvasApp() {
   const updateFlows = useCallback((nextFlows: Flow[]) => {
     setSpec(prev => ({ ...prev, flows: nextFlows }));
   }, [setSpec]);
+  
+  const handleViewportChange = useCallback((newViewport: { scale: number; x: number; y: number }) => {
+    setViewport(newViewport);
+  }, []);
 
   const focusScreen = useCallback((screenId: string) => {
     setSelection([screenId]);
@@ -646,6 +655,7 @@ export default function CanvasApp() {
             <i className="fa-solid fa-share-nodes" />
             Share
           </button>
+          
           {/* Tool indicator */}
           <div className="flex items-center gap-2 text-xs font-medium text-white/90 bg-white/15 backdrop-blur px-4 py-2 rounded-full border border-white/10">
             <i className="fa-solid fa-wand-magic-sparkles text-cyan-300" />
@@ -1039,6 +1049,10 @@ export default function CanvasApp() {
                 }}
                 selectedCurvePointIndex={selectedCurvePointIndex}
                 setSelectedCurvePointIndex={setSelectedCurvePointIndex}
+                editingCurveId={editingCurveId}
+                onEditingCurveIdChange={setEditingCurveId}
+                blockCanvasClicksRef={blockCanvasClicksRef}
+                skipNormalizationRef={skipNormalizationRef}
                 fitToContentKey={fitToContentKey}
                 rectDefaults={{
                   fill: rectDefaults.fill,
@@ -1049,7 +1063,7 @@ export default function CanvasApp() {
                   strokeDash: rectDefaults.strokeDash,
                 }}
                 viewportTransition={viewportTransition}
-                onViewportChange={(newViewport) => setViewport(newViewport)}
+                onViewportChange={handleViewportChange}
               />
             )}
             {/* Collaboration presence overlays */}
@@ -1076,12 +1090,161 @@ export default function CanvasApp() {
           </div>
         </main>
         {/* Right attributes panel */}
-        <aside className="w-72 border-l border-gray-200 bg-gradient-to-b from-white to-gray-50 flex flex-col shadow-sm">
-          <div className="p-4 border-b border-gray-200 flex items-center gap-2">
-            <i className="fa-solid fa-sliders text-gray-400" />
-            <span className="text-sm font-semibold text-gray-700">Attributes</span>
-          </div>
-          <div className="p-4 text-xs text-gray-600 space-y-4 overflow-auto flex-1">
+        {!sidebarVisible && (
+          <button
+            onClick={() => setSidebarVisible(true)}
+            className="fixed right-0 z-10 h-32 bg-gradient-to-b from-gray-300 to-gray-400 hover:from-gray-400 hover:to-gray-500 shadow-md transition-colors flex items-center justify-center"
+            title="Show Sidebar"
+            style={{ 
+              padding: 0,
+              width: '20px',
+              top: '96px',
+              borderRadius: '8px 0 0 8px',
+              borderLeft: '1px solid #9ca3af',
+              borderTop: '1px solid #9ca3af',
+              borderBottom: '1px solid #9ca3af'
+            }}
+          >
+            <span
+              className="text-[10px] font-semibold text-gray-700"
+              style={{ 
+                transform: 'rotate(-90deg)',
+                whiteSpace: 'nowrap',
+                letterSpacing: '0.5px'
+              }}
+            >
+              ATTRIBUTES
+            </span>
+          </button>
+        )}
+        {sidebarVisible && (
+          <aside className="w-72 border-l border-gray-200 bg-gradient-to-b from-white to-gray-50 flex flex-col shadow-sm relative">
+            {/* Collapse button on left edge - use fixed positioning for consistency */}
+            <button
+              onClick={() => setSidebarVisible(false)}
+              className="fixed z-10 h-32 bg-gradient-to-b from-gray-300 to-gray-400 hover:from-gray-400 hover:to-gray-500 shadow-md transition-colors flex items-center justify-center"
+              title="Hide Sidebar"
+              style={{ 
+                padding: 0,
+                width: '20px',
+                top: '96px',
+                right: '288px',
+                borderRadius: '8px 0 0 8px',
+                borderLeft: '1px solid #9ca3af',
+                borderTop: '1px solid #9ca3af',
+                borderBottom: '1px solid #9ca3af'
+              }}
+            >
+              <span
+                className="text-[10px] font-semibold text-gray-700"
+                style={{ 
+                  transform: 'rotate(-90deg)',
+                  whiteSpace: 'nowrap',
+                  letterSpacing: '0.5px'
+                }}
+              >
+                ATTRIBUTES
+              </span>
+            </button>
+            <div className="p-4 border-b border-gray-200 flex items-center gap-2">
+              <i className="fa-solid fa-sliders text-gray-400" />
+              <span className="text-sm font-semibold text-gray-700">Attributes</span>
+            </div>
+            <div className="p-4 text-xs text-gray-600 space-y-4 overflow-auto flex-1">
+              {/* Show CV panel when editing a curve */}
+              {editingCurveId && (() => {
+                const curveNode = findNode(spec.root, editingCurveId) as CurveNode | null;
+                if (!curveNode || curveNode.type !== 'curve') return null;
+                
+                const points = curveNode.points as number[];
+                const cvPoints: Array<{x: number, y: number, index: number}> = [];
+                for (let i = 0; i < points.length; i += 2) {
+                  cvPoints.push({ x: points[i], y: points[i + 1], index: i / 2 });
+                }
+                
+                return (
+                  <div className="space-y-4">
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-sm font-semibold text-blue-900">Curve Editing Mode</h3>
+                        <button
+                          onClick={() => setEditingCurveId(null)}
+                          className="text-xs px-2 py-1 bg-white border border-blue-300 rounded hover:bg-blue-50 transition-colors"
+                        >
+                          Exit
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-blue-700">Press Enter or Escape to exit</p>
+                    </div>
+                    
+                    <div>
+                      <h4 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Control Points ({cvPoints.length})</h4>
+                      <div className="space-y-2">
+                        {cvPoints.map((cv) => (
+                          <div
+                            key={cv.index}
+                            className={`p-2 rounded border ${
+                              selectedCurvePointIndex === cv.index
+                                ? 'bg-blue-50 border-blue-300'
+                                : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                            } transition-colors cursor-pointer`}
+                            onClick={() => setSelectedCurvePointIndex(cv.index)}
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-[11px] font-medium">Point {cv.index + 1}</span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  // Delete this CV point
+                                  const newPoints = [...points];
+                                  newPoints.splice(cv.index * 2, 2);
+                                  setSpec(prev => ({
+                                    ...prev,
+                                    root: updateNode(prev.root, editingCurveId, { points: newPoints })
+                                  }));
+                                  if (selectedCurvePointIndex === cv.index) {
+                                    setSelectedCurvePointIndex(null);
+                                  }
+                                }}
+                                className="text-[10px] px-2 py-0.5 text-red-600 hover:bg-red-50 rounded border border-red-200 transition-colors"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                            <div className="text-[10px] text-gray-500">
+                              x: {Math.round(cv.x)}, y: {Math.round(cv.y)}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <h4 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Curve Properties</h4>
+                      <CurveAttributesPanel
+                        curve={curveNode}
+                        updateNode={(patch) => {
+                          setSpec(prev => ({
+                            ...prev,
+                            root: updateNode(prev.root, editingCurveId, patch)
+                          }));
+                        }}
+                        selectedPointIndex={selectedCurvePointIndex}
+                        setSelectedPointIndex={setSelectedCurvePointIndex}
+                        beginRecentSession={beginRecentSession}
+                        previewRecent={previewRecent}
+                        commitRecent={commitRecent}
+                        pushRecent={pushRecent}
+                        recentColors={recentColors}
+                      />
+                    </div>
+                  </div>
+                );
+              })()}
+              
+              {/* Regular attribute panels when not editing curve */}
+              {!editingCurveId && (
+                <>
             <div className="bg-gray-100/70 rounded-lg p-3 space-y-2">
               <p className="text-[10px] uppercase tracking-wider font-semibold text-gray-500 flex items-center gap-1.5">
                 <i className="fa-solid fa-circle-info text-blue-400" />
@@ -1295,6 +1458,10 @@ export default function CanvasApp() {
               const elementPanel = renderElementPanelFor(node);
               const groupChildren = node.children;
               const hasChildren = Array.isArray(groupChildren) && groupChildren.length > 0;
+              
+              // Always show Screen/Flow option for all elements
+              const showScreenFlowTab = isScreenEligible;
+              
               const moveChild = (fromIndex: number, toIndex: number) => {
                 if (!groupChildren) return;
                 if (toIndex < 0 || toIndex >= groupChildren.length) return;
@@ -1391,8 +1558,35 @@ export default function CanvasApp() {
                           {(['group', 'frame', 'stack', 'grid'].includes(child.type) && 'children' in child && (child.children as any[]).length > 0) && (
                             <button
                               type="button"
-                              onClick={() => {
-                                setSelection([child.id]);
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                // Set flags IMMEDIATELY on mousedown, before canvas events
+                                blockCanvasClicksRef.current = true;
+                                skipNormalizationRef.current = true;
+                              }}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                e.nativeEvent.stopImmediatePropagation();
+                                
+                                const targetId = child.id;
+                                // Skip normalization for nested group selection
+                                skipNormalizationRef.current = true;
+                                setSelection([targetId]);
+                                // Also sync to collaboration if enabled
+                                if (isCollaborative) {
+                                  updateSelection([targetId]);
+                                }
+                                // Reset flags after a short delay
+                                setTimeout(() => {
+                                  blockCanvasClicksRef.current = false;
+                                  skipNormalizationRef.current = false;
+                                }, 100);
+                              }}
+                              onMouseUp={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
                               }}
                               className="w-full px-2 py-1.5 text-[11px] bg-blue-50 text-blue-600 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors flex items-center justify-center gap-1.5"
                             >
@@ -1410,29 +1604,93 @@ export default function CanvasApp() {
                 <div className="text-[11px] text-gray-400">No child elements to edit.</div>
               );
 
-              if (!hasChildren) {
-                return elementPanel;
+              // Check if this node has a parent that's a group/frame/stack/grid (but not the root)
+              const parentNode = findParentNode(spec.root, node.id);
+              const hasGroupParent = parentNode && parentNode.id !== spec.root.id && ['group', 'frame', 'stack', 'grid'].includes(parentNode.type);
+
+              // Show element panel alone if no children and no Screen/Flow support
+              if (!hasChildren && !showScreenFlowTab) {
+                return (
+                  <>
+                    {hasGroupParent && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          
+                          // Skip normalization for parent group selection
+                          skipNormalizationRef.current = true;
+                          setSelection([parentNode.id]);
+                          if (isCollaborative) {
+                            updateSelection([parentNode.id]);
+                          }
+                          // Reset flag after a short delay
+                          setTimeout(() => {
+                            skipNormalizationRef.current = false;
+                          }, 100);
+                        }}
+                        className="w-full px-2 py-1.5 mb-2 text-[11px] bg-gray-50 text-gray-600 border border-gray-200 rounded-md hover:bg-gray-100 transition-colors flex items-center justify-center gap-1.5"
+                      >
+                        <i className="fa-solid fa-arrow-left" />
+                        Back to Parent Group
+                      </button>
+                    )}
+                    {elementPanel}
+                  </>
+                );
+              }
+              
+              // Show tabs if has children OR supports Screen/Flow
+              if (hasChildren || showScreenFlowTab) {
+                return (
+                  <>
+                    {hasGroupParent && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          
+                          // Skip normalization for parent group selection
+                          skipNormalizationRef.current = true;
+                          setSelection([parentNode.id]);
+                          if (isCollaborative) {
+                            updateSelection([parentNode.id]);
+                          }
+                          // Reset flag after a short delay
+                          setTimeout(() => {
+                            skipNormalizationRef.current = false;
+                          }, 100);
+                        }}
+                        className="w-full px-2 py-1.5 mb-2 text-[11px] bg-gray-50 text-gray-600 border border-gray-200 rounded-md hover:bg-gray-100 transition-colors flex items-center justify-center gap-1.5"
+                      >
+                        <i className="fa-solid fa-arrow-left" />
+                        Back to Parent Group
+                      </button>
+                    )}
+                    <div className="flex items-center gap-1 rounded-md bg-gray-100 p-1 text-[11px]">
+                      <button
+                        className={`flex-1 rounded-md px-2 py-1 transition ${attributeTab === 'element' ? 'bg-white shadow-sm text-gray-700' : 'text-gray-500 hover:text-gray-700'}`}
+                        onClick={() => setAttributeTab('element')}
+                      >
+                        {hasChildren ? 'Group' : 'Element'}
+                      </button>
+                      {showScreenFlowTab && (
+                        <button
+                          className={`flex-1 rounded-md px-2 py-1 transition ${attributeTab === 'flow' ? 'bg-white shadow-sm text-gray-700' : 'text-gray-500 hover:text-gray-700'}`}
+                          onClick={() => setAttributeTab('flow')}
+                        >
+                          Screen/Flow
+                        </button>
+                      )}
+                    </div>
+                    {attributeTab === 'element' && hasChildren ? groupPanel : (attributeTab === 'flow' ? screenFlowPanel : elementPanel)}
+                  </>
+                );
               }
 
-              return (
-                <>
-                  <div className="flex items-center gap-1 rounded-md bg-gray-100 p-1 text-[11px]">
-                    <button
-                      className={`flex-1 rounded-md px-2 py-1 transition ${attributeTab === 'element' ? 'bg-white shadow-sm text-gray-700' : 'text-gray-500 hover:text-gray-700'}`}
-                      onClick={() => setAttributeTab('element')}
-                    >
-                      Group
-                    </button>
-                    <button
-                      className={`flex-1 rounded-md px-2 py-1 transition ${attributeTab === 'flow' ? 'bg-white shadow-sm text-gray-700' : 'text-gray-500 hover:text-gray-700'}`}
-                      onClick={() => setAttributeTab('flow')}
-                    >
-                      Screen/Flow
-                    </button>
-                  </div>
-                  {attributeTab === 'element' ? groupPanel : screenFlowPanel}
-                </>
-              );
+              return elementPanel;
             })()}
             {selectedIds.length !== 1 && tool==='rect' && selectedIds.length===0 && (
               <DefaultsPanel
@@ -1447,8 +1705,11 @@ export default function CanvasApp() {
             {selectedIds.length !== 1 && !(tool==='rect' && selectedIds.length===0) && (
               <div className="text-[11px] text-gray-400">{selectedIds.length === 0 ? 'No selection' : 'Multiple selection (attributes coming soon).'}</div>
             )}
+                </>
+              )}
           </div>
         </aside>
+        )}
       </div>
     </div>
   );

@@ -40,7 +40,14 @@ export const TextAttributesPanel: React.FC<TextAttributesPanelProps> = ({
   // Ensure span-level formatting tracks the top-level node when the user updates a shared attribute.
   const handleUpdate = (patch: Partial<TextNode>) => {
     const nextPatch: Partial<TextNode> & { spans?: TextSpan[] } = { ...patch };
-    if (textNode.spans && textNode.spans.length > 0) {
+    
+    // If updating text content, also update or clear spans
+    if (patch.text !== undefined && textNode.spans && textNode.spans.length > 0) {
+      // Clear spans when text is updated, or update the single span's text
+      nextPatch.spans = [{ text: patch.text }];
+    }
+    
+    if (textNode.spans && textNode.spans.length > 0 && patch.text === undefined) {
       const updatedSpans = textNode.spans.map((span) => {
         const newSpan: TextSpan = { ...span };
         if (patch.fontSize !== undefined) newSpan.fontSize = patch.fontSize;

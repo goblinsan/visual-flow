@@ -61,6 +61,10 @@ interface CanvasStageProps {
   setSelection: (ids: string[]) => void;
   selectedCurvePointIndex?: number | null;
   setSelectedCurvePointIndex?: (index: number | null) => void;
+  editingCurveId?: string | null;
+  onEditingCurveIdChange?: (id: string | null) => void;
+  blockCanvasClicksRef?: React.MutableRefObject<boolean>;
+  skipNormalizationRef?: React.MutableRefObject<boolean>; // Skip selection normalization (for nested group editing)
   fitToContentKey?: number; // Increment to trigger fit-to-content
   viewportTransition?: {
     targetId: string;
@@ -123,7 +127,13 @@ function InfiniteGrid({ width, height, scale, offsetX, offsetY }: InfiniteGridPr
   return <>{dots}</>;
 }
 
-function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select", onToolChange, selectedIconId, selectedComponentId, onUndo, onRedo, focusNodeId, onUngroup, rectDefaults, selection, setSelection, selectedCurvePointIndex, setSelectedCurvePointIndex, fitToContentKey, viewportTransition, onViewportChange }: CanvasStageProps) {
+function CanvasStage({ 
+  spec, setSpec, width = 800, height = 600, tool = "select", onToolChange, selectedIconId, selectedComponentId, 
+  onUndo, onRedo, focusNodeId, onUngroup, rectDefaults, selection, setSelection, selectedCurvePointIndex, setSelectedCurvePointIndex, 
+  editingCurveId: propsEditingCurveId, onEditingCurveIdChange,
+  blockCanvasClicksRef, skipNormalizationRef,
+  fitToContentKey, viewportTransition, onViewportChange 
+}: CanvasStageProps) {
   // View / interaction state
   const [scale, setScale] = useState(1);
   const [pos, setPos] = useState({ x: 0, y: 0 });
@@ -155,8 +165,13 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const justStartedTextEditRef = useRef(false);
   
-  // Curve editing mode (double-click to edit CVs)
-  const [editingCurveId, setEditingCurveId] = useState<string | null>(null);
+  // Curve editing mode - use external state if provided, otherwise use internal
+  const editingCurveId = propsEditingCurveId !== undefined ? propsEditingCurveId : null;
+  const setEditingCurveId = useCallback((id: string | null) => {
+    if (onEditingCurveIdChange) {
+      onEditingCurveIdChange(id);
+    }
+  }, [onEditingCurveIdChange]);
   const clipboardRef = useRef<LayoutNode[] | null>(null);
   const pasteOffsetRef = useRef(0);
   useEffect(() => {
@@ -839,6 +854,11 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   }, [onToolChange]);
 
   const onMouseDown = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
+    // Block canvas interactions if requested (e.g., when selecting from attribute panel)
+    if (blockCanvasClicksRef?.current) {
+      return;
+    }
+    
     // Rectangle tool creation pathway
     if (isRectMode) {
       if (e.evt.button !== 0) return; // left only
@@ -1350,11 +1370,11 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     return () => window.removeEventListener('keydown', onKey, CAPTURE_OPTIONS);
   }, [isCurveMode, curveDraft, finalizeCurve]);
 
-  // Curve edit mode: exit on Escape
+  // Curve edit mode: exit on Escape or Enter
   useEffect(() => {
     if (!editingCurveId) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === 'Escape' || e.key === 'Enter') {
         setEditingCurveId(null);
         setSelectedCurvePointIndex?.(null);
       }
@@ -1377,11 +1397,19 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       const name = target.name?.() || '';
       let nodeId = target.id();
       
-      // Check for curve
-      if (name.includes('curve') && nodeId) {
-        const curveNode = findNode(spec.root, nodeId);
+      // Check parent if target is a Line inside a curve Group
+      const parent = target.getParent();
+      const parentName = parent?.name?.() || '';
+      const parentId = parent?.id();
+      
+      // Check for curve (either direct or parent)
+      const checkName = name.includes('curve') ? name : parentName;
+      const checkId = name.includes('curve') ? nodeId : parentId;
+      
+      if (checkName.includes('curve') && checkId) {
+        const curveNode = findNode(spec.root, checkId);
         if (curveNode && curveNode.type === 'curve') {
-          setEditingCurveId(nodeId);
+          setEditingCurveId(checkId);
           setSelectedCurvePointIndex?.(null);
           return;
         }
@@ -1545,6 +1573,11 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
 
   // Single click handler for empty canvas
   const onClick = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
+    // Block canvas clicks if requested (e.g., when selecting from attribute panel)
+    if (blockCanvasClicksRef?.current) {
+      return;
+    }
+    
     // If we are editing, clicking the background commits (except immediately after start).
     if (editingTextId) {
       if (justStartedTextEditRef.current) {
@@ -1870,8 +1903,12 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     selectionContext.nodeById,
   ]);
 
-  // Normalize selection on changes
+  // Normalize selection on changes (skip when explicitly bypassed for nested group editing)
   useEffect(() => {
+    // Skip normalization when explicitly bypassed (e.g., editing nested groups)
+    if (skipNormalizationRef?.current) {
+      return;
+    }
     if (selected.length === 0) {
       // parent controls selection; nothing to do if empty
       return;
@@ -1880,7 +1917,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     if (norm.length !== selected.length || norm.some((id, i) => id !== selected[i])) {
       setSelection(norm);
     }
-  }, [selected, normalizeSelection, setSelection]);
+  }, [selected, normalizeSelection, setSelection, skipNormalizationRef]);
 
   // Transformer target attachment
   useEffect(() => {

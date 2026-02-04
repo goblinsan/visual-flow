@@ -39,3 +39,15 @@ export function updateNode(root: FrameNode, id: string, patch: SpecPatch): Frame
   const next = walk(root);
   return changed ? (next as FrameNode) : root;
 }
+
+/** Find the parent node of a given node by id. Returns null if not found or if node is root. */
+export function findParentNode(root: LayoutNode, childId: string): LayoutNode | null {
+  if (root.id === childId) return null; // root has no parent
+  if (!nodeHasChildren(root)) return null;
+  for (const child of root.children) {
+    if (child.id === childId) return root;
+    const found = findParentNode(child, childId);
+    if (found) return found;
+  }
+  return null;
+}

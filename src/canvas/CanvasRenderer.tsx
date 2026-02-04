@@ -472,6 +472,8 @@ function renderCurve(n: CurveNode) {
         lineCap={n.lineCap ?? "round"}
         tension={n.tension ?? 0.5}
         bezier={n.tension === undefined || n.tension === 0}
+        listening={true}
+        hitStrokeWidth={20}
       />
     </Group>
   );
