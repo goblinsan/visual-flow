@@ -80,13 +80,13 @@ interface LockOverlayProps {
 }
 
 export function LockOverlay({ collaborators, getNodePosition }: LockOverlayProps) {
-  const lockedUsers: Array<{ user: UserAwareness; nodeId: string; position?: { x: number; y: number } }> = [];
+  const lockedUsers: Array<{ user: UserAwareness; nodeId: string; position: { x: number; y: number } | undefined }> = [];
 
   // Find all users currently dragging
   collaborators.forEach((user) => {
     if (user.dragging?.nodeIds && user.dragging.nodeIds.length > 0) {
       const nodeId = user.dragging.nodeIds[0]; // Use first node
-      const position = getNodePosition ? getNodePosition(nodeId) : undefined;
+      const position = getNodePosition ? getNodePosition(nodeId) ?? undefined : undefined;
       
       lockedUsers.push({ user, nodeId, position });
     }

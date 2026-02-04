@@ -38,6 +38,8 @@ export function Phase3Demo({
   buildInitial,
   wsUrl,
 }: Phase3DemoProps) {
+  // Demo variables - used for illustration in documentation
+  // @ts-expect-error - Demo code, variables intentionally unused for documentation
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
   const [showCheckpointPanel, setShowCheckpointPanel] = useState(false);
 
@@ -51,6 +53,7 @@ export function Phase3Demo({
     isSyncing,
     lastError,
     updateCursor,
+    // @ts-expect-error - Demo code, variable intentionally unused for documentation
     updateSelection,
     updateDragging,
     reconnect,
@@ -96,13 +99,8 @@ export function Phase3Demo({
     updateCursor(e.clientX, e.clientY);
   };
 
-  // Handle selection changes
-  const handleSelectionChange = (nodeIds: string[]) => {
-    setSelectedNodeIds(nodeIds);
-    updateSelection(nodeIds);
-  };
-
   // Handle drag start (soft lock)
+  // @ts-expect-error - Demo code, function intentionally unused for documentation
   const handleDragStart = (nodeIds: string[], position: { x: number; y: number }) => {
     updateDragging({
       nodeIds,
@@ -111,6 +109,7 @@ export function Phase3Demo({
   };
 
   // Handle drag end (release lock)
+  // @ts-expect-error - Demo code, function intentionally unused for documentation
   const handleDragEnd = () => {
     updateDragging(undefined);
   };
