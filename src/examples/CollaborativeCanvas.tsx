@@ -71,6 +71,7 @@ export function CollaborativeCanvas({
 
   // Example: Get node bounds for selection overlay
   // In real app, this would query the actual rendered nodes
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const getNodeBounds = (_nodeId: string) => {
     // Placeholder - implement based on your rendering
     // Should return actual bounds of rendered node

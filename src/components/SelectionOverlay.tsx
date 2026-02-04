@@ -7,6 +7,8 @@ import type { UserAwareness } from '../collaboration/types';
 
 interface SelectionOverlayProps {
   collaborators: Map<number, UserAwareness>;
+  /** Local user's client ID (to filter out) */
+  localClientId?: number | null;
   /** Get bounding box for a node ID */
   getNodeBounds: (nodeId: string) => { x: number; y: number; width: number; height: number } | null;
   /** Canvas zoom level for scaling */
@@ -17,13 +19,14 @@ interface SelectionOverlayProps {
 
 export function SelectionOverlay({
   collaborators,
+  localClientId,
   getNodeBounds,
   zoom = 1,
   pan = { x: 0, y: 0 },
 }: SelectionOverlayProps) {
   return (
-    <div className="pointer-events-none absolute inset-0 z-40">
-      {Array.from(collaborators.values()).map((user) => {
+    <div className="pointer-events-none absolute inset-0 z-10">
+      {Array.from(collaborators.values()).filter(user => user.clientId !== localClientId).map((user) => {
         return user.selection.map((nodeId) => {
           const bounds = getNodeBounds(nodeId);
           if (!bounds) return null;

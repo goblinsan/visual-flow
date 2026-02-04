@@ -7,16 +7,18 @@ import type { UserAwareness } from '../collaboration/types';
 
 interface CursorOverlayProps {
   collaborators: Map<number, UserAwareness>;
+  /** Local user's client ID (to filter out) */
+  localClientId?: number | null;
   /** Canvas zoom level for scaling */
   zoom?: number;
   /** Canvas pan offset */
   pan?: { x: number; y: number };
 }
 
-export function CursorOverlay({ collaborators, zoom = 1, pan = { x: 0, y: 0 } }: CursorOverlayProps) {
+export function CursorOverlay({ collaborators, localClientId, zoom = 1, pan = { x: 0, y: 0 } }: CursorOverlayProps) {
   return (
-    <div className="pointer-events-none absolute inset-0 z-50">
-      {Array.from(collaborators.values()).map((user) => {
+    <div className="pointer-events-none absolute inset-0 z-10">
+      {Array.from(collaborators.values()).filter(user => user.clientId !== localClientId).map((user) => {
         if (!user.cursor) return null;
 
         // Transform cursor position based on canvas zoom and pan

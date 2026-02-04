@@ -66,6 +66,7 @@ interface CanvasStageProps {
     easing?: "linear" | "ease" | "ease-in" | "ease-out" | "ease-in-out";
     _key?: string;
   } | null;
+  onViewportChange?: (viewport: { scale: number; x: number; y: number }) => void; // For collaboration overlays
 }
 
 // Infinite dot grid component
@@ -120,7 +121,7 @@ function InfiniteGrid({ width, height, scale, offsetX, offsetY }: InfiniteGridPr
   return <>{dots}</>;
 }
 
-function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select", onToolChange, selectedIconId, selectedComponentId, onUndo, onRedo, focusNodeId, onUngroup, rectDefaults, selection, setSelection, fitToContentKey, viewportTransition }: CanvasStageProps) {
+function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select", onToolChange, selectedIconId, selectedComponentId, onUndo, onRedo, focusNodeId, onUngroup, rectDefaults, selection, setSelection, fitToContentKey, viewportTransition, onViewportChange }: CanvasStageProps) {
   // View / interaction state
   const [scale, setScale] = useState(1);
   const [pos, setPos] = useState({ x: 0, y: 0 });
@@ -130,6 +131,13 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   const transitionRafRef = useRef<number | null>(null);
   const selected = selection;
   const [menu, setMenu] = useState<null | { x: number; y: number }>(null);
+  
+  // Notify parent of viewport changes (for collaboration overlays)
+  useEffect(() => {
+    if (onViewportChange) {
+      onViewportChange({ scale, x: pos.x, y: pos.y });
+    }
+  }, [scale, pos.x, pos.y, onViewportChange]);
   
   // Font loading - triggers re-render when fonts finish loading
   useFontLoading();

@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, useEffect } from "react";
+import { useCallback, useRef, useState, useEffect, useMemo } from "react";
 import type { JSX } from "react";
 import { findNode, updateNode, type SpecPatch } from './utils/specUtils';
 import RectAttributesPanel from './components/RectAttributesPanel';
@@ -32,6 +32,55 @@ import type {
 import { saveNamedDesign, getSavedDesigns, getCurrentDesignName, setCurrentDesignName, type SavedDesign } from './utils/persistence';
 import useElementSize from './hooks/useElementSize';
 import { COMPONENT_LIBRARY, ICON_LIBRARY } from "./library";
+// Collaboration imports
+import { useRealtimeCanvas } from './collaboration';
+import { ConnectionStatusIndicator } from './components/ConnectionStatusIndicator';
+import { CursorOverlay } from './components/CursorOverlay';
+import { SelectionOverlay } from './components/SelectionOverlay';
+import { ActiveUsersList } from './components/ActiveUsersList';
+
+/** Get room ID from URL query param ?room=xxx */
+function getRoomIdFromURL(): string | null {
+  if (typeof window === 'undefined') return null;
+  const params = new URLSearchParams(window.location.search);
+  return params.get('room');
+}
+
+/** Generate a random room ID */
+function generateRoomId(): string {
+  return `room_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/** Get or generate a persistent user ID for this browser */
+function getUserId(): string {
+  const key = 'vizail_user_id';
+  let userId = localStorage.getItem(key);
+  if (!userId) {
+    userId = `user_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+    localStorage.setItem(key, userId);
+  }
+  return userId;
+}
+
+/** Get display name (can be customized later) */
+function getDisplayName(): string {
+  const key = 'vizail_display_name';
+  let name = localStorage.getItem(key);
+  if (!name) {
+    name = `User ${Math.floor(Math.random() * 1000)}`;
+    localStorage.setItem(key, name);
+  }
+  return name;
+}
+
+/** Get WebSocket URL based on environment */
+function getWebSocketUrl(): string {
+  // Check for environment variable first
+  const envUrl = import.meta.env.VITE_WEBSOCKET_URL;
+  if (envUrl) return envUrl;
+  // Default to localhost for development
+  return 'ws://localhost:8787';
+}
 
 function buildInitialSpec(): LayoutSpec {
   return {
@@ -194,10 +243,48 @@ const TEMPLATES: { id: string; name: string; icon: string; description: string; 
 ];
 
 export default function CanvasApp() {
-  const { spec, setSpec: setSpecRaw } = useDesignPersistence({ buildInitial: buildInitialSpec });
+  // Collaboration state
+  const [roomId, setRoomId] = useState<string | null>(getRoomIdFromURL);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const userId = useMemo(() => getUserId(), []);
+  const displayName = useMemo(() => getDisplayName(), []);
+  const wsUrl = useMemo(() => getWebSocketUrl(), []);
+  const isCollaborative = roomId !== null;
+
+  // Viewport state for collaboration overlays
+  const [viewport, setViewport] = useState<{ scale: number; x: number; y: number }>({ scale: 1, x: 0, y: 0 });
+
+  // Local persistence (used when NOT in collaborative mode)
+  const localPersistence = useDesignPersistence({ buildInitial: buildInitialSpec });
+
+  // Real-time collaboration (used when in collaborative mode)
+  const realtimeCanvas = useRealtimeCanvas({
+    canvasId: roomId || 'unused',
+    userId,
+    displayName,
+    buildInitial: buildInitialSpec,
+    wsUrl,
+    enabled: isCollaborative,
+  });
+
+  // Use the appropriate spec/setSpec based on mode
+  const { spec, setSpec: setSpecRaw } = isCollaborative
+    ? { spec: realtimeCanvas.spec, setSpec: realtimeCanvas.setSpec }
+    : { spec: localPersistence.spec, setSpec: localPersistence.setSpec };
+
+  // Collaboration helpers
+  const { status, collaborators, isSyncing, lastError, updateCursor, updateSelection, reconnect, clientId } = realtimeCanvas;
+
   const historyRef = useRef<{ past: LayoutSpec[]; future: LayoutSpec[] }>({ past: [], future: [] });
   const historyLockRef = useRef(false);
   const setSpec = useCallback((next: LayoutSpec | ((prev: LayoutSpec) => LayoutSpec)) => {
+    // In collaborative mode, skip history wrapper and use setSpec directly
+    if (isCollaborative) {
+      setSpecRaw(next);
+      return;
+    }
+    
+    // In local mode, wrap with history tracking
     setSpecRaw((prev) => {
       const resolved = typeof next === 'function' ? (next as (p: LayoutSpec) => LayoutSpec)(prev) : next;
       if (!historyLockRef.current && resolved !== prev) {
@@ -206,7 +293,7 @@ export default function CanvasApp() {
       }
       return resolved;
     });
-  }, [setSpecRaw]);
+  }, [setSpecRaw, isCollaborative]);
 
   const undo = useCallback(() => {
     const past = historyRef.current.past;
@@ -390,9 +477,12 @@ export default function CanvasApp() {
     setCurrentDesignName(design.name);
     setSelection([]);
     setOpenDialogOpen(false);
-    setTimeout(() => setFitToContentKey(k => k + 1), 50);
+    // Only fit to content in local mode (not collaborative)
+    if (!isCollaborative) {
+      setTimeout(() => setFitToContentKey(k => k + 1), 50);
+    }
     logger.info(`Loaded design: ${design.name}`);
-  }, [setSpec, setSelection]);
+  }, [setSpec, setSelection, isCollaborative]);
 
   // Apply a template from the New dialog
   const applyTemplate = useCallback((templateId: string) => {
@@ -401,12 +491,14 @@ export default function CanvasApp() {
       const newSpec = template.build();
       setSpec(newSpec);
       setSelection([]);
-      // Trigger fit-to-content after a small delay to ensure spec is applied
-      setTimeout(() => setFitToContentKey(k => k + 1), 50);
+      // Only fit to content in local mode (not collaborative)
+      if (!isCollaborative) {
+        setTimeout(() => setFitToContentKey(k => k + 1), 50);
+      }
       logger.info(`Applied template: ${template.name}`);
     }
     setNewDialogOpen(false);
-  }, [setSpec, setSelection]);
+  }, [setSpec, setSelection, isCollaborative]);
 
 
   // Derive stage width/height from container size (padding adjustments if needed)
@@ -532,12 +624,120 @@ export default function CanvasApp() {
               )}
             </div>
         </div>
-        <div className="flex items-center gap-2 text-xs font-medium text-white/90 bg-white/15 backdrop-blur px-4 py-2 rounded-full border border-white/10">
-          <i className="fa-solid fa-wand-magic-sparkles text-cyan-300" />
-          <span className="capitalize">{tool}</span>
+        <div className="flex items-center gap-4">
+          {/* Collaboration status (when in collaborative mode) */}
+          {isCollaborative && (
+            <div className="flex items-center gap-3">
+              <ConnectionStatusIndicator
+                status={status}
+                collaboratorCount={collaborators.size}
+                isSyncing={isSyncing}
+                lastError={lastError}
+                onReconnect={reconnect}
+              />
+              <ActiveUsersList collaborators={collaborators} maxVisible={4} />
+            </div>
+          )}
+          {/* Share button */}
+          <button
+            onClick={() => setShareDialogOpen(true)}
+            className="flex items-center gap-2 text-sm font-medium text-white bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 px-4 py-2 rounded-lg shadow-md transition-all duration-150"
+          >
+            <i className="fa-solid fa-share-nodes" />
+            Share
+          </button>
+          {/* Tool indicator */}
+          <div className="flex items-center gap-2 text-xs font-medium text-white/90 bg-white/15 backdrop-blur px-4 py-2 rounded-full border border-white/10">
+            <i className="fa-solid fa-wand-magic-sparkles text-cyan-300" />
+            <span className="capitalize">{tool}</span>
+          </div>
         </div>
       </header>
       {/* Modals */}
+      {/* Share / Collaboration Dialog */}
+      <Modal open={shareDialogOpen} onClose={() => setShareDialogOpen(false)} title="Share & Collaborate" size="md" variant="light">
+        <div className="space-y-4">
+          {isCollaborative ? (
+            <>
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <div className="flex items-center gap-2 text-green-700 font-medium mb-2">
+                  <i className="fa-solid fa-check-circle" />
+                  You're in a collaborative session
+                </div>
+                <p className="text-sm text-green-600">
+                  Share this link with others to collaborate in real-time:
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={`${window.location.origin}${window.location.pathname}?room=${roomId}`}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-sm font-mono"
+                  onClick={(e) => (e.target as HTMLInputElement).select()}
+                />
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}?room=${roomId}`);
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
+                >
+                  <i className="fa-regular fa-copy mr-1.5" />
+                  Copy
+                </button>
+              </div>
+              <div className="border-t border-gray-200 pt-4">
+                <button
+                  onClick={() => {
+                    // Leave collaborative mode
+                    const url = new URL(window.location.href);
+                    url.searchParams.delete('room');
+                    window.history.pushState({}, '', url.toString());
+                    setRoomId(null);
+                    setShareDialogOpen(false);
+                  }}
+                  className="text-sm text-red-600 hover:text-red-700"
+                >
+                  <i className="fa-solid fa-arrow-right-from-bracket mr-1.5" />
+                  Leave collaborative session
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-gray-600">
+                Start a collaborative session to work with others in real-time. 
+                Everyone with the link can see and edit the design together.
+              </p>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-center gap-2 text-blue-700 font-medium mb-2">
+                  <i className="fa-solid fa-users" />
+                  Real-time collaboration features:
+                </div>
+                <ul className="text-sm text-blue-600 space-y-1 ml-6 list-disc">
+                  <li>See other users' cursors in real-time</li>
+                  <li>View who has what selected</li>
+                  <li>Changes sync instantly across all users</li>
+                  <li>Works with humans and AI agents</li>
+                </ul>
+              </div>
+              <button
+                onClick={() => {
+                  const newRoomId = generateRoomId();
+                  const url = new URL(window.location.href);
+                  url.searchParams.set('room', newRoomId);
+                  window.history.pushState({}, '', url.toString());
+                  setRoomId(newRoomId);
+                }}
+                className="w-full px-4 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-lg hover:from-cyan-400 hover:to-blue-400 transition-all text-sm font-medium shadow-md"
+              >
+                <i className="fa-solid fa-play mr-2" />
+                Start Collaborative Session
+              </button>
+            </>
+          )}
+        </div>
+      </Modal>
       <Modal open={aboutOpen} onClose={() => setAboutOpen(false)} title="About Vizail" size="sm" variant="light">
         <p><strong>Vizail</strong> version <code>{appVersion}</code></p>
         <p className="mt-2">Experimental canvas + layout editor. Transforms are baked to schema on release.</p>
@@ -788,8 +988,23 @@ export default function CanvasApp() {
           </button>
         </aside>
         {/* Canvas center */}
-        <main className="flex-1 relative min-w-0">
-          <div ref={canvasRef} className="absolute inset-0">
+        <main 
+          className="flex-1 relative min-w-0"
+        >
+          <div 
+            ref={canvasRef} 
+            className="absolute inset-0 overflow-hidden"
+            onMouseMove={isCollaborative ? (e) => {
+              // Update cursor position for collaborators
+              // Convert screen coordinates to canvas space (inverse of viewport transform)
+              const rect = e.currentTarget.getBoundingClientRect();
+              const screenX = e.clientX - rect.left;
+              const screenY = e.clientY - rect.top;
+              const canvasX = (screenX - viewport.x) / viewport.scale;
+              const canvasY = (screenY - viewport.y) / viewport.scale;
+              updateCursor(canvasX, canvasY);
+            } : undefined}
+          >
             {stageWidth > 0 && stageHeight > 0 && (
               <CanvasStage
                 tool={tool}
@@ -815,7 +1030,13 @@ export default function CanvasApp() {
                 selectedIconId={selectedIconId}
                 selectedComponentId={selectedComponentId}
                 selection={selectedIds}
-                setSelection={setSelection}
+                setSelection={(ids) => {
+                  setSelection(ids);
+                  // Sync selection to collaborators
+                  if (isCollaborative) {
+                    updateSelection(ids);
+                  }
+                }}
                 fitToContentKey={fitToContentKey}
                 rectDefaults={{
                   fill: rectDefaults.fill,
@@ -826,7 +1047,29 @@ export default function CanvasApp() {
                   strokeDash: rectDefaults.strokeDash,
                 }}
                 viewportTransition={viewportTransition}
+                onViewportChange={(newViewport) => setViewport(newViewport)}
               />
+            )}
+            {/* Collaboration presence overlays */}
+            {isCollaborative && (
+              <>
+                <CursorOverlay collaborators={collaborators} localClientId={clientId} zoom={viewport.scale} pan={{ x: viewport.x, y: viewport.y }} />
+                <SelectionOverlay
+                  collaborators={collaborators}
+                  localClientId={clientId}
+                  getNodeBounds={(nodeId) => {
+                    // Find node and return its bounds
+                    const node = findNode(spec.root, nodeId);
+                    if (!node || !('position' in node) || !('size' in node)) return null;
+                    const pos = node.position as { x: number; y: number } | undefined;
+                    const size = node.size as { width: number; height: number } | undefined;
+                    if (!pos || !size) return null;
+                    return { x: pos.x, y: pos.y, width: size.width, height: size.height };
+                  }}
+                  zoom={viewport.scale}
+                  pan={{ x: viewport.x, y: viewport.y }}
+                />
+              </>
             )}
           </div>
         </main>

@@ -70,6 +70,12 @@ export function useRealtimeCanvas(
 
   // Awareness debounce timer
   const awarenessTimerRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Use ref for current spec to avoid stale closures in setSpec callback
+  const specRef = useRef<LayoutSpec>(spec);
+  useEffect(() => {
+    specRef.current = spec;
+  }, [spec]);
 
   /**
    * Initialize Yjs document and WebSocket provider
@@ -187,10 +193,20 @@ export function useRealtimeCanvas(
 
       awareness.on('change', awarenessUpdateHandler);
 
+      // Clean up awareness on page unload
+      const handleBeforeUnload = () => {
+        if (providerRef.current) {
+          providerRef.current.awareness.setLocalState(null);
+        }
+      };
+      window.addEventListener('beforeunload', handleBeforeUnload);
+
       // Cleanup
       return () => {
+        window.removeEventListener('beforeunload', handleBeforeUnload);
         ydoc.off('update', updateHandler);
         awareness.off('change', awarenessUpdateHandler);
+        awareness.setLocalState(null); // Clear awareness before destroying
         provider.destroy();
         ydoc.destroy();
       };
@@ -205,7 +221,7 @@ export function useRealtimeCanvas(
    * Update spec (local change that gets synced)
    */
   const setSpec = useCallback((newSpec: LayoutSpec | ((prev: LayoutSpec) => LayoutSpec)) => {
-    const actualSpec = typeof newSpec === 'function' ? newSpec(spec) : newSpec;
+    const actualSpec = typeof newSpec === 'function' ? newSpec(specRef.current) : newSpec;
     
     setSpecState(actualSpec);
 
@@ -220,7 +236,7 @@ export function useRealtimeCanvas(
         setLastError(error instanceof Error ? error.message : 'Update error');
       }
     }
-  }, [spec]);
+  }, []);
 
   /**
    * Update cursor position

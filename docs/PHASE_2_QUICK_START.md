@@ -19,7 +19,55 @@ wrangler deploy
 
 Note the deployed URL (e.g., `https://vizail-websocket.your-subdomain.workers.dev`)
 
-### 3. Enable Real-Time in Your App
+### 3. Using Collaboration (No Code Changes Required!)
+
+Collaboration is now built into the main application. To use it:
+
+1. **Start the WebSocket worker locally:**
+   ```bash
+   cd workers/websocket
+   npm install
+   wrangler dev --local
+   # Worker running at ws://localhost:8787
+   ```
+
+2. **Start the React app:**
+   ```bash
+   cd ../..  # Back to project root
+   pnpm dev
+   # App running at http://localhost:5173
+   ```
+
+3. **Start a collaborative session:**
+   - Click the **Share** button in the header
+   - Click "Start Collaborative Session"
+   - Share the generated URL with collaborators
+
+4. **Join a session:**
+   - Simply open the shared URL (contains `?room=xxx` parameter)
+   - You'll automatically join the collaborative session
+
+### Environment Configuration
+
+For production, set the WebSocket URL via environment variable:
+
+```bash
+# In .env or Cloudflare Pages environment variables
+VITE_WEBSOCKET_URL=wss://vizail-websocket.your-subdomain.workers.dev
+```
+
+### How It Works
+
+- **URL-based rooms**: The `?room=xxx` query parameter determines the collaborative session
+- **Automatic mode switching**: Without a room parameter, the app uses local storage; with one, it uses real-time sync
+- **Persistent user ID**: Each browser gets a unique user ID stored in localStorage
+- **Cursor & selection sharing**: Your cursor and selections are visible to all collaborators
+
+---
+
+## Advanced: Manual Hook Integration (Optional)
+
+If you need to customize the collaboration behavior, you can use the hooks directly:
 
 **Option A: Replace existing persistence hook**
 
