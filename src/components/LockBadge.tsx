@@ -80,13 +80,13 @@ interface LockOverlayProps {
 }
 
 export function LockOverlay({ collaborators, getNodePosition }: LockOverlayProps) {
-  const lockedUsers: Array<{ user: UserAwareness; nodeId: string; position: { x: number; y: number } | undefined }> = [];
+  const lockedUsers: Array<{ user: UserAwareness; nodeId: string; position: { x: number; y: number } | null | undefined }> = [];
 
   // Find all users currently dragging
   collaborators.forEach((user) => {
     if (user.dragging?.nodeIds && user.dragging.nodeIds.length > 0) {
       const nodeId = user.dragging.nodeIds[0]; // Use first node
-      const position = getNodePosition ? getNodePosition(nodeId) ?? undefined : undefined;
+      const position = getNodePosition?.(nodeId);
       
       lockedUsers.push({ user, nodeId, position });
     }
@@ -102,7 +102,7 @@ export function LockOverlay({ collaborators, getNodePosition }: LockOverlayProps
         <LockBadge
           key={`${user.clientId}-${nodeId}`}
           user={user}
-          position={position}
+          position={position ?? undefined}
           showGhost={true}
         />
       ))}

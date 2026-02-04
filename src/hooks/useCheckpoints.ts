@@ -25,10 +25,21 @@ class LocalStorageCheckpointStorage implements CheckpointStorage {
     checkpoints.push(checkpoint);
     
     // Keep only last 50 checkpoints per canvas to avoid storage bloat
-    const filtered = checkpoints
-      .filter((c) => c.canvasId === checkpoint.canvasId)
-      .sort((a, b) => b.createdAt - a.createdAt)
-      .slice(0, 50);
+    // Group by canvas and limit each canvas separately
+    const byCanvas = new Map<string, Checkpoint[]>();
+    for (const cp of checkpoints) {
+      if (!byCanvas.has(cp.canvasId)) {
+        byCanvas.set(cp.canvasId, []);
+      }
+      byCanvas.get(cp.canvasId)!.push(cp);
+    }
+    
+    // Keep last 50 per canvas
+    const filtered: Checkpoint[] = [];
+    for (const [_canvasId, canvasCheckpoints] of byCanvas) {
+      const sorted = canvasCheckpoints.sort((a, b) => b.createdAt - a.createdAt);
+      filtered.push(...sorted.slice(0, 50));
+    }
     
     localStorage.setItem(this.storageKey, JSON.stringify(filtered));
   }

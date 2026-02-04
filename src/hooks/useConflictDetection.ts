@@ -141,11 +141,13 @@ function detectChangedNodes(
  * Recursively collect all nodes from a tree
  */
 function collectNodes(node: any, nodeMap: Map<string, any>) {
-  if (!node) return;
+  if (!node || typeof node !== 'object') return;
+  
+  if (node.id) {
+    nodeMap.set(node.id, node);
+  }
 
-  nodeMap.set(node.id, node);
-
-  if (node.children) {
+  if (Array.isArray(node.children)) {
     for (const child of node.children) {
       collectNodes(child, nodeMap);
     }
