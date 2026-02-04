@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { renderHook } from '@testing-library/react';
+import { renderHook, act } from '@testing-library/react';
 import { useConflictDetection } from './useConflictDetection';
 import type { LayoutSpec } from '../layout-schema';
 import type { UserAwareness } from '../collaboration/types';
@@ -206,7 +206,9 @@ describe('useConflictDetection', () => {
     expect(result.current.conflicts.length).toBeGreaterThan(0);
     const conflictId = result.current.conflicts[0].id;
 
-    result.current.dismissConflict(conflictId);
+    act(() => {
+      result.current.dismissConflict(conflictId);
+    });
 
     expect(result.current.conflicts.length).toBe(0);
   });
