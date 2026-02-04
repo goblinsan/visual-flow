@@ -1,6 +1,7 @@
 /**
  * useRealtimeCanvas hook
  * Phase 2: Real-time collaboration with Yjs + WebSocket
+ * Phase 3: Performance optimizations - throttled updates, batched awareness
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -70,6 +71,10 @@ export function useRealtimeCanvas(
 
   // Awareness debounce timer
   const awarenessTimerRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Performance optimization: Throttle remote spec updates (max 10fps = 100ms)
+  const lastUpdateTimeRef = useRef<number>(0);
+  const pendingUpdateRef = useRef<boolean>(false);
   
   // Use ref for current spec to avoid stale closures in setSpec callback
   const specRef = useRef<LayoutSpec>(spec);
@@ -147,14 +152,37 @@ export function useRealtimeCanvas(
         }
       });
 
-      // Listen for document updates
+      // Listen for document updates with throttling for performance
       const updateHandler = () => {
-        // Update local spec from Yjs document
-        try {
-          const newSpec = yjsToLayoutSpec(ydoc);
-          setSpecState(newSpec);
-        } catch (error) {
-          console.error('Error converting Yjs to spec:', error);
+        // Throttle updates to max 10fps (100ms) for better performance with multiple collaborators
+        const now = Date.now();
+        const timeSinceLastUpdate = now - lastUpdateTimeRef.current;
+        
+        if (timeSinceLastUpdate >= 100) {
+          // Update immediately
+          try {
+            const newSpec = yjsToLayoutSpec(ydoc);
+            setSpecState(newSpec);
+            lastUpdateTimeRef.current = now;
+            pendingUpdateRef.current = false;
+          } catch (error) {
+            console.error('Error converting Yjs to spec:', error);
+          }
+        } else {
+          // Schedule update if not already pending
+          if (!pendingUpdateRef.current) {
+            pendingUpdateRef.current = true;
+            setTimeout(() => {
+              try {
+                const newSpec = yjsToLayoutSpec(ydoc);
+                setSpecState(newSpec);
+                lastUpdateTimeRef.current = Date.now();
+                pendingUpdateRef.current = false;
+              } catch (error) {
+                console.error('Error converting Yjs to spec:', error);
+              }
+            }, 100 - timeSinceLastUpdate);
+          }
         }
       };
 
@@ -273,16 +301,21 @@ export function useRealtimeCanvas(
   }, []);
 
   /**
-   * Update dragging state
+   * Update dragging state with batching
+   * Batches multiple rapid updates during drag to improve performance
    */
   const updateDragging = useCallback((dragging?: { nodeIds: string[]; ghostPosition: { x: number; y: number } }) => {
     if (!providerRef.current) return;
 
     const awareness = providerRef.current.awareness;
     const currentState = awareness.getLocalState();
-    awareness.setLocalStateField('user', {
-      ...currentState?.user,
-      dragging,
+    
+    // Use requestAnimationFrame for batching drag updates
+    requestAnimationFrame(() => {
+      awareness.setLocalStateField('user', {
+        ...currentState?.user,
+        dragging,
+      });
     });
   }, []);
 
