@@ -59,6 +59,8 @@ interface CanvasStageProps {
   rectDefaults?: { fill?: string; stroke?: string; strokeWidth: number; radius: number; opacity: number; strokeDash?: number[] };
   selection: string[];
   setSelection: (ids: string[]) => void;
+  selectedCurvePointIndex?: number | null;
+  setSelectedCurvePointIndex?: (index: number | null) => void;
   fitToContentKey?: number; // Increment to trigger fit-to-content
   viewportTransition?: {
     targetId: string;
@@ -121,7 +123,7 @@ function InfiniteGrid({ width, height, scale, offsetX, offsetY }: InfiniteGridPr
   return <>{dots}</>;
 }
 
-function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select", onToolChange, selectedIconId, selectedComponentId, onUndo, onRedo, focusNodeId, onUngroup, rectDefaults, selection, setSelection, fitToContentKey, viewportTransition, onViewportChange }: CanvasStageProps) {
+function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select", onToolChange, selectedIconId, selectedComponentId, onUndo, onRedo, focusNodeId, onUngroup, rectDefaults, selection, setSelection, selectedCurvePointIndex, setSelectedCurvePointIndex, fitToContentKey, viewportTransition, onViewportChange }: CanvasStageProps) {
   // View / interaction state
   const [scale, setScale] = useState(1);
   const [pos, setPos] = useState({ x: 0, y: 0 });
@@ -152,6 +154,9 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
   // Inline text editing state
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const justStartedTextEditRef = useRef(false);
+  
+  // Curve editing mode (double-click to edit CVs)
+  const [editingCurveId, setEditingCurveId] = useState<string | null>(null);
   const clipboardRef = useRef<LayoutNode[] | null>(null);
   const pasteOffsetRef = useRef(0);
   useEffect(() => {
@@ -782,10 +787,30 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     const template = COMPONENT_LIBRARY.find(c => c.id === selectedComponentId) ?? COMPONENT_LIBRARY[0];
     if (!template) return;
     const groupNode = template.build(worldPos, makeId);
+    
+    // Generate unique name for the component
+    const baseName = template.name;
+    const existingNames = new Set<string>();
+    const collectNames = (node: LayoutNode) => {
+      if (node.name) existingNames.add(node.name as string);
+      if ('children' in node && Array.isArray(node.children)) {
+        node.children.forEach(collectNames);
+      }
+    };
+    collectNames(spec.root);
+    
+    let finalName = baseName;
+    let counter = 2;
+    while (existingNames.has(finalName)) {
+      finalName = `${baseName} ${String(counter).padStart(2, '0')}`;
+      counter++;
+    }
+    
+    groupNode.name = finalName;
     setSpec(prev => appendNodesToRoot(prev, [groupNode]));
     setSelection([groupNode.id]);
     onToolChange?.('select');
-  }, [makeId, onToolChange, selectedComponentId, setSelection, setSpec]);
+  }, [makeId, onToolChange, selectedComponentId, setSelection, setSpec, spec.root]);
 
   // Actually insert the image after picker selection
   const handleImageSelected = useCallback((src: string, width: number, height: number) => {
@@ -1325,7 +1350,20 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
     return () => window.removeEventListener('keydown', onKey, CAPTURE_OPTIONS);
   }, [isCurveMode, curveDraft, finalizeCurve]);
 
-  // Double-click: finalize curve OR enter text editing mode
+  // Curve edit mode: exit on Escape
+  useEffect(() => {
+    if (!editingCurveId) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setEditingCurveId(null);
+        setSelectedCurvePointIndex?.(null);
+      }
+    };
+    window.addEventListener('keydown', onKey, CAPTURE_OPTIONS);
+    return () => window.removeEventListener('keydown', onKey, CAPTURE_OPTIONS);
+  }, [editingCurveId, setSelectedCurvePointIndex]);
+
+  // Double-click: finalize curve OR enter curve edit mode OR enter text editing mode
   const onDblClick = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     // Curve finalization
     if (isCurveMode && curveDraft && curveDraft.points.length >= 1) {
@@ -1333,12 +1371,24 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
       return;
     }
     
-    // Text editing - check if double-clicked on a text node
+    // Check if double-clicked on a curve - enter edit mode
     if (isSelectMode) {
       const target = e.target;
       const name = target.name?.() || '';
-      let isTextNode = name.includes('text');
       let nodeId = target.id();
+      
+      // Check for curve
+      if (name.includes('curve') && nodeId) {
+        const curveNode = findNode(spec.root, nodeId);
+        if (curveNode && curveNode.type === 'curve') {
+          setEditingCurveId(nodeId);
+          setSelectedCurvePointIndex?.(null);
+          return;
+        }
+      }
+      
+      // Text editing - check if double-clicked on a text node
+      let isTextNode = name.includes('text');
       
       // If we clicked on a child element (like a Text inside a Group for rich text),
       // check the parent for the text node name
@@ -1921,15 +1971,37 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
               rotation: rotationDeg
             }))
         }));
-        // Scaling logic: text nodes accumulate glyph scale; others resize as before
+        // Scaling logic: text nodes update fontSize; others resize as before
         if (scaleX !== 1 || scaleY !== 1) {
           if (currentNode.type === 'text') {
-            // For text nodes in multi-selection, Konva node.scaleX()/scaleY() already represent absolute glyph scale.
-            const absX = Math.max(0.05, node.scaleX());
-            const absY = Math.max(0.05, node.scaleY());
+            // For text nodes, update fontSize based on average scale (or Y scale for vertical sizing)
+            const textNode = currentNode as TextNode;
+            const baseFontSize = textNode.fontSize ?? (textNode.variant === 'h1' ? 28 : textNode.variant === 'h2' ? 22 : textNode.variant === 'h3' ? 18 : 14);
+            const scaleFactor = Math.max(0.1, scaleY); // Use Y scale for font size
+            const newFontSize = Math.round(Math.max(8, baseFontSize * scaleFactor));
+            
             setSpec(prev => ({
               ...prev,
-              root: mapNode<FrameNode>(prev.root, nodeId, (n) => n.type === 'text' ? { ...n, textScaleX: absX, textScaleY: absY } : n)
+              root: mapNode<FrameNode>(prev.root, nodeId, (n) => {
+                if (n.type !== 'text') return n;
+                const textN = n as TextNode;
+                // Update base fontSize and all span fontSizes proportionally
+                const result: TextNode = {
+                  ...textN,
+                  fontSize: newFontSize,
+                  position: { x: newPos.x, y: newPos.y },
+                };
+                // Scale spans if they exist
+                if (textN.spans && textN.spans.length > 0) {
+                  result.spans = textN.spans.map(span => {
+                    if (span.fontSize) {
+                      return { ...span, fontSize: Math.round(Math.max(8, span.fontSize * scaleFactor)) };
+                    }
+                    return span;
+                  });
+                }
+                return result;
+              })
             }));
           } else if (nodeHasSize(currentNode)) {
             const newSize = {
@@ -2035,12 +2107,33 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
               };
             })
           }));
-          // Persist absolute Konva scale as glyph scale
-          const absX = Math.max(0.05, node.scaleX());
-          const absY = Math.max(0.05, node.scaleY());
+        } else if (currentNode.type === 'text') {
+          // For individual text nodes: update fontSize based on scale
+          const textNode = currentNode as TextNode;
+          const baseFontSize = textNode.fontSize ?? (textNode.variant === 'h1' ? 28 : textNode.variant === 'h2' ? 22 : textNode.variant === 'h3' ? 18 : 14);
+          const scaleFactor = Math.max(0.1, scaleY); // Use Y scale for font size
+          const newFontSize = Math.round(Math.max(8, baseFontSize * scaleFactor));
+          
           setSpec(prev => ({
             ...prev,
-            root: mapNode<FrameNode>(prev.root, nodeId, (n) => n.type === 'text' ? { ...n, textScaleX: absX, textScaleY: absY } : n)
+            root: mapNode<FrameNode>(prev.root, nodeId, (n) => {
+              if (n.type !== 'text') return n;
+              const textN = n as TextNode;
+              const result: TextNode = {
+                ...textN,
+                fontSize: newFontSize,
+              };
+              // Scale spans if they exist
+              if (textN.spans && textN.spans.length > 0) {
+                result.spans = textN.spans.map(span => {
+                  if (span.fontSize) {
+                    return { ...span, fontSize: Math.round(Math.max(8, span.fontSize * scaleFactor)) };
+                  }
+                  return span;
+                });
+              }
+              return result;
+            })
           }));
         } else {
           // For individual non-text nodes: scale size
@@ -2131,7 +2224,7 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
             {renderNode(spec.root)}
           </Group>
           
-          {isSelectMode && !editingTextId && (
+          {isSelectMode && !editingTextId && !editingCurveId && (
             <Transformer 
               ref={trRef as unknown as React.RefObject<Konva.Transformer>} 
               rotateEnabled={true} 
@@ -2286,9 +2379,9 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
             );
           })()}
           
-          {/* Curve control point handles (when a curve is selected) */}
-          {isSelectMode && selected.length === 1 && (() => {
-            const curveNode = selectionContext.nodeById[selected[0]];
+          {/* Curve control point handles (when a curve is in edit mode OR selected) */}
+          {isSelectMode && ((selected.length === 1 && editingCurveId === selected[0]) || editingCurveId) && (() => {
+            const curveNode = selectionContext.nodeById[editingCurveId || selected[0]];
             if (!curveNode || curveNode.type !== 'curve') return null;
             
             const curveX = curveNode.position?.x ?? 0;
@@ -2322,16 +2415,25 @@ function CanvasStage({ spec, setSpec, width = 800, height = 600, tool = "select"
                 {/* Control point circles */}
                 {controlPoints.map((cp, idx) => {
                   const isEndpoint = idx === 0 || idx === controlPoints.length - 1;
+                  const isSelected = selectedCurvePointIndex === idx;
                   return (
                     <Circle
                       key={`curve-handle-${curveNode.id}-${idx}`}
                       x={cp.x}
                       y={cp.y}
-                      radius={isEndpoint ? 6 / scale : 5 / scale}
-                      fill={isEndpoint ? '#3b82f6' : 'white'}
-                      stroke="#3b82f6"
-                      strokeWidth={2 / scale}
+                      radius={isSelected ? 7 / scale : (isEndpoint ? 6 / scale : 5 / scale)}
+                      fill={isSelected ? '#10b981' : (isEndpoint ? '#3b82f6' : 'white')}
+                      stroke={isSelected ? '#10b981' : '#3b82f6'}
+                      strokeWidth={isSelected ? 3 / scale : 2 / scale}
                       draggable={!curveNode.locked}
+                      onClick={(e) => {
+                        e.cancelBubble = true;
+                        setSelectedCurvePointIndex?.(idx);
+                      }}
+                      onTap={(e) => {
+                        e.cancelBubble = true;
+                        setSelectedCurvePointIndex?.(idx);
+                      }}
                       onDragMove={(e) => {
                         const newX = e.target.x() - curveX;
                         const newY = e.target.y() - curveY;

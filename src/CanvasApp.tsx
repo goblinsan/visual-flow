@@ -1037,6 +1037,8 @@ export default function CanvasApp() {
                     updateSelection(ids);
                   }
                 }}
+                selectedCurvePointIndex={selectedCurvePointIndex}
+                setSelectedCurvePointIndex={setSelectedCurvePointIndex}
                 fitToContentKey={fitToContentKey}
                 rectDefaults={{
                   fill: rectDefaults.fill,
@@ -1103,7 +1105,8 @@ export default function CanvasApp() {
                 }));
               };
 
-              const isScreenEligible = ['group', 'frame', 'stack', 'grid', 'box'].includes(node.type);
+              // All nodes can be marked as screens for flow
+              const isScreenEligible = true;
               const screenMeta = node.screen;
               const flows = spec.flows ?? [];
 
@@ -1384,6 +1387,19 @@ export default function CanvasApp() {
                               placeholder="Layer name"
                             />
                           </div>
+                          {/* Navigate into nested groups */}
+                          {(['group', 'frame', 'stack', 'grid'].includes(child.type) && 'children' in child && (child.children as any[]).length > 0) && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelection([child.id]);
+                              }}
+                              className="w-full px-2 py-1.5 text-[11px] bg-blue-50 text-blue-600 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors flex items-center justify-center gap-1.5"
+                            >
+                              <i className="fa-solid fa-arrow-right-to-bracket" />
+                              Edit Nested Group ({(child.children as any[]).length} children)
+                            </button>
+                          )}
                           {renderElementPanelFor(child)}
                         </div>
                       </details>

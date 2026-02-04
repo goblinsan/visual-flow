@@ -196,10 +196,12 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
 }, ref) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const [isComposing, setIsComposing] = useState(false);
+  const initializedRef = useRef(false);
   
-  // Initialize content
+  // Initialize content only once
   useEffect(() => {
-    if (!editorRef.current) return;
+    if (!editorRef.current || initializedRef.current) return;
+    initializedRef.current = true;
     
     if (spans && spans.length > 0) {
       editorRef.current.innerHTML = spansToHtml(spans, baseStyles);
@@ -220,7 +222,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
         sel?.addRange(range);
       }, 0);
     }
-  }, [autoFocus, baseStyles, spans, value]);
+  }, [autoFocus, baseStyles]);  // Removed spans and value from dependencies
   
   const handleInput = useCallback(() => {
     if (!editorRef.current || isComposing) return;
