@@ -2021,7 +2021,12 @@ export default function CanvasApp() {
                           <div className="flex gap-2 pt-2">
                             <button
                               onClick={async () => {
-                                await proposals.approveProposal(selectedProposal.id);
+                                const success = await proposals.approveProposal(selectedProposal.id);
+                                if (success) {
+                                  // Apply the proposal operations to the local spec so changes persist
+                                  const mergedSpec = applyProposalOperations(spec, selectedProposal.operations);
+                                  setSpec(mergedSpec);
+                                }
                                 setSelectedProposalId(null);
                                 setViewingProposedSpec(false);
                               }}

@@ -488,6 +488,39 @@ async function deleteBranch(user, env, branchId) {
 __name(deleteBranch, "deleteBranch");
 
 // src/routes/proposals.ts
+function applyOperationsToSpec(spec, operations) {
+  const newSpec = JSON.parse(JSON.stringify(spec));
+  for (const op of operations) {
+    switch (op.type) {
+      case "create":
+        if (op.after) {
+          newSpec.root.children.push(op.after);
+        }
+        break;
+      case "update":
+        if (op.after) {
+          const idx = newSpec.root.children.findIndex((n) => n.id === op.nodeId);
+          if (idx >= 0) {
+            newSpec.root.children[idx] = { ...newSpec.root.children[idx], ...op.after };
+          }
+        }
+        break;
+      case "delete":
+        newSpec.root.children = newSpec.root.children.filter((n) => n.id !== op.nodeId);
+        break;
+      case "move":
+        if (op.after && typeof op.after === "object" && "position" in op.after) {
+          const idx = newSpec.root.children.findIndex((n) => n.id === op.nodeId);
+          if (idx >= 0 && "position" in newSpec.root.children[idx]) {
+            newSpec.root.children[idx].position = op.after.position;
+          }
+        }
+        break;
+    }
+  }
+  return newSpec;
+}
+__name(applyOperationsToSpec, "applyOperationsToSpec");
 async function listProposals(user, env, canvasId) {
   const access = await checkCanvasAccess(env, user.id, canvasId);
   if (!access.allowed) {
@@ -609,17 +642,31 @@ async function approveProposal(user, env, proposalId) {
       return errorResponse("Only pending proposals can be approved", 400);
     }
     const now = Date.now();
-    await env.DB.prepare(`
-        UPDATE agent_proposals
-        SET status = ?, reviewed_at = ?, reviewed_by = ?
-        WHERE id = ?
-      `).bind("approved", now, user.id, proposalId).run();
+    const operations = JSON.parse(proposal.operations);
+    const canvas = await env.DB.prepare("SELECT spec FROM canvases WHERE id = ?").bind(proposal.canvas_id).first();
+    if (!canvas) {
+      return errorResponse("Canvas not found", 404);
+    }
+    const currentSpec = JSON.parse(canvas.spec);
+    const updatedSpec = applyOperationsToSpec(currentSpec, operations);
+    await env.DB.batch([
+      env.DB.prepare(`
+          UPDATE agent_proposals
+          SET status = ?, reviewed_at = ?, reviewed_by = ?
+          WHERE id = ?
+        `).bind("approved", now, user.id, proposalId),
+      env.DB.prepare(`
+          UPDATE canvases
+          SET spec = ?, updated_at = ?
+          WHERE id = ?
+        `).bind(JSON.stringify(updatedSpec), now, proposal.canvas_id)
+    ]);
     const updated = {
       ...proposal,
       status: "approved",
       reviewed_at: now,
       reviewed_by: user.id,
-      operations: JSON.parse(proposal.operations),
+      operations,
       assumptions: JSON.parse(proposal.assumptions)
     };
     return jsonResponse(updated);
