@@ -3,7 +3,6 @@
  * Phase 4: Agent Collaboration
  */
 
-import React from 'react';
 import type { DesignRationale } from '../types/agent';
 
 export interface RationaleTooltipProps {
@@ -12,7 +11,7 @@ export interface RationaleTooltipProps {
   visible: boolean;
 }
 
-export function RationaleTooltip(props: RationaleTooltipProps): JSX.Element | null {
+export function RationaleTooltip(props: RationaleTooltipProps) {
   const { rationale, position, visible } = props;
 
   if (!visible) return null;
@@ -68,7 +67,7 @@ export interface RationaleOverlayProps {
   getNodePosition: (nodeId: string) => { x: number; y: number } | null;
 }
 
-export function RationaleOverlay(props: RationaleOverlayProps): JSX.Element {
+export function RationaleOverlay(props: RationaleOverlayProps) {
   const { rationales, hoveredNodeId, getNodePosition } = props;
 
   if (!hoveredNodeId || !rationales.has(hoveredNodeId)) {

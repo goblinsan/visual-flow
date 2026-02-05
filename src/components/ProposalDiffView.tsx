@@ -3,7 +3,7 @@
  * Phase 4: Agent Collaboration
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import type { AgentProposal } from '../types/agent';
 import { getOperationIcon } from '../utils/proposalHelpers';
 
@@ -14,7 +14,7 @@ export interface ProposalDiffViewProps {
   onReject?: () => Promise<void>;
 }
 
-export function ProposalDiffView(props: ProposalDiffViewProps): JSX.Element {
+export function ProposalDiffView(props: ProposalDiffViewProps) {
   const { proposal, onClose, onApprove, onReject } = props;
   const [activeTab, setActiveTab] = useState<'changes' | 'rationale' | 'assumptions'>('changes');
   const [loading, setLoading] = useState(false);

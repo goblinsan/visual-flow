@@ -3,7 +3,7 @@
  * Demonstrates how to use agent collaboration features
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useBranches } from '../hooks/useBranches';
 import { useProposals } from '../hooks/useProposals';
 import { AgentTokenDialog } from '../components/AgentTokenDialog';
@@ -18,13 +18,13 @@ export interface Phase4DemoProps {
   userId: string;
 }
 
-export function Phase4Demo(props: Phase4DemoProps): JSX.Element {
-  const { canvasId, userId } = props;
+export function Phase4Demo(props: Phase4DemoProps) {
+  const { canvasId } = props;
 
   // State
   const [showTokenDialog, setShowTokenDialog] = useState(false);
   const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
-  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+  const [hoveredNodeId] = useState<string | null>(null);
   const [rationales] = useState<Map<string, DesignRationale>>(new Map());
 
   // Hooks
@@ -65,7 +65,7 @@ export function Phase4Demo(props: Phase4DemoProps): JSX.Element {
     }
   };
 
-  const getNodePosition = (nodeId: string): { x: number; y: number } | null => {
+  const getNodePosition = (): { x: number; y: number } | null => {
     // Mock implementation - in real app, get actual node position from canvas
     return { x: 100, y: 100 };
   };
@@ -183,6 +183,6 @@ export function Phase4Demo(props: Phase4DemoProps): JSX.Element {
 /**
  * Example usage with mock data
  */
-export function Phase4DemoWithMockData(): JSX.Element {
+export function Phase4DemoWithMockData() {
   return <Phase4Demo canvasId="demo-canvas-1" userId="demo-user-1" />;
 }

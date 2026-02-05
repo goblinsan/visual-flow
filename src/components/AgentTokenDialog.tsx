@@ -3,7 +3,7 @@
  * Phase 4: Agent Collaboration
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import type { AgentScope, AgentToken } from '../types/agent';
 
 export interface AgentTokenDialogProps {
@@ -12,8 +12,8 @@ export interface AgentTokenDialogProps {
   onGenerate: (agentId: string, scope: AgentScope) => Promise<AgentToken | null>;
 }
 
-export function AgentTokenDialog(props: AgentTokenDialogProps): JSX.Element {
-  const { canvasId, onClose, onGenerate } = props;
+export function AgentTokenDialog(props: AgentTokenDialogProps) {
+  const { onClose, onGenerate } = props;
   const [agentId, setAgentId] = useState('');
   const [scope, setScope] = useState<AgentScope>('propose');
   const [loading, setLoading] = useState(false);

@@ -3,7 +3,6 @@
  */
 
 import type { Meta, StoryObj } from '@storybook/react';
-import React from 'react';
 import { AgentTokenDialog } from './components/AgentTokenDialog';
 import { ProposalListPanel } from './components/ProposalListPanel';
 import { ProposalDiffView } from './components/ProposalDiffView';

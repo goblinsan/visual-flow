@@ -3,7 +3,7 @@
  * Phase 4: Agent Collaboration
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import type { AgentProposal } from '../types/agent';
 import {
   calculateProposalDiff,
@@ -19,7 +19,7 @@ export interface ProposalListPanelProps {
   onReject: (proposalId: string) => Promise<void>;
 }
 
-export function ProposalListPanel(props: ProposalListPanelProps): JSX.Element {
+export function ProposalListPanel(props: ProposalListPanelProps) {
   const { proposals, loading, onSelectProposal, onApprove, onReject } = props;
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
 
@@ -111,7 +111,7 @@ interface ProposalCardProps {
   onReject: () => void;
 }
 
-function ProposalCard(props: ProposalCardProps): JSX.Element {
+function ProposalCard(props: ProposalCardProps) {
   const { proposal, onSelect, onApprove, onReject } = props;
   const diff = calculateProposalDiff(proposal.operations);
   const statusColor = getProposalStatusColor(proposal.status);
