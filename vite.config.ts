@@ -20,6 +20,13 @@ export default defineConfig({
   define: {
     'import.meta.env.VITE_APP_VERSION': JSON.stringify(pkgVersion),
   },
+  server: {
+    watch: {
+      // Ignore wrangler local state dirs — D1 SQLite files change on every
+      // API call, which would otherwise trigger full-page reloads via HMR.
+      ignored: ['**/.wrangler/**'],
+    },
+  },
   test: {
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.ts'],

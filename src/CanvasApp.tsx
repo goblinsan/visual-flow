@@ -364,14 +364,32 @@ export default function CanvasApp() {
   const appVersion = import.meta.env.VITE_APP_VERSION ?? '0.0.0';
 
   // Phase 4: Agent Proposals
-  const [currentCanvasId] = useState('c5ac2c60-b82b-46e5-afc6-97c04b11e8f1'); // TODO: Get from URL or persistence
+  // Persist canvas ID per design name so it survives re-renders / remounts
+  const canvasIdStorageKey = `vizail_canvas_id_${currentDesignName ?? '__default__'}`;
+  const [currentCanvasId, setCurrentCanvasIdRaw] = useState<string | null>(() => {
+    try { return localStorage.getItem(canvasIdStorageKey); } catch { return null; }
+  });
+  const setCurrentCanvasId = useCallback((id: string | null) => {
+    setCurrentCanvasIdRaw(id);
+    try {
+      if (id) localStorage.setItem(canvasIdStorageKey, id);
+      else localStorage.removeItem(canvasIdStorageKey);
+    } catch { /* ignore */ }
+  }, [canvasIdStorageKey]);
+  // Re-read from storage when the design name changes
+  useEffect(() => {
+    try {
+      setCurrentCanvasIdRaw(localStorage.getItem(canvasIdStorageKey));
+    } catch { setCurrentCanvasIdRaw(null); }
+  }, [canvasIdStorageKey]);
   const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
   const [viewingProposedSpec, setViewingProposedSpec] = useState(false);
+  const [creatingCanvasId, setCreatingCanvasId] = useState(false);
   
   const proposals = useProposals({
-    canvasId: currentCanvasId,
-    enabled: false, // Disabled auto-refresh - only manual refresh
-    refreshInterval: 0,
+    canvasId: currentCanvasId ?? '',
+    enabled: !!currentCanvasId, // Auto-load when canvas ID exists
+    refreshInterval: currentCanvasId ? 30000 : 0, // Poll every 30s when shared
   });
 
   const pushRecent = useCallback((col: string) => { commitRecent(col); }, [commitRecent]);
@@ -1126,20 +1144,24 @@ export default function CanvasApp() {
                 setSidebarVisible(true);
                 setPanelMode('attributes');
               }}
-              className="fixed right-0 z-10 h-32 bg-gradient-to-b from-gray-300 to-gray-400 hover:from-gray-400 hover:to-gray-500 shadow-md transition-colors flex items-center justify-center"
+              className={`fixed right-0 z-10 h-32 shadow-md transition-colors flex items-center justify-center ${
+                panelMode === 'attributes'
+                  ? 'bg-gradient-to-b from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700'
+                  : 'bg-gradient-to-b from-gray-300 to-gray-400 hover:from-gray-400 hover:to-gray-500'
+              }`}
               title="Show Attributes"
               style={{ 
                 padding: 0,
                 width: '20px',
                 top: '96px',
                 borderRadius: '8px 0 0 8px',
-                borderLeft: '1px solid #9ca3af',
-                borderTop: '1px solid #9ca3af',
-                borderBottom: '1px solid #9ca3af'
+                borderLeft: `1px solid ${panelMode === 'attributes' ? '#0d9488' : '#9ca3af'}`,
+                borderTop: `1px solid ${panelMode === 'attributes' ? '#0d9488' : '#9ca3af'}`,
+                borderBottom: `1px solid ${panelMode === 'attributes' ? '#0d9488' : '#9ca3af'}`
               }}
             >
               <span
-                className="text-[10px] font-semibold text-gray-700"
+                className={`text-[10px] font-semibold ${panelMode === 'attributes' ? 'text-white' : 'text-gray-700'}`}
                 style={{ 
                   transform: 'rotate(-90deg)',
                   whiteSpace: 'nowrap',
@@ -1154,20 +1176,24 @@ export default function CanvasApp() {
                 setSidebarVisible(true);
                 setPanelMode('agent');
               }}
-              className="fixed right-0 z-10 h-32 bg-gradient-to-b from-purple-400 to-purple-500 hover:from-purple-500 hover:to-purple-600 shadow-md transition-colors flex items-center justify-center"
+              className={`fixed right-0 z-10 h-32 shadow-md transition-colors flex items-center justify-center ${
+                panelMode === 'agent'
+                  ? 'bg-gradient-to-b from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700'
+                  : 'bg-gradient-to-b from-gray-300 to-gray-400 hover:from-gray-400 hover:to-gray-500'
+              }`}
               title="Show Agent Control"
               style={{ 
                 padding: 0,
                 width: '20px',
                 top: '260px',
                 borderRadius: '8px 0 0 8px',
-                borderLeft: '1px solid #9333ea',
-                borderTop: '1px solid #9333ea',
-                borderBottom: '1px solid #9333ea'
+                borderLeft: `1px solid ${panelMode === 'agent' ? '#0d9488' : '#9ca3af'}`,
+                borderTop: `1px solid ${panelMode === 'agent' ? '#0d9488' : '#9ca3af'}`,
+                borderBottom: `1px solid ${panelMode === 'agent' ? '#0d9488' : '#9ca3af'}`
               }}
             >
               <span
-                className="text-[10px] font-semibold text-white"
+                className={`text-[10px] font-semibold ${panelMode === 'agent' ? 'text-white' : 'text-gray-700'}`}
                 style={{ 
                   transform: 'rotate(-90deg)',
                   whiteSpace: 'nowrap',
@@ -1186,7 +1212,7 @@ export default function CanvasApp() {
               onClick={() => setPanelMode('attributes')}
               className={`fixed z-10 h-32 shadow-md transition-colors flex items-center justify-center ${
                 panelMode === 'attributes'
-                  ? 'bg-gradient-to-b from-gray-400 to-gray-500'
+                  ? 'bg-gradient-to-b from-teal-500 to-teal-600'
                   : 'bg-gradient-to-b from-gray-300 to-gray-400 hover:from-gray-400 hover:to-gray-500'
               }`}
               title="Attributes"
@@ -1196,13 +1222,13 @@ export default function CanvasApp() {
                 top: '96px',
                 right: '288px',
                 borderRadius: '8px 0 0 8px',
-                borderLeft: '1px solid #9ca3af',
-                borderTop: '1px solid #9ca3af',
-                borderBottom: '1px solid #9ca3af'
+                borderLeft: `1px solid ${panelMode === 'attributes' ? '#0d9488' : '#9ca3af'}`,
+                borderTop: `1px solid ${panelMode === 'attributes' ? '#0d9488' : '#9ca3af'}`,
+                borderBottom: `1px solid ${panelMode === 'attributes' ? '#0d9488' : '#9ca3af'}`
               }}
             >
               <span
-                className="text-[10px] font-semibold text-gray-700"
+                className={`text-[10px] font-semibold ${panelMode === 'attributes' ? 'text-white' : 'text-gray-700'}`}
                 style={{ 
                   transform: 'rotate(-90deg)',
                   whiteSpace: 'nowrap',
@@ -1216,8 +1242,8 @@ export default function CanvasApp() {
               onClick={() => setPanelMode('agent')}
               className={`fixed z-10 h-32 shadow-md transition-colors flex items-center justify-center ${
                 panelMode === 'agent'
-                  ? 'bg-gradient-to-b from-purple-500 to-purple-600'
-                  : 'bg-gradient-to-b from-purple-400 to-purple-500 hover:from-purple-500 hover:to-purple-600'
+                  ? 'bg-gradient-to-b from-teal-500 to-teal-600'
+                  : 'bg-gradient-to-b from-gray-300 to-gray-400 hover:from-gray-400 hover:to-gray-500'
               }`}
               title="Agent Control"
               style={{ 
@@ -1226,13 +1252,13 @@ export default function CanvasApp() {
                 top: '260px',
                 right: '288px',
                 borderRadius: '8px 0 0 8px',
-                borderLeft: '1px solid #9333ea',
-                borderTop: '1px solid #9333ea',
-                borderBottom: '1px solid #9333ea'
+                borderLeft: `1px solid ${panelMode === 'agent' ? '#0d9488' : '#9ca3af'}`,
+                borderTop: `1px solid ${panelMode === 'agent' ? '#0d9488' : '#9ca3af'}`,
+                borderBottom: `1px solid ${panelMode === 'agent' ? '#0d9488' : '#9ca3af'}`
               }}
             >
               <span
-                className="text-[10px] font-semibold text-white"
+                className={`text-[10px] font-semibold ${panelMode === 'agent' ? 'text-white' : 'text-gray-700'}`}
                 style={{ 
                   transform: 'rotate(-90deg)',
                   whiteSpace: 'nowrap',
@@ -1267,7 +1293,7 @@ export default function CanvasApp() {
                 </>
               ) : (
                 <>
-                  <i className="fa-solid fa-robot text-purple-400" />
+                  <i className="fa-solid fa-wand-magic-sparkles text-teal-500" />
                   <span className="text-sm font-semibold text-gray-700">Agent Control</span>
                 </>
               )}
@@ -1862,14 +1888,25 @@ export default function CanvasApp() {
                     ) : (
                       <button
                         onClick={async () => {
-                          // Create canvas ID from current spec
-                          const canvasId = crypto.randomUUID();
-                          setCurrentCanvasId(canvasId);
-                          // TODO: Save canvas to backend with this ID
+                          setCreatingCanvasId(true);
+                          try {
+                            const { apiClient } = await import('./api/client');
+                            const result = await apiClient.createCanvas(currentDesignName || 'Untitled Canvas', spec);
+                            if (result.data) {
+                              setCurrentCanvasId(result.data.id);
+                            } else {
+                              console.error('Failed to create canvas:', result.error);
+                            }
+                          } catch (err) {
+                            console.error('Error creating canvas:', err);
+                          } finally {
+                            setCreatingCanvasId(false);
+                          }
                         }}
-                        className="w-full px-3 py-2 bg-blue-600 text-white text-xs font-medium rounded hover:bg-blue-700 transition"
+                        disabled={creatingCanvasId}
+                        className="w-full px-3 py-2 bg-teal-600 text-white text-xs font-medium rounded hover:bg-teal-700 transition disabled:opacity-50"
                       >
-                        Create Canvas ID
+                        {creatingCanvasId ? 'Creating...' : 'Share with Agent'}
                       </button>
                     )}
                   </div>
@@ -1883,7 +1920,12 @@ export default function CanvasApp() {
                         Proposals ({proposals.proposals.length})
                       </div>
                       <button
-                        onClick={() => proposals.refetch()}
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          proposals.refetch();
+                        }}
                         className="text-xs text-blue-600 hover:text-blue-700 transition"
                         disabled={proposals.loading}
                       >
@@ -1891,11 +1933,17 @@ export default function CanvasApp() {
                       </button>
                     </div>
 
-                    {proposals.loading && (
+                    {proposals.error && (
+                      <div className="text-xs text-red-500 bg-red-50 border border-red-200 rounded p-2 mb-2">
+                        {proposals.error}
+                      </div>
+                    )}
+
+                    {proposals.loading && proposals.proposals.length === 0 && (
                       <div className="text-xs text-gray-500 text-center py-4">Loading proposals...</div>
                     )}
 
-                    {!proposals.loading && proposals.proposals.filter(p => p.status === 'pending').length === 0 && (
+                    {!proposals.loading && !proposals.error && proposals.proposals.filter(p => p.status === 'pending').length === 0 && (
                       <div className="text-xs text-gray-500 text-center py-4">No pending proposals</div>
                     )}
 
@@ -1960,9 +2008,9 @@ export default function CanvasApp() {
                           </div>
                           
                           {selectedProposal.assumptions && selectedProposal.assumptions.length > 0 && (
-                            <div className="bg-purple-50 border border-purple-200 rounded p-2 text-xs">
-                              <div className="font-semibold text-purple-900 mb-1">Assumptions</div>
-                              <ul className="text-purple-800 space-y-1">
+                            <div className="bg-amber-50 border border-amber-200 rounded p-2 text-xs">
+                              <div className="font-semibold text-amber-900 mb-1">Assumptions</div>
+                              <ul className="text-amber-800 space-y-1">
                                 {selectedProposal.assumptions.map((assumption, i) => (
                                   <li key={i}>• {assumption}</li>
                                 ))}

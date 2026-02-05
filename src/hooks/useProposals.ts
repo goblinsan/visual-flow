@@ -31,6 +31,8 @@ export interface UseProposalsResult {
   approveProposal: (proposalId: string) => Promise<boolean>;
   rejectProposal: (proposalId: string, reason?: string) => Promise<boolean>;
   refreshProposals: () => Promise<void>;
+  /** Manual fetch that works even when auto-refresh is disabled */
+  refetch: () => Promise<void>;
 }
 
 /**
@@ -48,17 +50,46 @@ export function useProposals(options: UseProposalsOptions): UseProposalsResult {
     setLoading(true);
     setError(null);
 
-    const result = await apiClient.listProposals(canvasId);
+    try {
+      const result = await apiClient.listProposals(canvasId);
 
-    if (result.error) {
-      setError(result.error);
+      if (result.error) {
+        setError(result.error);
+        setLoading(false);
+        return;
+      }
+
+      setProposals(result.data || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Network error');
+    } finally {
       setLoading(false);
-      return;
     }
-
-    setProposals(result.data || []);
-    setLoading(false);
   }, [canvasId, enabled]);
+
+  /** Manual fetch that works even when auto-refresh is disabled */
+  const refetch = useCallback(async () => {
+    if (!canvasId) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const result = await apiClient.listProposals(canvasId);
+
+      if (result.error) {
+        setError(result.error);
+        setLoading(false);
+        return;
+      }
+
+      setProposals(result.data || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Network error');
+    } finally {
+      setLoading(false);
+    }
+  }, [canvasId]);
 
   const createProposal = useCallback(
     async (
@@ -160,5 +191,6 @@ export function useProposals(options: UseProposalsOptions): UseProposalsResult {
     approveProposal,
     rejectProposal,
     refreshProposals,
+    refetch,
   };
 }
