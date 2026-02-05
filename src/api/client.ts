@@ -4,6 +4,13 @@
  */
 
 import type { LayoutSpec } from '../layout-schema';
+import type {
+  AgentToken,
+  AgentBranch,
+  AgentProposal,
+  AgentScope,
+  ProposalOperation,
+} from '../types/agent';
 
 export interface CloudCanvas {
   id: string;
@@ -116,6 +123,91 @@ export class ApiClient {
   // Health check
   async health(): Promise<{ data?: { status: string; timestamp: number }; error?: string }> {
     return this.request<{ status: string; timestamp: number }>('/health', { method: 'GET' });
+  }
+
+  // Agent Token methods
+  async generateAgentToken(
+    canvasId: string,
+    agentId: string,
+    scope: AgentScope
+  ): Promise<{ data?: AgentToken; error?: string }> {
+    return this.request<AgentToken>(`/canvases/${canvasId}/agent-token`, {
+      method: 'POST',
+      body: JSON.stringify({ agentId, scope }),
+    });
+  }
+
+  async revokeAgentToken(
+    canvasId: string,
+    agentId: string
+  ): Promise<{ data?: { success: boolean }; error?: string }> {
+    return this.request<{ success: boolean }>(`/canvases/${canvasId}/agent-token/${agentId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Branch methods
+  async listBranches(canvasId: string): Promise<{ data?: AgentBranch[]; error?: string }> {
+    return this.request<AgentBranch[]>(`/canvases/${canvasId}/branches`, { method: 'GET' });
+  }
+
+  async createBranch(
+    canvasId: string,
+    agentId: string,
+    baseVersion: number
+  ): Promise<{ data?: AgentBranch; error?: string }> {
+    return this.request<AgentBranch>(`/canvases/${canvasId}/branches`, {
+      method: 'POST',
+      body: JSON.stringify({ agentId, baseVersion }),
+    });
+  }
+
+  async getBranch(branchId: string): Promise<{ data?: AgentBranch; error?: string }> {
+    return this.request<AgentBranch>(`/branches/${branchId}`, { method: 'GET' });
+  }
+
+  async deleteBranch(branchId: string): Promise<{ data?: { success: boolean }; error?: string }> {
+    return this.request<{ success: boolean }>(`/branches/${branchId}`, { method: 'DELETE' });
+  }
+
+  // Proposal methods
+  async listProposals(canvasId: string): Promise<{ data?: AgentProposal[]; error?: string }> {
+    return this.request<AgentProposal[]>(`/canvases/${canvasId}/proposals`, { method: 'GET' });
+  }
+
+  async createProposal(
+    branchId: string,
+    proposal: {
+      title: string;
+      description: string;
+      operations: ProposalOperation[];
+      rationale: string;
+      assumptions: string[];
+      confidence: number;
+    }
+  ): Promise<{ data?: AgentProposal; error?: string }> {
+    return this.request<AgentProposal>(`/branches/${branchId}/proposals`, {
+      method: 'POST',
+      body: JSON.stringify(proposal),
+    });
+  }
+
+  async getProposal(proposalId: string): Promise<{ data?: AgentProposal; error?: string }> {
+    return this.request<AgentProposal>(`/proposals/${proposalId}`, { method: 'GET' });
+  }
+
+  async approveProposal(proposalId: string): Promise<{ data?: AgentProposal; error?: string }> {
+    return this.request<AgentProposal>(`/proposals/${proposalId}/approve`, { method: 'POST' });
+  }
+
+  async rejectProposal(
+    proposalId: string,
+    reason?: string
+  ): Promise<{ data?: AgentProposal; error?: string }> {
+    return this.request<AgentProposal>(`/proposals/${proposalId}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
   }
 }
 
