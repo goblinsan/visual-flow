@@ -173,4 +173,147 @@ describe('ApiClient', () => {
       }));
     });
   });
+
+  describe('agent token operations', () => {
+    it('should generate agent token', async () => {
+      const mockToken = {
+        token: 'test-token-123',
+        agentId: 'my-agent',
+        ownerId: 'user1',
+        canvasId: 'canvas1',
+        scope: 'propose' as const,
+        expiresAt: Date.now() + 86400000,
+        createdAt: Date.now(),
+      };
+
+      fetchMock.mockResolvedValueOnce(mockJsonResponse(mockToken));
+
+      const result = await client.generateAgentToken('canvas1', 'my-agent', 'propose');
+
+      expect(result.data).toEqual(mockToken);
+      expect(fetchMock).toHaveBeenCalledWith('/api/canvases/canvas1/agent-token', expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ agentId: 'my-agent', scope: 'propose' }),
+      }));
+    });
+
+    it('should revoke agent token', async () => {
+      fetchMock.mockResolvedValueOnce(mockJsonResponse({ success: true }));
+
+      const result = await client.revokeAgentToken('canvas1', 'my-agent');
+
+      expect(result.data).toEqual({ success: true });
+      expect(fetchMock).toHaveBeenCalledWith('/api/canvases/canvas1/agent-token/my-agent', expect.objectContaining({
+        method: 'DELETE',
+      }));
+    });
+  });
+
+  describe('branch operations', () => {
+    it('should list branches', async () => {
+      const mockBranches = [
+        {
+          id: 'branch1',
+          canvasId: 'canvas1',
+          agentId: 'agent1',
+          ownerId: 'user1',
+          status: 'active' as const,
+          baseVersion: 1,
+          createdAt: 123,
+          updatedAt: 123,
+        },
+      ];
+
+      fetchMock.mockResolvedValueOnce(mockJsonResponse(mockBranches));
+
+      const result = await client.listBranches('canvas1');
+
+      expect(result.data).toEqual(mockBranches);
+    });
+
+    it('should create branch', async () => {
+      const mockBranch = {
+        id: 'branch2',
+        canvasId: 'canvas1',
+        agentId: 'agent1',
+        ownerId: 'user1',
+        status: 'active' as const,
+        baseVersion: 1,
+        createdAt: 456,
+        updatedAt: 456,
+      };
+
+      fetchMock.mockResolvedValueOnce(mockJsonResponse(mockBranch));
+
+      const result = await client.createBranch('canvas1', 'agent1', 1);
+
+      expect(result.data).toEqual(mockBranch);
+      expect(fetchMock).toHaveBeenCalledWith('/api/canvases/canvas1/branches', expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ agentId: 'agent1', baseVersion: 1 }),
+      }));
+    });
+  });
+
+  describe('proposal operations', () => {
+    it('should list proposals', async () => {
+      const mockProposals = [
+        {
+          id: 'proposal1',
+          branchId: 'branch1',
+          canvasId: 'canvas1',
+          agentId: 'agent1',
+          status: 'pending' as const,
+          title: 'Add header',
+          description: 'Added navigation header',
+          operations: [],
+          rationale: 'Based on wireframe',
+          assumptions: [],
+          confidence: 0.85,
+          createdAt: 123,
+        },
+      ];
+
+      fetchMock.mockResolvedValueOnce(mockJsonResponse(mockProposals));
+
+      const result = await client.listProposals('canvas1');
+
+      expect(result.data).toEqual(mockProposals);
+    });
+
+    it('should approve proposal', async () => {
+      const mockProposal = {
+        id: 'proposal1',
+        status: 'approved' as const,
+        reviewedAt: Date.now(),
+        reviewedBy: 'user1',
+      };
+
+      fetchMock.mockResolvedValueOnce(mockJsonResponse(mockProposal));
+
+      const result = await client.approveProposal('proposal1');
+
+      expect(result.data?.status).toBe('approved');
+      expect(fetchMock).toHaveBeenCalledWith('/api/proposals/proposal1/approve', expect.objectContaining({
+        method: 'POST',
+      }));
+    });
+
+    it('should reject proposal', async () => {
+      const mockProposal = {
+        id: 'proposal1',
+        status: 'rejected' as const,
+      };
+
+      fetchMock.mockResolvedValueOnce(mockJsonResponse(mockProposal));
+
+      const result = await client.rejectProposal('proposal1', 'Not needed');
+
+      expect(result.data?.status).toBe('rejected');
+      expect(fetchMock).toHaveBeenCalledWith('/api/proposals/proposal1/reject', expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ reason: 'Not needed' }),
+      }));
+    });
+  });
 });
