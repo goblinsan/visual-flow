@@ -149,12 +149,16 @@ export function diffSpecs(before: LayoutSpec, after: LayoutSpec): ProposalOperat
         }
 
         // Check if other properties changed (update)
-        const hasChanges =
-          JSON.stringify(beforeNode) !== JSON.stringify(afterNode) &&
-          (beforeNode.position?.x === afterNode.position?.x &&
-            beforeNode.position?.y === afterNode.position?.y);
+        // Exclude position changes since those are already handled as 'move'
+        const hasPositionChange =
+          beforeNode.position?.x !== afterNode.position?.x ||
+          beforeNode.position?.y !== afterNode.position?.y;
 
-        if (hasChanges) {
+        const hasOtherChanges =
+          JSON.stringify(beforeNode) !== JSON.stringify(afterNode) &&
+          !hasPositionChange;
+
+        if (hasOtherChanges) {
           operations.push({
             type: 'update',
             nodeId: id,
@@ -171,28 +175,32 @@ export function diffSpecs(before: LayoutSpec, after: LayoutSpec): ProposalOperat
 
 /**
  * Apply proposal operations to a spec (merge)
+ * NOTE: This is a stub implementation for Phase 4.
+ * In production, this would need to handle complete node tree manipulation.
  */
 export function applyProposalOperations(
   spec: LayoutSpec,
   operations: ProposalOperation[]
 ): LayoutSpec {
-  // This is a simplified implementation
-  // In production, this would need to handle node tree manipulation
+  // TODO: Implement full node tree manipulation
+  // This stub is included for API completeness but should not be used in production
+  console.warn('applyProposalOperations is a stub - implement node tree manipulation before use');
+  
   const newSpec = JSON.parse(JSON.stringify(spec)) as LayoutSpec;
 
   for (const op of operations) {
     switch (op.type) {
       case 'create':
-        // Would need to insert node at correct location
+        // TODO: Insert node at correct location in tree
         break;
       case 'update':
-        // Would need to update node properties
+        // TODO: Update node properties while preserving tree structure
         break;
       case 'delete':
-        // Would need to remove node
+        // TODO: Remove node and clean up references
         break;
       case 'move':
-        // Would need to update position
+        // TODO: Update position or parent relationship
         break;
     }
   }

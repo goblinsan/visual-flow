@@ -71,14 +71,14 @@ export function RationaleOverlay(props: RationaleOverlayProps) {
   const { rationales, hoveredNodeId, getNodePosition } = props;
 
   if (!hoveredNodeId || !rationales.has(hoveredNodeId)) {
-    return <></>;
+    return null;
   }
 
   const rationale = rationales.get(hoveredNodeId)!;
   const position = getNodePosition(hoveredNodeId);
 
   if (!position) {
-    return <></>;
+    return null;
   }
 
   return (
