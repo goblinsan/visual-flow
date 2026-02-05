@@ -38,6 +38,9 @@ import { ConnectionStatusIndicator } from './components/ConnectionStatusIndicato
 import { CursorOverlay } from './components/CursorOverlay';
 import { SelectionOverlay } from './components/SelectionOverlay';
 import { ActiveUsersList } from './components/ActiveUsersList';
+import { useProposals } from './hooks/useProposals';
+import { applyProposalOperations } from './utils/proposalHelpers';
+import type { AgentProposal } from './types/agent';
 
 /** Get room ID from URL query param ?room=xxx */
 function getRoomIdFromURL(): string | null {
@@ -350,6 +353,7 @@ export default function CanvasApp() {
   const [newDialogOpen, setNewDialogOpen] = useState(false); // New design template dialog
   const [openDialogOpen, setOpenDialogOpen] = useState(false); // Open design dialog
   const [currentDesignName, setCurrentDesignNameState] = useState<string | null>(getCurrentDesignName);
+  const [panelMode, setPanelMode] = useState<'attributes' | 'agent'>('attributes');
   const [fitToContentKey, setFitToContentKey] = useState(0); // Increment to trigger fit-to-content in CanvasStage
   // Curve control point selection
   const [selectedCurvePointIndex, setSelectedCurvePointIndex] = useState<number | null>(null);
@@ -358,6 +362,17 @@ export default function CanvasApp() {
   const blockCanvasClicksRef = useRef(false);
   const skipNormalizationRef = useRef(false);
   const appVersion = import.meta.env.VITE_APP_VERSION ?? '0.0.0';
+
+  // Phase 4: Agent Proposals
+  const [currentCanvasId] = useState('c5ac2c60-b82b-46e5-afc6-97c04b11e8f1'); // TODO: Get from URL or persistence
+  const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
+  const [viewingProposedSpec, setViewingProposedSpec] = useState(false);
+  
+  const proposals = useProposals({
+    canvasId: currentCanvasId,
+    enabled: false, // Disabled auto-refresh - only manual refresh
+    refreshInterval: 0,
+  });
 
   const pushRecent = useCallback((col: string) => { commitRecent(col); }, [commitRecent]);
 
@@ -1015,18 +1030,25 @@ export default function CanvasApp() {
               updateCursor(canvasX, canvasY);
             } : undefined}
           >
-            {stageWidth > 0 && stageHeight > 0 && (
-              <CanvasStage
-                tool={tool}
-                spec={spec}
-                setSpec={setSpec}
-                width={stageWidth}
-                height={stageHeight}
-                onToolChange={setTool}
-                onUndo={undo}
-                onRedo={redo}
-                focusNodeId={focusNodeId}
-                onUngroup={(ids) => {
+            {stageWidth > 0 && stageHeight > 0 && (() => {
+              // Compute the spec to display (current or proposed)
+              const selectedProposal = proposals.proposals.find(p => p.id === selectedProposalId);
+              const displaySpec = viewingProposedSpec && selectedProposal
+                ? applyProposalOperations(spec, selectedProposal.operations)
+                : spec;
+              
+              return (
+                <CanvasStage
+                  tool={tool}
+                  spec={displaySpec}
+                  setSpec={viewingProposedSpec ? () => {} : setSpec} // Read-only when viewing proposal
+                  width={stageWidth}
+                  height={stageHeight}
+                  onToolChange={setTool}
+                  onUndo={undo}
+                  onRedo={redo}
+                  focusNodeId={focusNodeId}
+                  onUngroup={(ids) => {
                   if (!spec.flows || ids.length === 0) return;
                   const nextFlows = spec.flows
                     .map(f => ({
@@ -1064,7 +1086,14 @@ export default function CanvasApp() {
                 }}
                 viewportTransition={viewportTransition}
                 onViewportChange={handleViewportChange}
-              />
+                />
+              );
+            })()}
+            {/* Proposal preview indicator */}
+            {viewingProposedSpec && (
+              <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg font-semibold text-sm z-50">
+                👁️ Viewing Proposed Changes
+              </div>
             )}
             {/* Collaboration presence overlays */}
             {isCollaborative && (
@@ -1091,39 +1120,76 @@ export default function CanvasApp() {
         </main>
         {/* Right attributes panel */}
         {!sidebarVisible && (
-          <button
-            onClick={() => setSidebarVisible(true)}
-            className="fixed right-0 z-10 h-32 bg-gradient-to-b from-gray-300 to-gray-400 hover:from-gray-400 hover:to-gray-500 shadow-md transition-colors flex items-center justify-center"
-            title="Show Sidebar"
-            style={{ 
-              padding: 0,
-              width: '20px',
-              top: '96px',
-              borderRadius: '8px 0 0 8px',
-              borderLeft: '1px solid #9ca3af',
-              borderTop: '1px solid #9ca3af',
-              borderBottom: '1px solid #9ca3af'
-            }}
-          >
-            <span
-              className="text-[10px] font-semibold text-gray-700"
+          <>
+            <button
+              onClick={() => {
+                setSidebarVisible(true);
+                setPanelMode('attributes');
+              }}
+              className="fixed right-0 z-10 h-32 bg-gradient-to-b from-gray-300 to-gray-400 hover:from-gray-400 hover:to-gray-500 shadow-md transition-colors flex items-center justify-center"
+              title="Show Attributes"
               style={{ 
-                transform: 'rotate(-90deg)',
-                whiteSpace: 'nowrap',
-                letterSpacing: '0.5px'
+                padding: 0,
+                width: '20px',
+                top: '96px',
+                borderRadius: '8px 0 0 8px',
+                borderLeft: '1px solid #9ca3af',
+                borderTop: '1px solid #9ca3af',
+                borderBottom: '1px solid #9ca3af'
               }}
             >
-              ATTRIBUTES
-            </span>
-          </button>
+              <span
+                className="text-[10px] font-semibold text-gray-700"
+                style={{ 
+                  transform: 'rotate(-90deg)',
+                  whiteSpace: 'nowrap',
+                  letterSpacing: '0.5px'
+                }}
+              >
+                ATTRIBUTES
+              </span>
+            </button>
+            <button
+              onClick={() => {
+                setSidebarVisible(true);
+                setPanelMode('agent');
+              }}
+              className="fixed right-0 z-10 h-32 bg-gradient-to-b from-purple-400 to-purple-500 hover:from-purple-500 hover:to-purple-600 shadow-md transition-colors flex items-center justify-center"
+              title="Show Agent Control"
+              style={{ 
+                padding: 0,
+                width: '20px',
+                top: '260px',
+                borderRadius: '8px 0 0 8px',
+                borderLeft: '1px solid #9333ea',
+                borderTop: '1px solid #9333ea',
+                borderBottom: '1px solid #9333ea'
+              }}
+            >
+              <span
+                className="text-[10px] font-semibold text-white"
+                style={{ 
+                  transform: 'rotate(-90deg)',
+                  whiteSpace: 'nowrap',
+                  letterSpacing: '0.5px'
+                }}
+              >
+                AGENT
+              </span>
+            </button>
+          </>
         )}
         {sidebarVisible && (
           <aside className="w-72 border-l border-gray-200 bg-gradient-to-b from-white to-gray-50 flex flex-col shadow-sm relative">
-            {/* Collapse button on left edge - use fixed positioning for consistency */}
+            {/* Vertical tab buttons on left edge */}
             <button
-              onClick={() => setSidebarVisible(false)}
-              className="fixed z-10 h-32 bg-gradient-to-b from-gray-300 to-gray-400 hover:from-gray-400 hover:to-gray-500 shadow-md transition-colors flex items-center justify-center"
-              title="Hide Sidebar"
+              onClick={() => setPanelMode('attributes')}
+              className={`fixed z-10 h-32 shadow-md transition-colors flex items-center justify-center ${
+                panelMode === 'attributes'
+                  ? 'bg-gradient-to-b from-gray-400 to-gray-500'
+                  : 'bg-gradient-to-b from-gray-300 to-gray-400 hover:from-gray-400 hover:to-gray-500'
+              }`}
+              title="Attributes"
               style={{ 
                 padding: 0,
                 width: '20px',
@@ -1146,11 +1212,69 @@ export default function CanvasApp() {
                 ATTRIBUTES
               </span>
             </button>
+            <button
+              onClick={() => setPanelMode('agent')}
+              className={`fixed z-10 h-32 shadow-md transition-colors flex items-center justify-center ${
+                panelMode === 'agent'
+                  ? 'bg-gradient-to-b from-purple-500 to-purple-600'
+                  : 'bg-gradient-to-b from-purple-400 to-purple-500 hover:from-purple-500 hover:to-purple-600'
+              }`}
+              title="Agent Control"
+              style={{ 
+                padding: 0,
+                width: '20px',
+                top: '260px',
+                right: '288px',
+                borderRadius: '8px 0 0 8px',
+                borderLeft: '1px solid #9333ea',
+                borderTop: '1px solid #9333ea',
+                borderBottom: '1px solid #9333ea'
+              }}
+            >
+              <span
+                className="text-[10px] font-semibold text-white"
+                style={{ 
+                  transform: 'rotate(-90deg)',
+                  whiteSpace: 'nowrap',
+                  letterSpacing: '0.5px'
+                }}
+              >
+                AGENT
+              </span>
+            </button>
+            <button
+              onClick={() => setSidebarVisible(false)}
+              className="fixed z-10 h-12 bg-gradient-to-b from-gray-200 to-gray-300 hover:from-gray-300 hover:to-gray-400 shadow-md transition-colors flex items-center justify-center"
+              title="Hide Panel"
+              style={{ 
+                padding: 0,
+                width: '20px',
+                top: '420px',
+                right: '288px',
+                borderRadius: '8px 0 0 8px',
+                borderLeft: '1px solid #9ca3af',
+                borderTop: '1px solid #9ca3af',
+                borderBottom: '1px solid #9ca3af'
+              }}
+            >
+              <span className="text-xs text-gray-600">▶</span>
+            </button>
             <div className="p-4 border-b border-gray-200 flex items-center gap-2">
-              <i className="fa-solid fa-sliders text-gray-400" />
-              <span className="text-sm font-semibold text-gray-700">Attributes</span>
+              {panelMode === 'attributes' ? (
+                <>
+                  <i className="fa-solid fa-sliders text-gray-400" />
+                  <span className="text-sm font-semibold text-gray-700">Attributes</span>
+                </>
+              ) : (
+                <>
+                  <i className="fa-solid fa-robot text-purple-400" />
+                  <span className="text-sm font-semibold text-gray-700">Agent Control</span>
+                </>
+              )}
             </div>
             <div className="p-4 text-xs text-gray-600 space-y-4 overflow-auto flex-1">
+              {panelMode === 'attributes' && (
+                <>
               {/* Show CV panel when editing a curve */}
               {editingCurveId && (() => {
                 const curveNode = findNode(spec.root, editingCurveId) as CurveNode | null;
@@ -1707,8 +1831,177 @@ export default function CanvasApp() {
             )}
                 </>
               )}
-          </div>
-        </aside>
+                </>
+              )}
+
+              {/* Agent Panel Content */}
+              {panelMode === 'agent' && (
+                <>
+                  {/* Canvas ID Section */}
+                  <div className="space-y-2">
+                    <div className="text-xs font-semibold text-gray-700">Canvas ID</div>
+                    {currentCanvasId ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={currentCanvasId}
+                            readOnly
+                            className="flex-1 px-2 py-1 text-xs font-mono bg-gray-50 border border-gray-200 rounded"
+                          />
+                          <button
+                            onClick={() => navigator.clipboard.writeText(currentCanvasId)}
+                            className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition"
+                            title="Copy to clipboard"
+                          >
+                            <i className="fa-solid fa-copy text-gray-600" />
+                          </button>
+                        </div>
+                        <div className="text-xs text-gray-500">Share this ID with agents to allow proposals</div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={async () => {
+                          // Create canvas ID from current spec
+                          const canvasId = crypto.randomUUID();
+                          setCurrentCanvasId(canvasId);
+                          // TODO: Save canvas to backend with this ID
+                        }}
+                        className="w-full px-3 py-2 bg-blue-600 text-white text-xs font-medium rounded hover:bg-blue-700 transition"
+                      >
+                        Create Canvas ID
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Proposals Section */}
+                  {currentCanvasId && (
+                    <>
+                      <div className="border-t pt-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="text-xs font-semibold text-gray-700">
+                        Proposals ({proposals.proposals.length})
+                      </div>
+                      <button
+                        onClick={() => proposals.refetch()}
+                        className="text-xs text-blue-600 hover:text-blue-700 transition"
+                        disabled={proposals.loading}
+                      >
+                        {proposals.loading ? '↻ Loading...' : '↻ Refresh'}
+                      </button>
+                    </div>
+
+                    {proposals.loading && (
+                      <div className="text-xs text-gray-500 text-center py-4">Loading proposals...</div>
+                    )}
+
+                    {!proposals.loading && proposals.proposals.filter(p => p.status === 'pending').length === 0 && (
+                      <div className="text-xs text-gray-500 text-center py-4">No pending proposals</div>
+                    )}
+
+                    {proposals.proposals.filter(p => p.status === 'pending').map((proposal) => (
+                      <div
+                        key={proposal.id}
+                        className={`border rounded-lg p-3 cursor-pointer transition mb-2 ${
+                          selectedProposalId === proposal.id
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-gray-200 hover:border-blue-300'
+                        }`}
+                        onClick={() => {
+                          setSelectedProposalId(proposal.id);
+                          setViewingProposedSpec(false);
+                        }}
+                      >
+                        <div className="font-medium text-gray-900 mb-1 text-sm">{proposal.title}</div>
+                        <div className="text-xs text-gray-600 mb-2">{proposal.description}</div>
+                        <div className="flex items-center gap-2 text-xs text-gray-500">
+                          <span>{proposal.operations.length} change{proposal.operations.length !== 1 ? 's' : ''}</span>
+                          <span>•</span>
+                          <span>{Math.round(proposal.confidence * 100)}% confidence</span>
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* Selected Proposal Details */}
+                    {selectedProposalId && (() => {
+                      const selectedProposal = proposals.proposals.find(p => p.id === selectedProposalId);
+                      if (!selectedProposal) return null;
+
+                      return (
+                        <div className="border-t pt-3 mt-3 space-y-3">
+                          <div className="text-xs font-semibold text-gray-700">Preview</div>
+                          
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => setViewingProposedSpec(false)}
+                              className={`flex-1 px-3 py-2 rounded text-xs font-medium transition ${
+                                !viewingProposedSpec
+                                  ? 'bg-gray-900 text-white'
+                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                              }`}
+                            >
+                              Current
+                            </button>
+                            <button
+                              onClick={() => setViewingProposedSpec(true)}
+                              className={`flex-1 px-3 py-2 rounded text-xs font-medium transition ${
+                                viewingProposedSpec
+                                  ? 'bg-green-600 text-white'
+                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                              }`}
+                            >
+                              Proposed
+                            </button>
+                          </div>
+                          
+                          <div className="bg-blue-50 border border-blue-200 rounded p-2 text-xs">
+                            <div className="font-semibold text-blue-900 mb-1">Rationale</div>
+                            <div className="text-blue-800">{selectedProposal.rationale}</div>
+                          </div>
+                          
+                          {selectedProposal.assumptions && selectedProposal.assumptions.length > 0 && (
+                            <div className="bg-purple-50 border border-purple-200 rounded p-2 text-xs">
+                              <div className="font-semibold text-purple-900 mb-1">Assumptions</div>
+                              <ul className="text-purple-800 space-y-1">
+                                {selectedProposal.assumptions.map((assumption, i) => (
+                                  <li key={i}>• {assumption}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                          
+                          <div className="flex gap-2 pt-2">
+                            <button
+                              onClick={async () => {
+                                await proposals.approveProposal(selectedProposal.id);
+                                setSelectedProposalId(null);
+                                setViewingProposedSpec(false);
+                              }}
+                              className="flex-1 px-3 py-2 bg-green-600 text-white rounded font-medium hover:bg-green-700 transition text-xs"
+                            >
+                              ✓ Approve
+                            </button>
+                            <button
+                              onClick={async () => {
+                                await proposals.rejectProposal(selectedProposal.id, 'User rejected');
+                                setSelectedProposalId(null);
+                                setViewingProposedSpec(false);
+                              }}
+                              className="flex-1 px-3 py-2 bg-red-600 text-white rounded font-medium hover:bg-red-700 transition text-xs"
+                            >
+                              ✗ Reject
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+          </aside>
         )}
       </div>
     </div>

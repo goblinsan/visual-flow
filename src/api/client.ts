@@ -49,6 +49,7 @@ export class ApiClient {
         ...options,
         headers: {
           'Content-Type': 'application/json',
+          'CF-Access-Authenticated-User-Email': 'your@email.com', // Mock for local dev
           ...options.headers,
         },
       });
@@ -212,4 +213,6 @@ export class ApiClient {
 }
 
 // Singleton instance
-export const apiClient = new ApiClient();
+export const apiClient = new ApiClient(
+  import.meta.env.VITE_API_URL || 'http://localhost:62587/api'
+);

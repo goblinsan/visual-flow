@@ -398,3 +398,21 @@ const ProposalDiffView = lazy(() => import('./components/ProposalDiffView'));
 ---
 
 For more details, see [PHASE4_GUIDE.md](./PHASE4_GUIDE.md)
+
+
+
+curl -X POST http://localhost:62587/api/canvases \
+  -H "Content-Type: application/json" \
+  -H "CF-Access-Authenticated-User-Email: your@email.com" \
+  -d '{
+    "name": "Test Canvas for Phase 4",
+    "spec": {
+      "root": {
+        "id": "root",
+        "type": "frame",
+        "position": {"x": 0, "y": 0},
+        "size": {"width": 1920, "height": 1080},
+        "children": []
+      }
+    }
+  }'

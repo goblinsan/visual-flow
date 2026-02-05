@@ -175,32 +175,51 @@ export function diffSpecs(before: LayoutSpec, after: LayoutSpec): ProposalOperat
 
 /**
  * Apply proposal operations to a spec (merge)
- * NOTE: This is a stub implementation for Phase 4.
- * In production, this would need to handle complete node tree manipulation.
  */
 export function applyProposalOperations(
   spec: LayoutSpec,
   operations: ProposalOperation[]
 ): LayoutSpec {
-  // TODO: Implement full node tree manipulation
-  // This stub is included for API completeness but should not be used in production
-  console.warn('applyProposalOperations is a stub - implement node tree manipulation before use');
-  
   const newSpec = JSON.parse(JSON.stringify(spec)) as LayoutSpec;
 
   for (const op of operations) {
     switch (op.type) {
       case 'create':
-        // TODO: Insert node at correct location in tree
+        if (op.after) {
+          // Add new node to root children
+          newSpec.root.children.push(op.after as any);
+        }
         break;
+        
       case 'update':
-        // TODO: Update node properties while preserving tree structure
+        if (op.after) {
+          // Find and update the node
+          const nodeIndex = newSpec.root.children.findIndex(n => n.id === op.nodeId);
+          if (nodeIndex >= 0) {
+            newSpec.root.children[nodeIndex] = {
+              ...newSpec.root.children[nodeIndex],
+              ...op.after,
+            } as any;
+          }
+        }
         break;
+        
       case 'delete':
-        // TODO: Remove node and clean up references
+        // Remove node from children
+        newSpec.root.children = newSpec.root.children.filter(n => n.id !== op.nodeId);
         break;
+        
       case 'move':
-        // TODO: Update position or parent relationship
+        if (op.after && 'position' in op.after) {
+          // Update node position
+          const nodeIndex = newSpec.root.children.findIndex(n => n.id === op.nodeId);
+          if (nodeIndex >= 0) {
+            const node = newSpec.root.children[nodeIndex];
+            if ('position' in node) {
+              (node as any).position = op.after.position;
+            }
+          }
+        }
         break;
     }
   }
