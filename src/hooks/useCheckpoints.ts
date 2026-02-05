@@ -118,6 +118,9 @@ interface UseCheckpointsOptions {
   storage?: CheckpointStorage;
 }
 
+// Default storage instance (shared across hook instances)
+const defaultStorage = new LocalStorageCheckpointStorage();
+
 export function useCheckpoints({
   canvasId,
   getSpec,
@@ -125,8 +128,11 @@ export function useCheckpoints({
   userId,
   autoCheckpointIntervalMs = 5 * 60 * 1000, // 5 minutes
   enableAutoCheckpoint = true,
-  storage = new LocalStorageCheckpointStorage(),
+  storage,
 }: UseCheckpointsOptions) {
+  // Use default storage if none provided
+  const storageInstance = storage ?? defaultStorage;
+  
   const [checkpoints, setCheckpoints] = useState<CheckpointMetadata[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
@@ -140,12 +146,12 @@ export function useCheckpoints({
    */
   const loadCheckpoints = useCallback(async () => {
     try {
-      const list = await storage.list(canvasId);
+      const list = await storageInstance.list(canvasId);
       setCheckpoints(list);
     } catch (error) {
       console.error('Error loading checkpoints:', error);
     }
-  }, [canvasId, storage]);
+  }, [canvasId, storageInstance]);
 
   /**
    * Create a checkpoint
@@ -166,7 +172,7 @@ export function useCheckpoints({
           sizeBytes: JSON.stringify(spec).length,
         };
 
-        await storage.save(checkpoint);
+        await storageInstance.save(checkpoint);
         lastCheckpointRef.current = Date.now();
         lastSpecRef.current = spec;
 
@@ -174,7 +180,7 @@ export function useCheckpoints({
         await loadCheckpoints();
 
         // Cleanup old auto-checkpoints (keep 10)
-        await storage.cleanup(canvasId, 10);
+        await storageInstance.cleanup(canvasId, 10);
 
         return checkpoint;
       } catch (error) {
@@ -194,7 +200,7 @@ export function useCheckpoints({
     async (checkpointId: string) => {
       setIsRestoring(true);
       try {
-        const checkpoint = await storage.get(checkpointId);
+        const checkpoint = await storageInstance.get(checkpointId);
         if (!checkpoint) {
           throw new Error(`Checkpoint ${checkpointId} not found`);
         }
@@ -210,7 +216,7 @@ export function useCheckpoints({
         setIsRestoring(false);
       }
     },
-    [setSpec, storage]
+    [setSpec, storageInstance]
   );
 
   /**
@@ -219,14 +225,14 @@ export function useCheckpoints({
   const deleteCheckpoint = useCallback(
     async (checkpointId: string) => {
       try {
-        await storage.delete(checkpointId);
+        await storageInstance.delete(checkpointId);
         await loadCheckpoints();
       } catch (error) {
         console.error('Error deleting checkpoint:', error);
         throw error;
       }
     },
-    [storage, loadCheckpoints]
+    [storageInstance, loadCheckpoints]
   );
 
   /**
