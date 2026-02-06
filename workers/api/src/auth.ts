@@ -28,8 +28,12 @@ export async function authenticateUser(request: Request, env: Env): Promise<User
     return authenticateAgentToken(authHeader.slice(7), env);
   }
 
-  // Method 2: Cloudflare Access email header
-  const email = request.headers.get('CF-Access-Authenticated-User-Email');
+  // Method 2: Cloudflare Access email header (set by CF Access proxy)
+  //   Also accept X-User-Email as a fallback for direct worker access
+  //   (CF strips CF-Access-* headers when not going through Access)
+  const email =
+    request.headers.get('CF-Access-Authenticated-User-Email') ||
+    request.headers.get('X-User-Email');
   
   if (!email) {
     return null;

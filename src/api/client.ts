@@ -82,7 +82,10 @@ export class ApiClient {
         ...options,
         headers: {
           'Content-Type': 'application/json',
-          'CF-Access-Authenticated-User-Email': 'your@email.com', // Mock for local dev
+          // Send both headers — CF-Access- works behind Access proxy,
+          // X-User-Email works when hitting the worker directly
+          'CF-Access-Authenticated-User-Email': 'your@email.com',
+          'X-User-Email': 'your@email.com',
           ...options.headers,
         },
       });

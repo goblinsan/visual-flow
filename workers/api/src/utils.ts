@@ -12,7 +12,7 @@ export function jsonResponse(data: unknown, status = 200, env?: { ALLOWED_ORIGIN
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': allowedOrigin,
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, CF-Access-Authenticated-User-Email, Authorization',
+      'Access-Control-Allow-Headers': 'Content-Type, CF-Access-Authenticated-User-Email, X-User-Email, Authorization',
     },
   });
 }
