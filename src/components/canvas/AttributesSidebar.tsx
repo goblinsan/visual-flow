@@ -40,8 +40,8 @@ interface AttributesSidebarProps {
   setLastFillById: (value: Record<string, string>) => void;
   lastStrokeById: Record<string, string>;
   setLastStrokeById: (value: Record<string, string>) => void;
-  rawDashInput: Record<string, string>;
-  setRawDashInput: (value: Record<string, string>) => void;
+  rawDashInput: string;
+  setRawDashInput: (value: string) => void;
   beginRecentSession: () => void;
   previewRecent: (color: string) => void;
   commitRecent: (color: string) => void;
