@@ -1,4 +1,4 @@
-import { Stage, Layer, Transformer, Rect, Group, Ellipse, Line, Circle } from "react-konva";
+import { Stage, Layer, Transformer, Rect, Group, Line, Circle } from "react-konva";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { JSX } from "react";
 import type Konva from "konva";
@@ -11,10 +11,11 @@ import { beginMarquee, updateMarquee, finalizeMarquee, type MarqueeSession } fro
 import { deleteNodes, duplicateNodes, nudgeNodes } from "./editing";
 import { applyPosition, applyPositionAndSize, groupNodes, ungroupNodes } from "./stage-internal";
 import { mapNode, nodeHasChildren } from "../commands/types";
-import { RichTextEditor, type RichTextEditorHandle } from "../components/RichTextEditor";
-import { TextEditToolbar } from "../components/TextEditToolbar";
+import type { RichTextEditorHandle } from "../components/RichTextEditor";
 import { ImagePickerModal } from "../components/ImagePickerModal";
 import { COMPONENT_LIBRARY, ICON_LIBRARY } from "../library";
+import { DraftPreviewLayer } from "./DraftPreviewLayer";
+import { TextEditingOverlay } from "./TextEditingOverlay";
 
 // Grid configuration
 const GRID_SPACING = 20; // Space between dots
@@ -2308,113 +2309,20 @@ function CanvasStage({
             stroke={'#3b82f6'}
             dash={[4,4]}
           />
-          {/* Rectangle draft preview */}
-          {isRectMode && rectDraft && (() => {
-            const { start, current } = rectDraft;
-            let x = start.x; let y = start.y; let w = current.x - start.x; let h = current.y - start.y;
-            const alt = altPressed; const shift = shiftPressed;
-            if (alt) {
-              w = (current.x - start.x) * 2;
-              h = (current.y - start.y) * 2;
-            }
-            if (shift) {
-              const m = Math.max(Math.abs(w), Math.abs(h));
-              w = Math.sign(w || 1) * m;
-              h = Math.sign(h || 1) * m;
-            }
-            if (alt) {
-              x = start.x - Math.abs(w)/2;
-              y = start.y - Math.abs(h)/2;
-              w = Math.abs(w); h = Math.abs(h);
-            } else {
-              if (w < 0) { x = x + w; w = Math.abs(w);} 
-              if (h < 0) { y = y + h; h = Math.abs(h);} 
-            }
-            return (
-              <Rect
-                x={x}
-                y={y}
-                width={Math.max(1, w)}
-                height={Math.max(1, h)}
-                fill={'rgba(255,255,255,0.35)'}
-                stroke={'#334155'}
-                strokeWidth={1}
-                dash={[6,4]}
-                listening={false}
-              />
-            );
-          })()}
-          {/* Ellipse draft preview */}
-          {isEllipseMode && ellipseDraft && (() => {
-            const { start, current } = ellipseDraft;
-            let x = start.x; let y = start.y; let w = current.x - start.x; let h = current.y - start.y;
-            const alt = altPressed; const shift = shiftPressed;
-            if (alt) {
-              w = (current.x - start.x) * 2;
-              h = (current.y - start.y) * 2;
-            }
-            if (shift) {
-              const m = Math.max(Math.abs(w), Math.abs(h));
-              w = Math.sign(w || 1) * m;
-              h = Math.sign(h || 1) * m;
-            }
-            if (alt) {
-              x = start.x - Math.abs(w)/2;
-              y = start.y - Math.abs(h)/2;
-              w = Math.abs(w); h = Math.abs(h);
-            } else {
-              if (w < 0) { x = x + w; w = Math.abs(w);} 
-              if (h < 0) { y = y + h; h = Math.abs(h);} 
-            }
-            const radiusX = Math.max(1, w) / 2;
-            const radiusY = Math.max(1, h) / 2;
-            return (
-              <Ellipse
-                x={x + radiusX}
-                y={y + radiusY}
-                radiusX={radiusX}
-                radiusY={radiusY}
-                fill={'rgba(255,255,255,0.35)'}
-                stroke={'#334155'}
-                strokeWidth={1}
-                dash={[6,4]}
-                listening={false}
-              />
-            );
-          })()}
-          {/* Line draft preview */}
-          {isLineMode && lineDraft && (() => {
-            const { start, current } = lineDraft;
-            return (
-              <Line
-                points={[start.x, start.y, current.x, current.y]}
-                stroke={'#334155'}
-                strokeWidth={2}
-                dash={[6,4]}
-                lineCap="round"
-                listening={false}
-              />
-            );
-          })()}
-          {/* Curve draft preview */}
-          {isCurveMode && curveDraft && curveDraft.points.length >= 1 && (() => {
-            const pts: number[] = [];
-            for (const p of curveDraft.points) {
-              pts.push(p.x, p.y);
-            }
-            pts.push(curveDraft.current.x, curveDraft.current.y);
-            return (
-              <Line
-                points={pts}
-                stroke={'#334155'}
-                strokeWidth={2}
-                dash={[6,4]}
-                lineCap="round"
-                tension={0.5}
-                listening={false}
-              />
-            );
-          })()}
+          
+          {/* Draft preview layer */}
+          <DraftPreviewLayer
+            isRectMode={isRectMode}
+            isEllipseMode={isEllipseMode}
+            isLineMode={isLineMode}
+            isCurveMode={isCurveMode}
+            rectDraft={rectDraft}
+            ellipseDraft={ellipseDraft}
+            lineDraft={lineDraft}
+            curveDraft={curveDraft}
+            altPressed={altPressed}
+            shiftPressed={shiftPressed}
+          />
           
           {/* Curve control point handles (when a curve is in edit mode OR selected) */}
           {isSelectMode && ((selected.length === 1 && editingCurveId === selected[0]) || editingCurveId) && (() => {
@@ -2526,43 +2434,21 @@ function CanvasStage({
         const toolbarAnchor = { x: textX + textWidth / 2, y: textY };
         
         return (
-          <>
-            {/* Fixed toolbar above text */}
-            <TextEditToolbar
-              visible={!!(textSelection && textSelection.start !== textSelection.end)}
-              anchorPosition={toolbarAnchor}
-              hasSelection={!!(textSelection && textSelection.start !== textSelection.end)}
-              currentFormat={undefined}
-              onApplyFormat={applyFormat}
-            />
-            <RichTextEditor
-              ref={richTextEditorRef}
-              autoFocus
-              commitOnBlur={false}
-              value={editingTextValue}
-              spans={editingTextSpans}
-              baseStyles={baseStyles}
-              onChange={handleTextChange}
-              onCommit={commitTextEdit}
-              onCancel={cancelTextEdit}
-              onSelectionChange={(sel) => {
-                setTextSelection(sel);
-              }}
-              onFormatShortcut={(format) => {
-                if (!richTextEditorRef.current) return;
-                const sel = richTextEditorRef.current.getSelection();
-                if (!sel || sel.start === sel.end) return;
-                
-                if (format === 'bold') {
-                  richTextEditorRef.current.applyFormatToSelection({ fontWeight: 'bold' });
-                } else if (format === 'italic') {
-                  richTextEditorRef.current.applyFormatToSelection({ fontStyle: 'italic' });
-                }
-              }}
-              style={getTextEditStyle() || undefined}
-              className="focus:outline-none selection:bg-blue-200"
-            />
-          </>
+          <TextEditingOverlay
+            visible={true}
+            editingTextValue={editingTextValue}
+            editingTextSpans={editingTextSpans}
+            baseStyles={baseStyles}
+            textEditStyle={getTextEditStyle()}
+            textSelection={textSelection}
+            toolbarAnchorPosition={toolbarAnchor}
+            richTextEditorRef={richTextEditorRef}
+            onChange={handleTextChange}
+            onCommit={commitTextEdit}
+            onCancel={cancelTextEdit}
+            onSelectionChange={setTextSelection}
+            onApplyFormat={applyFormat}
+          />
         );
       })()}
       
