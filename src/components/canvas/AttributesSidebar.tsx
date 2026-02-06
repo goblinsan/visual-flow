@@ -4,6 +4,7 @@ import RectAttributesPanel from '../RectAttributesPanel';
 import EllipseAttributesPanel from '../EllipseAttributesPanel';
 import LineAttributesPanel from '../LineAttributesPanel';
 import CurveAttributesPanel from '../CurveAttributesPanel';
+import PolygonAttributesPanel from '../PolygonAttributesPanel';
 import TextAttributesPanel from '../TextAttributesPanel';
 import ImageAttributesPanel from '../ImageAttributesPanel';
 import DefaultsPanel from '../DefaultsPanel';
@@ -16,6 +17,7 @@ import type {
   EllipseNode,
   LineNode,
   CurveNode,
+  PolygonNode,
   TextNode,
   ImageNode,
   FlowTransition,
@@ -368,6 +370,22 @@ export function AttributesSidebar({
                     updateNode={updateCurve}
                     selectedPointIndex={selectedCurvePointIndex}
                     setSelectedPointIndex={setSelectedCurvePointIndex}
+                    beginRecentSession={beginRecentSession}
+                    previewRecent={previewRecent}
+                    commitRecent={commitRecent}
+                    pushRecent={pushRecent}
+                    recentColors={recentColors}
+                  />
+                );
+              }
+
+              if (targetNode.type === 'polygon') {
+                const polygon = targetNode as PolygonNode;
+                const updatePolygon = createUpdateFn(polygon.id);
+                return (
+                  <PolygonAttributesPanel
+                    polygon={polygon}
+                    updateNode={updatePolygon}
                     beginRecentSession={beginRecentSession}
                     previewRecent={previewRecent}
                     commitRecent={commitRecent}

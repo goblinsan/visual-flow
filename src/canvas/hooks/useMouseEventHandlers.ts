@@ -43,8 +43,10 @@ interface UseMouseEventHandlersProps {
   setLineDraft: (draft: DraftState | null | ((prev: DraftState | null) => DraftState | null)) => void;
   curveDraft: CurveDraftState | null;
   setCurveDraft: (draft: CurveDraftState | null | ((prev: CurveDraftState | null) => CurveDraftState | null)) => void;
-  polygonDraft: CurveDraftState | null;
-  setPolygonDraft: (draft: CurveDraftState | null | ((prev: CurveDraftState | null) => CurveDraftState | null)) => void;
+  polygonDraft: DraftState | null;
+  setPolygonDraft: (draft: DraftState | null | ((prev: DraftState | null) => DraftState | null)) => void;
+  polygonSides: number;
+  setPolygonSides: (sides: number) => void;
   
   // Interaction sessions
   dragSession: DragSession | null;
@@ -217,19 +219,13 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
       return;
     }
     
-    // Polygon tool creation pathway - click to add points, double-click or Enter to finish
+    // Polygon tool creation pathway - drag to create regular polygon
     if (isPolygonMode) {
       if (e.evt.button !== 0) return;
       const stage = e.target.getStage(); if (!stage) return;
       const pointer = stage.getPointerPosition(); if (!pointer) return;
       const world = toWorld(stage, pointer);
-      if (!polygonDraft) {
-        // Start new polygon
-        setPolygonDraft({ points: [world], current: world });
-      } else {
-        // Add point to polygon
-        setPolygonDraft(prev => prev ? { ...prev, points: [...prev.points, world] } : prev);
-      }
+      setPolygonDraft({ start: world, current: world });
       return;
     }
     
@@ -479,6 +475,14 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
       return;
     }
     
+    if (isPolygonMode) {
+      if (!polygonDraft) return;
+      const pointer = stage.getPointerPosition(); if (!pointer) return;
+      const worldPos = toWorld(stage, pointer);
+      setPolygonDraft(prev => prev ? { ...prev, current: worldPos } : prev);
+      return;
+    }
+    
     if (!isSelectMode && !isPanMode) return;
 
     if (panning) {
@@ -569,6 +573,9 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
     
     // Finalize line creation
     if (isLineMode && lineDraft) { finalizeLine(); return; }
+    
+    // Finalize polygon creation
+    if (isPolygonMode && polygonDraft) { finalizePolygon(); return; }
     
     // Note: Curve finalization happens on double-click or Enter, not mouseup
 

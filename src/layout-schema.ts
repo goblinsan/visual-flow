@@ -190,7 +190,7 @@ export interface CurveNode extends BaseNode {
 }
 
 /** Polygon shape node (closed multi-point shape). */
-export interface PolygonNode extends BaseNode {
+export interface PolygonNode extends BaseNode, Partial<AbsoluteChild> {
   type: "polygon";
   points: number[];      // [x1, y1, x2, y2, ..., xn, yn] array of vertices
   position?: Pos;        // offset for the polygon group
@@ -200,6 +200,7 @@ export interface PolygonNode extends BaseNode {
   strokeWidth?: number;  // px
   strokeDash?: number[]; // dash pattern
   closed?: boolean;      // whether the polygon is closed (default true)
+  sides?: number;        // number of sides for regular polygon (3-30, default 5)
 }
 
 export type LayoutNode =

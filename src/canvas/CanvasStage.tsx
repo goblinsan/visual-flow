@@ -269,11 +269,14 @@ function CanvasStage({
     current: { x: number; y: number };
   }>(null);
   
-  // Polygon draft
+  // Polygon draft state (drag to create like rect/ellipse)
   const [polygonDraft, setPolygonDraft] = useState<null | {
-    points: { x: number; y: number }[];
+    start: { x: number; y: number };
     current: { x: number; y: number };
   }>(null);
+  
+  // Polygon sides (adjustable with mouse wheel during creation)
+  const [polygonSides, setPolygonSides] = useState(5);
 
   // Use shape tools hook
   const shapeTools = useShapeTools(setSpec, setSelection, onToolChange, rectDefaults, undefined, undefined, undefined);
@@ -341,9 +344,9 @@ function CanvasStage({
 
   const finalizePolygon = useCallback(() => {
     if (!isPolygonMode || !polygonDraft) return;
-    shapeTools.finalizePolygon(polygonDraft);
+    shapeTools.finalizePolygon(polygonDraft, altPressed, shiftPressed, polygonSides);
     setPolygonDraft(null);
-  }, [isPolygonMode, polygonDraft, shapeTools]);
+  }, [isPolygonMode, polygonDraft, shapeTools, altPressed, shiftPressed, polygonSides]);
 
   // Helper: open image picker at click position
   const createImage = useCallback((worldPos: { x: number; y: number }) => {
@@ -405,6 +408,8 @@ function CanvasStage({
     setCurveDraft,
     polygonDraft,
     setPolygonDraft,
+    polygonSides,
+    setPolygonSides,
     dragSession,
     setDragSession,
     marqueeSession,
@@ -487,11 +492,22 @@ function CanvasStage({
     if (!isPolygonMode) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { setPolygonDraft(null); }
-      if (e.key === 'Enter' && polygonDraft && polygonDraft.points.length >= 3) { finalizePolygon(); }
     };
     window.addEventListener('keydown', onKey, CAPTURE_OPTIONS);
     return () => window.removeEventListener('keydown', onKey, CAPTURE_OPTIONS);
-  }, [isPolygonMode, polygonDraft, finalizePolygon]);
+  }, [isPolygonMode]);
+  
+  // Polygon: adjust sides with mouse wheel during creation
+  useEffect(() => {
+    if (!isPolygonMode || !polygonDraft) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -1 : 1;
+      setPolygonSides(prev => Math.max(3, Math.min(30, prev + delta)));
+    };
+    window.addEventListener('wheel', onWheel, { passive: false, capture: true });
+    return () => window.removeEventListener('wheel', onWheel, { capture: true } as any);
+  }, [isPolygonMode, polygonDraft]);
 
   // Curve edit mode: exit on Escape or Enter
   useEffect(() => {
@@ -903,6 +919,7 @@ function CanvasStage({
             lineDraft={lineDraft}
             curveDraft={curveDraft}
             polygonDraft={polygonDraft}
+            polygonSides={polygonSides}
             altPressed={altPressed}
             shiftPressed={shiftPressed}
           />

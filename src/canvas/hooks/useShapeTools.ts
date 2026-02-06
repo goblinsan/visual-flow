@@ -44,6 +44,7 @@ interface PolygonDefaults {
   strokeWidth: number;
   opacity: number;
   closed: boolean;
+  sides: number; // number of sides for regular polygon
 }
 
 // Default styling values for shapes (module-level constants to avoid re-creation)
@@ -51,7 +52,7 @@ const DEFAULT_RECT_STYLE: RectDefaults = { fill: '#ffffff', stroke: '#334155', s
 const DEFAULT_ELLIPSE_STYLE: EllipseDefaults = { fill: '#ffffff', stroke: '#334155', strokeWidth: 1, opacity: 1 };
 const DEFAULT_LINE_STYLE: LineDefaults = { stroke: '#334155', strokeWidth: 2 };
 const DEFAULT_CURVE_STYLE: CurveDefaults = { stroke: '#334155', strokeWidth: 2, tension: 0.5 };
-const DEFAULT_POLYGON_STYLE: PolygonDefaults = { fill: '#ffffff', stroke: '#334155', strokeWidth: 1, opacity: 1, closed: true };
+const DEFAULT_POLYGON_STYLE: PolygonDefaults = { fill: '#ffffff', stroke: '#334155', strokeWidth: 1, opacity: 1, closed: true, sides: 5 };
 
 const updateRootChildren = (spec: LayoutSpec, updater: (children: LayoutNode[]) => LayoutNode[]): LayoutSpec => {
   const root = spec.root;
@@ -276,28 +277,84 @@ export function useShapeTools(
   }, [setSpec, onToolChange, curveDefaults, setSelection]);
 
   const finalizePolygon = useCallback((
-    polygonDraft: CurveDraftState | null
+    polygonDraft: DraftState | null,
+    altPressed: boolean,
+    shiftPressed: boolean,
+    sides: number = 5
   ) => {
-    if (!polygonDraft || polygonDraft.points.length < 3) return;
-    
-    const points = polygonDraft.points;
-    const origin = points[0];
-    
-    // Convert points to relative coordinates
-    const relativePoints = points.flatMap(p => [p.x - origin.x, p.y - origin.y]);
-    
+    if (!polygonDraft) return;
+    const { start, current } = polygonDraft;
+    let x1 = start.x, y1 = start.y;
+    const x2 = current.x, y2 = current.y;
+    let w = x2 - x1; let h = y2 - y1;
+    const alt = altPressed;
+    const shift = shiftPressed;
     const defaults = polygonDefaults || DEFAULT_POLYGON_STYLE;
+    
+    // Handle alt and shift modifiers like rect/ellipse
+    if (alt) {
+      w = (current.x - start.x) * 2;
+      h = (current.y - start.y) * 2;
+      if (shift) {
+        const m = Math.max(Math.abs(w), Math.abs(h));
+        w = Math.sign(w || 1) * m; h = Math.sign(h || 1) * m;
+      }
+      const widthF = Math.max(4, Math.abs(w));
+      const heightF = Math.max(4, Math.abs(h));
+      const topLeft = { x: start.x - widthF / 2, y: start.y - heightF / 2 };
+      const isClick = Math.abs(widthF) < 4 && Math.abs(heightF) < 4;
+      const sizeFinal = isClick ? { width: 80, height: 80 } : { width: widthF, height: heightF };
+      
+      // Generate regular polygon points
+      const points = generateRegularPolygonPoints(sizeFinal.width, sizeFinal.height, sides);
+      
+      const id = 'polygon_' + Math.random().toString(36).slice(2, 9);
+      const polygonNode: PolygonNode = {
+        id,
+        type: 'polygon',
+        position: topLeft,
+        size: sizeFinal,
+        points,
+        fill: defaults.fill,
+        stroke: defaults.stroke,
+        strokeWidth: defaults.strokeWidth,
+        opacity: defaults.opacity,
+        closed: defaults.closed,
+        sides,
+      };
+      setSpec(prev => appendNodesToRoot(prev, [polygonNode]));
+      setSelection([id]);
+      onToolChange?.('select');
+      return;
+    }
+    
+    // Normal mode (no alt)
+    if (shift) {
+      const m = Math.max(Math.abs(w), Math.abs(h));
+      w = Math.sign(w || 1) * m; h = Math.sign(h || 1) * m;
+    }
+    const widthF = Math.max(4, Math.abs(w));
+    const heightF = Math.max(4, Math.abs(h));
+    const topLeft = { x: w < 0 ? x1 + w : x1, y: h < 0 ? y1 + h : y1 };
+    const isClick = Math.abs(widthF) < 4 && Math.abs(heightF) < 4;
+    const sizeFinal = isClick ? { width: 80, height: 80 } : { width: widthF, height: heightF };
+    
+    // Generate regular polygon points
+    const points = generateRegularPolygonPoints(sizeFinal.width, sizeFinal.height, sides);
+    
     const id = 'polygon_' + Math.random().toString(36).slice(2, 9);
     const polygonNode: PolygonNode = {
       id,
       type: 'polygon',
-      position: { x: origin.x, y: origin.y },
-      points: relativePoints,
+      position: topLeft,
+      size: sizeFinal,
+      points,
       fill: defaults.fill,
       stroke: defaults.stroke,
       strokeWidth: defaults.strokeWidth,
       opacity: defaults.opacity,
       closed: defaults.closed,
+      sides,
     };
     setSpec(prev => appendNodesToRoot(prev, [polygonNode]));
     setSelection([id]);
@@ -311,4 +368,25 @@ export function useShapeTools(
     finalizeCurve,
     finalizePolygon,
   };
+}
+
+// Helper function to generate regular polygon points
+function generateRegularPolygonPoints(width: number, height: number, sides: number): number[] {
+  const points: number[] = [];
+  const radiusX = width / 2;
+  const radiusY = height / 2;
+  const centerX = radiusX;
+  const centerY = radiusY;
+  
+  // Start from top (angle offset to make polygon upright)
+  const angleOffset = -Math.PI / 2;
+  
+  for (let i = 0; i < sides; i++) {
+    const angle = angleOffset + (i * 2 * Math.PI) / sides;
+    const x = centerX + radiusX * Math.cos(angle);
+    const y = centerY + radiusY * Math.sin(angle);
+    points.push(x, y);
+  }
+  
+  return points;
 }

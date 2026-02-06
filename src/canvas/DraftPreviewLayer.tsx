@@ -20,7 +20,8 @@ interface DraftPreviewLayerProps {
   ellipseDraft: DraftState | null;
   lineDraft: DraftState | null;
   curveDraft: CurveDraftState | null;
-  polygonDraft: CurveDraftState | null;
+  polygonDraft: DraftState | null;
+  polygonSides: number;
   altPressed: boolean;
   shiftPressed: boolean;
 }
@@ -36,6 +37,7 @@ export function DraftPreviewLayer({
   lineDraft,
   curveDraft,
   polygonDraft,
+  polygonSides,
   altPressed,
   shiftPressed,
 }: DraftPreviewLayerProps) {
@@ -153,19 +155,49 @@ export function DraftPreviewLayer({
       })()}
       
       {/* Polygon draft preview */}
-      {isPolygonMode && polygonDraft && polygonDraft.points.length >= 1 && (() => {
-        const pts: number[] = [];
-        for (const p of polygonDraft.points) {
-          pts.push(p.x, p.y);
+      {isPolygonMode && polygonDraft && (() => {
+        const { start, current } = polygonDraft;
+        let x = start.x, y = start.y, w = current.x - start.x, h = current.y - start.y;
+        const alt = altPressed; const shift = shiftPressed;
+        if (alt) {
+          w = (current.x - start.x) * 2;
+          h = (current.y - start.y) * 2;
         }
-        pts.push(polygonDraft.current.x, polygonDraft.current.y);
+        if (shift) {
+          const m = Math.max(Math.abs(w), Math.abs(h));
+          w = Math.sign(w || 1) * m;
+          h = Math.sign(h || 1) * m;
+        }
+        if (alt) {
+          x = start.x - Math.abs(w)/2;
+          y = start.y - Math.abs(h)/2;
+          w = Math.abs(w); h = Math.abs(h);
+        } else {
+          if (w < 0) { x = x + w; w = Math.abs(w);} 
+          if (h < 0) { y = y + h; h = Math.abs(h);} 
+        }
+        
+        // Generate regular polygon points
+        const radiusX = Math.max(1, w) / 2;
+        const radiusY = Math.max(1, h) / 2;
+        const centerX = x + radiusX;
+        const centerY = y + radiusY;
+        const angleOffset = -Math.PI / 2;
+        const points: number[] = [];
+        for (let i = 0; i < polygonSides; i++) {
+          const angle = angleOffset + (i * 2 * Math.PI) / polygonSides;
+          const px = centerX + radiusX * Math.cos(angle);
+          const py = centerY + radiusY * Math.sin(angle);
+          points.push(px, py);
+        }
+        
         return (
           <Line
-            points={pts}
-            closed={polygonDraft.points.length >= 2}
+            points={points}
+            closed={true}
             fill={'rgba(255,255,255,0.35)'}
             stroke={'#334155'}
-            strokeWidth={2}
+            strokeWidth={1}
             dash={[6,4]}
             listening={false}
           />
