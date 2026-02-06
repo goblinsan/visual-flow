@@ -7,6 +7,7 @@ import { generateId, jsonResponse, errorResponse } from '../utils';
 import { checkCanvasAccess } from '../auth';
 import { generateSecureToken, hashToken } from '../tokenHash';
 import { validateRequestBody, generateAgentTokenSchema } from '../validation';
+import { checkAgentTokenQuota } from '../quota';
 
 interface AgentToken {
   id: string;
@@ -32,6 +33,12 @@ export async function generateAgentToken(
   const access = await checkCanvasAccess(env, user.id, canvasId, 'owner');
   if (!access.allowed) {
     return errorResponse('Canvas not found or insufficient permissions', 404);
+  }
+
+  // Check quota before generating token
+  const quota = await checkAgentTokenQuota(env, canvasId);
+  if (!quota.allowed) {
+    return errorResponse(quota.error || 'Agent token quota exceeded', 403);
   }
 
   // Validate request body

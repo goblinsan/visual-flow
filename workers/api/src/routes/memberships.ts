@@ -1,10 +1,11 @@
 /**
- * Membership (sharing) routes
+ * Membership routes for Phase 1
  */
 
 import type { Env, User, Membership } from '../types';
 import { generateId, jsonResponse, errorResponse } from '../utils';
 import { checkCanvasAccess } from '../auth';
+import { checkMemberQuota } from '../quota';
 
 /**
  * GET /api/canvases/:id/members
@@ -46,6 +47,12 @@ export async function addMember(
   canvasId: string,
   request: Request
 ): Promise<Response> {
+  // Check quota before adding member
+  const quota = await checkMemberQuota(env, canvasId);
+  if (!quota.allowed) {
+    return errorResponse(quota.error || 'Member quota exceeded', 403);
+  }
+
   try {
     // Check owner or editor access
     const access = await checkCanvasAccess(env, user.id, canvasId, 'editor');
