@@ -39,12 +39,12 @@ import useElementSize from './hooks/useElementSize';
 import { COMPONENT_LIBRARY, ICON_LIBRARY } from "./library";
 // Collaboration imports
 import { useRealtimeCanvas } from './collaboration';
-import { ConnectionStatusIndicator } from './components/ConnectionStatusIndicator';
 import { CursorOverlay } from './components/CursorOverlay';
 import { SelectionOverlay } from './components/SelectionOverlay';
-import { ActiveUsersList } from './components/ActiveUsersList';
 import { useProposals } from './hooks/useProposals';
 import { applyProposalOperations } from './utils/proposalHelpers';
+import { HeaderToolbar } from './components/canvas/HeaderToolbar';
+import { LeftToolbar } from './components/canvas/LeftToolbar';
 
 /** Get room ID from URL query param ?room=xxx */
 function getRoomIdFromURL(): string | null {
@@ -634,111 +634,24 @@ export default function CanvasApp() {
   return (
     <div className="h-screen w-screen overflow-hidden bg-gray-100 text-gray-900 flex flex-col">
       {/* Header */}
-      <header ref={headerRef} className="flex items-center justify-between border-b border-blue-900/30 bg-gradient-to-r from-blue-950 via-blue-900 to-cyan-700 shadow-lg select-none" style={{ padding: '20px' }}>
-        <div className="flex items-center gap-8">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-white/15 backdrop-blur flex items-center justify-center shadow-sm overflow-hidden">
-                <img src="/vizail-mark.svg" alt="Vizail" className="w-7 h-7" />
-              </div>
-              <h1 className="tracking-wide text-white" style={{ fontFamily: '"Cal Sans", "Cal Sans Semibold", sans-serif', fontWeight: 600, fontSize: '2em' }}>Viz<span className="text-cyan-300">ai</span>l</h1>
-            </div>
-            {/* File menu */}
-            <div className="relative">
-              <button
-                onClick={() => setFileOpen(o => !o)}
-                className={`text-sm px-3 py-1.5 rounded-md transition-colors duration-150 text-white/90 hover:bg-white/10 ${fileOpen ? 'bg-white/10' : ''}`}
-                aria-haspopup="true"
-                aria-expanded={fileOpen}
-              >
-                <i className="fa-regular fa-folder mr-1.5 text-cyan-300" />
-                File
-                <i className="fa-solid fa-chevron-down ml-1.5 text-[10px] text-white/50" />
-              </button>
-              {fileOpen && (
-                <div className="absolute left-0 mt-1.5 w-48 rounded-lg border border-gray-200 bg-white shadow-xl z-30 p-1.5 flex flex-col overflow-hidden">
-                  {[
-                    ["fa-regular fa-file", "New", "new", "⌘N"],
-                    ["fa-regular fa-folder-open", "Open…", "open", "⌘O"],
-                    ["fa-regular fa-floppy-disk", "Save", "save", "⌘S"],
-                    ["fa-solid fa-file-export", "Save As…", "saveAs", "⇧⌘S"],
-                  ].map(([icon, label, act, shortcut]) => (
-                    <button
-                      key={act}
-                      onClick={() => { fileAction(act); setFileOpen(false); }}
-                      className="w-full flex items-center justify-between px-3 py-2 text-sm rounded-md hover:bg-gray-100 transition-colors duration-100"
-                    >
-                      <span className="flex items-center gap-2.5">
-                        <i className={`${icon} text-gray-500 w-4`} />
-                        {label}
-                      </span>
-                      <span className="text-[10px] text-gray-400 font-mono">{shortcut}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            {/* Help menu */}
-            <div className="relative">
-              <button
-                onClick={() => setHelpOpen(o => !o)}
-                className={`text-sm px-3 py-1.5 rounded-md transition-colors duration-150 text-white/90 hover:bg-white/10 ${helpOpen ? 'bg-white/10' : ''}`}
-                aria-haspopup="true"
-                aria-expanded={helpOpen}
-              >
-                <i className="fa-regular fa-circle-question mr-1.5 text-cyan-300" />
-                Help
-                <i className="fa-solid fa-chevron-down ml-1.5 text-[10px] text-white/50" />
-              </button>
-              {helpOpen && (
-                <div className="absolute left-0 mt-1.5 w-52 rounded-lg border border-gray-200 bg-white shadow-xl z-30 p-1.5 flex flex-col overflow-hidden">
-                  <button
-                    onClick={() => { setAboutOpen(true); setHelpOpen(false); }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm rounded-md hover:bg-gray-100 transition-colors duration-100"
-                  >
-                    <i className="fa-solid fa-info-circle text-gray-500 w-4" />
-                    About
-                  </button>
-                  <button
-                    onClick={() => { setCheatOpen(true); setHelpOpen(false); }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm rounded-md hover:bg-gray-100 transition-colors duration-100"
-                  >
-                    <i className="fa-regular fa-keyboard text-gray-500 w-4" />
-                    Keyboard Shortcuts
-                  </button>
-                </div>
-              )}
-            </div>
-        </div>
-        <div className="flex items-center gap-4">
-          {/* Collaboration status (when in collaborative mode) */}
-          {isCollaborative && (
-            <div className="flex items-center gap-3">
-              <ConnectionStatusIndicator
-                status={status}
-                collaboratorCount={collaborators.size}
-                isSyncing={isSyncing}
-                lastError={lastError}
-                onReconnect={reconnect}
-              />
-              <ActiveUsersList collaborators={collaborators} maxVisible={4} />
-            </div>
-          )}
-          {/* Share button */}
-          <button
-            onClick={() => setShareDialogOpen(true)}
-            className="flex items-center gap-2 text-sm font-medium text-white bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 px-4 py-2 rounded-lg shadow-md transition-all duration-150"
-          >
-            <i className="fa-solid fa-share-nodes" />
-            Share
-          </button>
-          
-          {/* Tool indicator */}
-          <div className="flex items-center gap-2 text-xs font-medium text-white/90 bg-white/15 backdrop-blur px-4 py-2 rounded-full border border-white/10">
-            <i className="fa-solid fa-wand-magic-sparkles text-cyan-300" />
-            <span className="capitalize">{tool}</span>
-          </div>
-        </div>
-      </header>
+      <HeaderToolbar
+        headerRef={headerRef}
+        fileOpen={fileOpen}
+        setFileOpen={setFileOpen}
+        fileAction={fileAction}
+        helpOpen={helpOpen}
+        setHelpOpen={setHelpOpen}
+        setAboutOpen={setAboutOpen}
+        setCheatOpen={setCheatOpen}
+        isCollaborative={isCollaborative}
+        status={status}
+        collaborators={collaborators}
+        isSyncing={isSyncing}
+        lastError={lastError}
+        reconnect={reconnect}
+        setShareDialogOpen={setShareDialogOpen}
+        tool={tool}
+      />
       {/* Modals */}
       {/* Share / Collaboration Dialog */}
       <Modal open={shareDialogOpen} onClose={() => setShareDialogOpen(false)} title="Share & Collaborate" size="md" variant="light">
@@ -993,86 +906,12 @@ export default function CanvasApp() {
       {/* Body layout */}
       <div className="flex flex-1 min-h-0">
         {/* Left toolbar */}
-        <aside className="w-14 border-r border-gray-200 bg-gradient-to-b from-white to-gray-50 flex flex-col items-center py-3 gap-1 shadow-sm">
-          {[
-            { icon: "fa-solid fa-arrow-pointer", val: "select", tooltip: "Select (V)" },
-            { icon: "fa-regular fa-square", val: "rect", tooltip: "Rectangle (R)" },
-            { icon: "fa-regular fa-circle", val: "ellipse", tooltip: "Ellipse (O)" },
-            { icon: "fa-solid fa-minus", val: "line", tooltip: "Line (L)" },
-            { icon: "fa-solid fa-bezier-curve", val: "curve", tooltip: "Curve (P)" },
-            { icon: "fa-solid fa-font", val: "text", tooltip: "Text (T)" },
-            { icon: "fa-regular fa-image", val: "image", tooltip: "Image (I)" },
-            { icon: "fa-solid fa-icons", val: "icon", tooltip: "Icon Library" },
-            { icon: "fa-solid fa-layer-group", val: "component", tooltip: "Components" },
-          ].map(({ icon, val, tooltip }) => (
-            <button
-              key={val}
-              onClick={() => {
-                if (val === 'icon') {
-                  setTool('icon');
-                  setIconLibraryOpen(true);
-                  return;
-                }
-                if (val === 'component') {
-                  setTool('component');
-                  setComponentLibraryOpen(true);
-                  return;
-                }
-                setTool(val);
-              }}
-              title={tooltip}
-              className={`relative w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-150 ${
-                tool === val 
-                  ? "text-white" 
-                  : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-              }`}
-            >
-              {tool === val && (
-                <span className="absolute inset-0 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow-md" />
-              )}
-              <i className={`${icon} text-base relative z-10`} />
-            </button>
-          ))}
-          <div className="flex-1" />
-          <div className="flex flex-col gap-1 mb-2">
-            <button
-              onClick={() => setTool('zoom')}
-              title="Zoom tool (click to zoom in, Alt-click to zoom out)"
-              className={`relative w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-150 ${
-                tool === 'zoom'
-                  ? "text-white"
-                  : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-              }`}
-            >
-              {tool === 'zoom' && (
-                <span className="absolute inset-0 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow-md" />
-              )}
-              <i className="fa-solid fa-magnifying-glass text-base relative z-10" />
-            </button>
-            <button
-              onClick={() => setTool('pan')}
-              title="Pan tool (drag to pan)"
-              className={`relative w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-150 ${
-                tool === 'pan'
-                  ? "text-white"
-                  : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-              }`}
-            >
-              {tool === 'pan' && (
-                <span className="absolute inset-0 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow-md" />
-              )}
-              <i className="fa-regular fa-hand text-base relative z-10" />
-            </button>
-          </div>
-          <div className="w-8 h-px bg-gray-200 my-2" />
-          <button
-            onClick={() => setCheatOpen(true)}
-            title="Keyboard shortcuts"
-            className="w-10 h-10 rounded-lg flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-all duration-150"
-          >
-            <i className="fa-regular fa-keyboard text-base" />
-          </button>
-        </aside>
+        <LeftToolbar
+          tool={tool}
+          setTool={setTool}
+          setIconLibraryOpen={setIconLibraryOpen}
+          setComponentLibraryOpen={setComponentLibraryOpen}
+        />
         {/* Canvas center */}
         <main 
           className="flex-1 relative min-w-0"
