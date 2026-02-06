@@ -12,6 +12,9 @@ export interface LineNode {
   opacity?: number;
   strokeDash?: number[];
   lineCap?: 'butt' | 'round' | 'square';
+  startArrow?: boolean;
+  endArrow?: boolean;
+  arrowSize?: number;
 }
 
 export interface LineAttributesPanelProps {
@@ -40,7 +43,7 @@ export const LineAttributesPanel: React.FC<LineAttributesPanelProps> = ({
     setLocalDash(dashStr);
   }, [line.strokeDash]);
 
-  const { stroke, strokeWidth, opacity, lineCap, points } = line;
+  const { stroke, strokeWidth, opacity, lineCap, startArrow, endArrow, arrowSize, points } = line;
 
   // Calculate line length
   const dx = points[2] - points[0];
@@ -165,6 +168,54 @@ export const LineAttributesPanel: React.FC<LineAttributesPanelProps> = ({
           className="accent-blue-500"
         />
       </label>
+
+      {/* Arrow Options */}
+      <div className="border-t border-gray-200 pt-3 mt-1">
+        <span className="text-[11px] font-semibold text-gray-600 flex items-center gap-1.5 mb-2">
+          <i className="fa-solid fa-arrow-right text-gray-400 text-[10px]" />
+          Arrows
+        </span>
+        
+        <div className="grid grid-cols-2 gap-2 mb-2">
+          <label className="flex items-center gap-2 cursor-pointer group">
+            <input
+              type="checkbox"
+              checked={startArrow ?? false}
+              onChange={e => updateNode({ startArrow: e.target.checked })}
+              className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span className="text-[11px] text-gray-700 group-hover:text-gray-900">Start Arrow</span>
+          </label>
+          
+          <label className="flex items-center gap-2 cursor-pointer group">
+            <input
+              type="checkbox"
+              checked={endArrow ?? false}
+              onChange={e => updateNode({ endArrow: e.target.checked })}
+              className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span className="text-[11px] text-gray-700 group-hover:text-gray-900">End Arrow</span>
+          </label>
+        </div>
+        
+        {(startArrow || endArrow) && (
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[11px] font-medium text-gray-600 flex items-center gap-1">
+              <i className="fa-solid fa-up-right-and-down-left-from-center text-gray-400 text-[9px]" />
+              Arrow Size ({(arrowSize ?? 1).toFixed(1)}x)
+            </span>
+            <input
+              type="range"
+              min={0.5}
+              max={3}
+              step={0.1}
+              value={arrowSize ?? 1}
+              onChange={e => updateNode({ arrowSize: Number(e.target.value) })}
+              className="accent-blue-500"
+            />
+          </label>
+        )}
+      </div>
 
       <label className="flex flex-col gap-1.5">
         <span className="text-[11px] font-medium text-gray-600 flex items-center gap-1.5">
