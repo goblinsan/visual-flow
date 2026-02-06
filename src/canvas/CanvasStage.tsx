@@ -21,6 +21,7 @@ import { useViewportManager } from "./hooks/useViewportManager";
 import { useSelectionManager } from "./hooks/useSelectionManager";
 import { useTransformManager } from "./hooks/useTransformManager";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
+import { ContextMenu } from "./components/ContextMenu";
 
 // Grid configuration
 const GRID_SPACING = 20; // Space between dots
@@ -1401,27 +1402,6 @@ function CanvasStage({
     setMenu({ x: e.clientX - rect.left, y: e.clientY - rect.top });
   }, [isSelectMode, spec.root.id, selected, getTopContainerAncestor, normalizeSelection, setSelection]);
 
-  // Close menu on outside clicks
-  useEffect(() => {
-    if (!menu) return;
-    const handleDocMouseDown = (ev: MouseEvent) => {
-      const wrap = wrapperRef.current;
-      if (!wrap) return;
-      if (wrap.contains(ev.target as Node)) {
-        const menuEl = wrap.querySelector('.z-50');
-        if (menuEl && menuEl.contains(ev.target as Node)) return;
-      }
-      setMenu(null);
-    };
-    const handleDocContext = () => { setMenu(null); };
-    window.addEventListener('mousedown', handleDocMouseDown, true);
-    window.addEventListener('contextmenu', handleDocContext, true);
-    return () => {
-      window.removeEventListener('mousedown', handleDocMouseDown, true);
-      window.removeEventListener('contextmenu', handleDocContext, true);
-    };
-  }, [menu]);
-
   // Group / Ungroup logic
   const canUngroup = useMemo(() => 
     selected.length === 1 && selectionContext.nodeById[selected[0]]?.type === "group", 
@@ -1770,294 +1750,25 @@ function CanvasStage({
       })()}
       
       {/* Context Menu */}
-      {menu && isSelectMode && (
-        <div 
-          ref={(el) => {
-            // Adjust position if menu extends past viewport
-            if (el) {
-              const rect = el.getBoundingClientRect();
-              const viewportHeight = window.innerHeight;
-              const viewportWidth = window.innerWidth;
-              if (rect.bottom > viewportHeight - 10) {
-                el.style.top = `${menu.y - (rect.bottom - viewportHeight) - 20}px`;
-              }
-              if (rect.right > viewportWidth - 10) {
-                el.style.left = `${menu.x - (rect.right - viewportWidth) - 20}px`;
-              }
-            }
-          }}
-          style={{ position: 'absolute', left: menu.x, top: menu.y, pointerEvents: 'auto', maxHeight: 'calc(100vh - 40px)', overflowY: 'auto' }}
-          className="z-50 text-xs bg-white border border-gray-300 rounded shadow-md select-none min-w-40"
-        >
-          {/* Layer ordering actions (true sibling reordering) */}
-          {selected.length > 0 && (
-            (() => {
-              // Build map parentId -> list of child ids selected
-              const parentMap: Record<string, string[]> = {};
-              for (const id of selected) {
-                const p = selectionContext.parentOf[id];
-                if (p) {
-                  parentMap[p] = parentMap[p] ? [...parentMap[p], id] : [id];
-                }
-              }
-              const applyReorder = (mode: 'forward'|'lower'|'top'|'bottom') => {
-                setSpec(prev => {
-                  const nextRoot = (function walk(n: LayoutNode): LayoutNode {
-                    if (!nodeHasChildren(n)) return n;
-                    const children = n.children;
-                    if (parentMap[n.id] && children.length > 0) {
-                      const selectedChildren = new Set(parentMap[n.id]);
-                      let newChildren = children.slice();
-                      if (mode === 'forward') {
-                        for (let i = newChildren.length - 2; i >= 0; i--) {
-                          if (selectedChildren.has(newChildren[i].id) && !selectedChildren.has(newChildren[i + 1].id)) {
-                            const tmp = newChildren[i + 1];
-                            newChildren[i + 1] = newChildren[i];
-                            newChildren[i] = tmp;
-                          }
-                        }
-                      } else if (mode === 'lower') {
-                        for (let i = 1; i < newChildren.length; i++) {
-                          if (selectedChildren.has(newChildren[i].id) && !selectedChildren.has(newChildren[i - 1].id)) {
-                            const tmp = newChildren[i - 1];
-                            newChildren[i - 1] = newChildren[i];
-                            newChildren[i] = tmp;
-                          }
-                        }
-                      } else if (mode === 'top') {
-                        const moving = newChildren.filter((c) => selectedChildren.has(c.id));
-                        const staying = newChildren.filter((c) => !selectedChildren.has(c.id));
-                        newChildren = [...staying, ...moving];
-                      } else if (mode === 'bottom') {
-                        const moving = newChildren.filter((c) => selectedChildren.has(c.id));
-                        const staying = newChildren.filter((c) => !selectedChildren.has(c.id));
-                        newChildren = [...moving, ...staying];
-                      }
-                      n = { ...n, children: newChildren.map((c) => walk(c)) };
-                      return n;
-                    }
-                    if (children.length > 0) {
-                      return { ...n, children: children.map((c) => walk(c)) };
-                    }
-                    return n;
-                  })(prev.root);
-                  return {
-                    ...prev,
-                    root: nextRoot as FrameNode
-                  };
-                });
-                setMenu(null);
-              };
-              return (
-                <>
-                  <button onClick={() => applyReorder('forward')} className="px-3 py-1.5 w-full text-left hover:bg-gray-100">Move Forward</button>
-                  <button onClick={() => applyReorder('top')} className="px-3 py-1.5 w-full text-left hover:bg-gray-100">Move To Top</button>
-                  <button onClick={() => applyReorder('lower')} className="px-3 py-1.5 w-full text-left hover:bg-gray-100">Move Lower</button>
-                  <button onClick={() => applyReorder('bottom')} className="px-3 py-1.5 w-full text-left hover:bg-gray-100">Move To Bottom</button>
-                  <div className="h-px bg-gray-200 my-1" />
-                </>
-              );
-            })()
-          )}
-          <button
-            disabled={selected.length === 0}
-            onClick={() => {
-              if (selected.length === 0) return;
-              const nodes = selected.map(id => findNode(spec.root, id)).filter(Boolean) as LayoutNode[];
-              if (nodes.length > 0) {
-                clipboardRef.current = nodes.map(n => cloneNode(n));
-                pasteOffsetRef.current = 0;
-              }
-              setMenu(null);
-            }}
-            className={`px-3 py-1.5 w-full text-left ${selected.length > 0 ? 'hover:bg-gray-100' : 'text-gray-400 cursor-not-allowed'}`}
-          >
-            Copy
-          </button>
-          <button
-            disabled={!clipboardRef.current || clipboardRef.current.length === 0}
-            onClick={() => {
-              if (!clipboardRef.current || clipboardRef.current.length === 0) return;
-              const offset = 16 * (pasteOffsetRef.current + 1);
-              const existing = collectExistingIds(spec.root as LayoutNode);
-              const makeId = createUniqueIdFactory(existing);
-              const clones = clipboardRef.current.map(n => remapIdsAndOffset(cloneNode(n), { x: offset, y: offset }, makeId));
-              setSpec(prev => appendNodesToRoot(prev, clones));
-              setSelection(clones.map(n => n.id));
-              pasteOffsetRef.current += 1;
-              setMenu(null);
-            }}
-            className={`px-3 py-1.5 w-full text-left ${clipboardRef.current && clipboardRef.current.length > 0 ? 'hover:bg-gray-100' : 'text-gray-400 cursor-not-allowed'}`}
-          >
-            Paste
-          </button>
-          <div className="h-px bg-gray-200 my-1" />
-          <button 
-            disabled={!canGroup}
-            onClick={() => { if (canGroup) performGroup(); else setMenu(null); }}
-            className={`px-3 py-1.5 w-full text-left ${canGroup ? 'hover:bg-gray-100' : 'text-gray-400 cursor-not-allowed'}`}
-          >
-            Group Selection
-          </button>
-          <button 
-            disabled={!canUngroup}
-            onClick={() => { if (canUngroup) performUngroup(); else setMenu(null); }}
-            className={`px-3 py-1.5 w-full text-left ${canUngroup ? 'hover:bg-gray-100' : 'text-gray-400 cursor-not-allowed'}`}
-          >
-            Ungroup
-          </button>
-          {/* Re-enable aspect for stretched image(s) */}
-          {selected.length > 0 && (() => {
-            const anyStretch = selected.some(id => {
-              const node = selectionContext.nodeById[id];
-              return node?.type === 'image' && node.preserveAspect === false;
-            });
-            return anyStretch;
-          })() && (
-            <button
-              onClick={() => {
-                setSpec(prev => ({
-                  ...prev,
-                  root: mapNode<FrameNode>(prev.root, '__bulk__', (n) => n)
-                }));
-                setSpec(prev => {
-                  const mapAll = <T extends LayoutNode>(n: T): T => {
-                    if (selected.includes(n.id) && n.type === 'image' && n.preserveAspect === false) {
-                      return { ...n, preserveAspect: true, objectFit: n.objectFit || 'contain' } as T;
-                    }
-                    if (nodeHasChildren(n)) {
-                      const mappedChildren = n.children.map((child) => mapAll(child));
-                      return { ...n, children: mappedChildren } as T;
-                    }
-                    return n;
-                  };
-                  const nextRoot = mapAll(prev.root);
-                  return {
-                    ...prev,
-                    root: nextRoot
-                  };
-                });
-                setMenu(null);
-              }}
-              className="px-3 py-1.5 w-full text-left hover:bg-gray-100"
-            >
-              Re-enable Aspect
-            </button>
-          )}
-          {/* Reset Text Scale (only if any selected text node has scale !=1) */}
-          {selected.length > 0 && (() => {
-            const anyScaled = selected.some(id => {
-              const node = selectionContext.nodeById[id];
-              return node?.type === 'text' && ((node.textScaleX && Math.abs(node.textScaleX - 1) > 0.001) || (node.textScaleY && Math.abs(node.textScaleY - 1) > 0.001));
-            });
-            return anyScaled;
-          })() && (
-            <button
-              onClick={() => {
-                setSpec(prev => {
-                  const mapAll = <T extends LayoutNode>(n: T): T => {
-                    if (selected.includes(n.id) && n.type === 'text') {
-                      return { ...n, textScaleX: 1, textScaleY: 1 } as T;
-                    }
-                    if (nodeHasChildren(n)) {
-                      const mappedChildren = n.children.map((child) => mapAll(child));
-                      return { ...n, children: mappedChildren } as T;
-                    }
-                    return n;
-                  };
-                  const nextRoot = mapAll(prev.root);
-                  return {
-                    ...prev,
-                    root: nextRoot
-                  };
-                });
-                setMenu(null);
-              }}
-              className="px-3 py-1.5 w-full text-left hover:bg-gray-100"
-            >Reset Text Scale</button>
-          )}
-          {/* Delete */}
-          {selected.length > 0 && (
-            <button
-              onClick={() => {
-                setSpec(prev => deleteNodes(prev, new Set(selected)));
-                setSelection([]);
-                setMenu(null);
-              }}
-              className="px-3 py-1.5 w-full text-left hover:bg-red-50 text-red-600"
-            >Delete</button>
-          )}
-          <div className="h-px bg-gray-200 my-1" />
-          {/* Lock/Unlock */}
-          {selected.length > 0 && (() => {
-            const anyLocked = selected.some(id => selectionContext.nodeById[id]?.locked === true);
-            const anyUnlocked = selected.some(id => selectionContext.nodeById[id]?.locked !== true);
-            return (
-              <>
-                {anyUnlocked && (
-                  <button
-                    onClick={() => {
-                      const lockedIds = [...selected];
-                      setSpec(prev => {
-                        const mapAll = <T extends LayoutNode>(n: T): T => {
-                          if (lockedIds.includes(n.id)) {
-                            return { ...n, locked: true } as T;
-                          }
-                          if (nodeHasChildren(n)) {
-                            const mappedChildren = n.children.map((child) => mapAll(child));
-                            return { ...n, children: mappedChildren } as T;
-                          }
-                          return n;
-                        };
-                        const nextRoot = mapAll(prev.root);
-                        return { ...prev, root: nextRoot };
-                      });
-                      // Clear selection so the locked state takes effect immediately
-                      setSelection([]);
-                      setMenu(null);
-                    }}
-                    className="px-3 py-1.5 w-full text-left hover:bg-gray-100 flex items-center gap-2"
-                  >
-                    <i className="fa-solid fa-lock text-gray-400 w-4" />
-                    Lock
-                  </button>
-                )}
-                {anyLocked && (
-                  <button
-                    onClick={() => {
-                      setSpec(prev => {
-                        const mapAll = <T extends LayoutNode>(n: T): T => {
-                          if (selected.includes(n.id)) {
-                            return { ...n, locked: false } as T;
-                          }
-                          if (nodeHasChildren(n)) {
-                            const mappedChildren = n.children.map((child) => mapAll(child));
-                            return { ...n, children: mappedChildren } as T;
-                          }
-                          return n;
-                        };
-                        const nextRoot = mapAll(prev.root);
-                        return { ...prev, root: nextRoot };
-                      });
-                      setMenu(null);
-                    }}
-                    className="px-3 py-1.5 w-full text-left hover:bg-gray-100 flex items-center gap-2"
-                  >
-                    <i className="fa-solid fa-lock-open text-gray-400 w-4" />
-                    Unlock
-                  </button>
-                )}
-                <div className="h-px bg-gray-200 my-1" />
-              </>
-            );
-          })()}
-          <button 
-            onClick={() => setMenu(null)} 
-            className="px-3 py-1.5 hover:bg-gray-100 w-full text-left text-gray-500"
-          >
-            Close
-          </button>
-        </div>
+      {isSelectMode && (
+        <ContextMenu
+          menu={menu}
+          onClose={() => setMenu(null)}
+          selected={selected}
+          selectionContext={selectionContext}
+          spec={spec}
+          setSpec={setSpec}
+          setSelection={setSelection}
+          canGroup={canGroup}
+          canUngroup={canUngroup}
+          performGroup={performGroup}
+          performUngroup={performUngroup}
+          findNode={findNode}
+          cloneNode={cloneNode}
+          collectExistingIds={collectExistingIds}
+          createUniqueIdFactory={createUniqueIdFactory}
+          remapIdsAndOffset={remapIdsAndOffset}
+        />
       )}
       
       {/* Image Picker Modal */}
