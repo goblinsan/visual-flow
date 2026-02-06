@@ -16,6 +16,10 @@ import { ImagePickerModal } from "../components/ImagePickerModal";
 import { COMPONENT_LIBRARY, ICON_LIBRARY } from "../library";
 import { DraftPreviewLayer } from "./DraftPreviewLayer";
 import { TextEditingOverlay } from "./TextEditingOverlay";
+import { useShapeTools } from "./hooks/useShapeTools";
+import { useViewportManager } from "./hooks/useViewportManager";
+import { useSelectionManager } from "./hooks/useSelectionManager";
+import { useTransformManager } from "./hooks/useTransformManager";
 
 // Grid configuration
 const GRID_SPACING = 20; // Space between dots
@@ -175,27 +179,9 @@ function CanvasStage({
   }, [onEditingCurveIdChange]);
   const clipboardRef = useRef<LayoutNode[] | null>(null);
   const pasteOffsetRef = useRef(0);
-  useEffect(() => {
-    posRef.current = pos;
-  }, [pos]);
-
-  const easingFn = useCallback((name: "linear" | "ease" | "ease-in" | "ease-out" | "ease-in-out") => {
-    switch (name) {
-      case "linear":
-        return (t: number) => t;
-      case "ease-in":
-        return (t: number) => t * t;
-      case "ease-out":
-        return (t: number) => 1 - Math.pow(1 - t, 2);
-      case "ease-in-out":
-        return (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
-      default:
-        return (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
-    }
-  }, []);
 
   type Bounds = { x: number; y: number; width: number; height: number };
-  const getNodeBounds = useCallback((node: LayoutNode, accX: number, accY: number): Bounds | null => {
+  const getNodeBounds = useCallback((node: LayoutNode, accX = 0, accY = 0): Bounds | null => {
     const pos = (node as { position?: Pos }).position ?? { x: 0, y: 0 };
     const baseX = accX + (pos.x ?? 0);
     const baseY = accY + (pos.y ?? 0);
@@ -217,65 +203,27 @@ function CanvasStage({
     return bounds;
   }, []);
 
-  const findNodeBoundsById = useCallback((node: LayoutNode, id: string, accX = 0, accY = 0): Bounds | null => {
-    const pos = (node as { position?: Pos }).position ?? { x: 0, y: 0 };
-    const nextX = accX + (pos.x ?? 0);
-    const nextY = accY + (pos.y ?? 0);
-    if (node.id === id) {
-      return getNodeBounds(node, accX, accY);
-    }
-    if (Array.isArray(node.children)) {
-      for (const child of node.children) {
-        const found = findNodeBoundsById(child, id, nextX, nextY);
-        if (found) return found;
-      }
-    }
-    return null;
+  // Adapter for viewport manager - simplified signature
+  const getNodeBoundsForViewport = useCallback((node: LayoutNode): Bounds | null => {
+    return getNodeBounds(node, 0, 0);
   }, [getNodeBounds]);
 
-  useEffect(() => {
-    if (!viewportTransition?.targetId) return;
-    const bounds = findNodeBoundsById(spec.root, viewportTransition.targetId);
-    if (!bounds) return;
-    const duration = Math.max(0, viewportTransition.durationMs ?? 300);
-    const ease = easingFn(viewportTransition.easing ?? "ease-out");
-    const targetX = width / 2 - (bounds.x + bounds.width / 2) * scale;
-    const targetY = height / 2 - (bounds.y + bounds.height / 2) * scale;
-    const from = posRef.current;
+  // Use viewport manager hook
+  useViewportManager(
+    width,
+    height,
+    scale,
+    setScale,
+    pos,
+    setPos,
+    spec,
+    getNodeBoundsForViewport,
+    viewportTransition,
+    onViewportChange,
+    fitToContentKey
+  );
 
-    if (transitionRafRef.current) {
-      cancelAnimationFrame(transitionRafRef.current);
-      transitionRafRef.current = null;
-    }
-
-    if (duration === 0) {
-      setPos({ x: targetX, y: targetY });
-      return;
-    }
-
-    const start = performance.now();
-    const tick = (now: number) => {
-      const t = Math.min(1, (now - start) / duration);
-      const k = ease(t);
-      setPos({
-        x: from.x + (targetX - from.x) * k,
-        y: from.y + (targetY - from.y) * k,
-      });
-      if (t < 1) {
-        transitionRafRef.current = requestAnimationFrame(tick);
-      } else {
-        transitionRafRef.current = null;
-      }
-    };
-    transitionRafRef.current = requestAnimationFrame(tick);
-    return () => {
-      if (transitionRafRef.current) {
-        cancelAnimationFrame(transitionRafRef.current);
-        transitionRafRef.current = null;
-      }
-    };
-  }, [viewportTransition?._key, viewportTransition?.targetId, viewportTransition?.durationMs, viewportTransition?.easing, width, height, scale, spec.root, findNodeBoundsById, easingFn]);
-    const getNodeWorldPosition = useCallback((nodeId: string): { x: number; y: number } | null => {
+  const getNodeWorldPosition = useCallback((nodeId: string): { x: number; y: number } | null => {
       let result: { x: number; y: number } | null = null;
       const walk = (node: LayoutNode, accX: number, accY: number) => {
         const pos = (node as { position?: Pos }).position ?? { x: 0, y: 0 };
@@ -384,69 +332,6 @@ function CanvasStage({
   const wrapperRef = useRef<HTMLDivElement>(null);
   const marqueeRectRef = useRef<Konva.Rect>(null);
 
-  // Transform session snapshot (captured at first transform frame)
-  const [transformSession, setTransformSession] = useState<null | {
-    nodes: Record<string, {
-      topLeft: { x: number; y: number };
-      size: { width: number; height: number };
-      center: { x: number; y: number };
-    }>;
-    selectionBox?: { x: number; y: number; width: number; height: number; center: { x: number; y: number } };
-  }>(null);
-
-  // Fit-to-content: calculate scale and position to fit the spec.root content in the viewport
-  useEffect(() => {
-    if (fitToContentKey === undefined || fitToContentKey === 0) return;
-    
-    // Get bounds of all children or use root size
-    const rootSize = spec.root.size;
-    const children = spec.root.children || [];
-    
-    let minX = 0, minY = 0, maxX = rootSize?.width || 1600, maxY = rootSize?.height || 1200;
-    
-    if (children.length > 0) {
-      // Calculate bounding box of all children
-      minX = Infinity; minY = Infinity; maxX = -Infinity; maxY = -Infinity;
-      for (const child of children) {
-        const cx = child.position?.x ?? 0;
-        const cy = child.position?.y ?? 0;
-        const cw = child.size?.width ?? 100;
-        const ch = child.size?.height ?? 100;
-        minX = Math.min(minX, cx);
-        minY = Math.min(minY, cy);
-        maxX = Math.max(maxX, cx + cw);
-        maxY = Math.max(maxY, cy + ch);
-      }
-      // Add padding
-      const padding = 40;
-      minX -= padding;
-      minY -= padding;
-      maxX += padding;
-      maxY += padding;
-    }
-    
-    const contentWidth = maxX - minX;
-    const contentHeight = maxY - minY;
-    
-    // Calculate scale to fit content in viewport with some padding
-    const viewportPadding = 60;
-    const availableWidth = width - viewportPadding * 2;
-    const availableHeight = height - viewportPadding * 2;
-    
-    const scaleX = availableWidth / contentWidth;
-    const scaleY = availableHeight / contentHeight;
-    const newScale = Math.min(scaleX, scaleY, 1); // Don't zoom in beyond 100%
-    
-    // Center the content
-    const centerX = (minX + maxX) / 2;
-    const centerY = (minY + maxY) / 2;
-    const newPosX = width / 2 - centerX * newScale;
-    const newPosY = height / 2 - centerY * newScale;
-    
-    setScale(newScale);
-    setPos({ x: newPosX, y: newPosY });
-  }, [fitToContentKey, width, height, spec]);
-
   useEffect(() => {
     if (!focusNodeId) return;
     const node = findNode(spec.root, focusNodeId);
@@ -503,19 +388,6 @@ function CanvasStage({
     return top;
   }, [spec.root.id]);
 
-  const normalizeSelection = useCallback((ids: string[]) => {
-    const stage = stageRef.current;
-    if (!stage) return ids;
-    const promoted = ids.map(id => getTopContainerAncestor(stage, id));
-    const out: string[] = [];
-    const seen = new Set<string>();
-    for (const id of promoted) {
-      if (id === spec.root.id) continue;
-      if (!seen.has(id)) { seen.add(id); out.push(id); }
-    }
-    return out;
-  }, [getTopContainerAncestor, spec.root.id]);
-
   // Helper to check if target is transformer-related
   const isTransformerTarget = useCallback((target: Konva.Node | null): boolean => {
     if (!target) return false;
@@ -564,209 +436,41 @@ function CanvasStage({
     current: { x: number; y: number };
   }>(null);
 
-  // Helper: finalize rectangle (called on mouseup or via global listener)
+  // Use shape tools hook
+  const shapeTools = useShapeTools(setSpec, setSelection, onToolChange, rectDefaults);
+
+  // Use selection manager hook
+  const selectionManager = useSelectionManager(stageRef, spec.root.id, getTopContainerAncestor);
+  const normalizeSelection = selectionManager.normalizeSelection;
+
+  // Use transform manager hook
+  const transformManager = useTransformManager(trRef, spec, setSpec, selected, findNode);
+  const { transformSession, onTransform, onTransformEnd } = transformManager;
+
+  // Wrap shape finalization functions to handle draft state
   const finalizeRect = useCallback(() => {
     if (!isRectMode || !rectDraft) return;
-    const { start, current } = rectDraft;
-    let x1 = start.x, y1 = start.y;
-    const x2 = current.x, y2 = current.y;
-    let w = x2 - x1; let h = y2 - y1;
-    const alt = altPressed;
-    const shift = shiftPressed;
-  const defaults = rectDefaults || { fill: '#ffffff', stroke: '#334155', strokeWidth: 1, radius: 0, opacity: 1, strokeDash: undefined };
-  if (alt) {
-      w = (current.x - start.x) * 2;
-      h = (current.y - start.y) * 2;
-      if (shift) {
-        const m = Math.max(Math.abs(w), Math.abs(h));
-        w = Math.sign(w || 1) * m; h = Math.sign(h || 1) * m;
-      }
-      const widthF = Math.max(4, Math.abs(w));
-      const heightF = Math.max(4, Math.abs(h));
-      const topLeft = { x: start.x - widthF / 2, y: start.y - heightF / 2 };
-      const isClick = Math.abs(widthF) < 4 && Math.abs(heightF) < 4;
-      const sizeFinal = isClick ? { width: 80, height: 60 } : { width: widthF, height: heightF };
-      const id = 'rect_' + Math.random().toString(36).slice(2, 9);
-      setSpec(prev => appendNodesToRoot(prev, [{
-        id,
-        type: 'rect',
-        position: topLeft,
-        size: sizeFinal,
-        fill: defaults.fill,
-        stroke: defaults.stroke,
-        strokeWidth: defaults.strokeWidth,
-        radius: defaults.radius,
-        opacity: defaults.opacity,
-        strokeDash: defaults.strokeDash,
-      }]));
-  setSelection([id]);
-      // Stay in text mode while editing; switch to select on commit.
-      setRectDraft(null);
-      return;
-    }
-    if (shift) {
-      const m = Math.max(Math.abs(w), Math.abs(h));
-      w = Math.sign(w || 1) * m; h = Math.sign(h || 1) * m;
-    }
-    if (w < 0) { x1 = x1 + w; w = Math.abs(w); }
-    if (h < 0) { y1 = y1 + h; h = Math.abs(h); }
-    const widthF = Math.max(4, w); const heightF = Math.max(4, h);
-    const isClick = Math.abs(widthF) < 4 && Math.abs(heightF) < 4;
-    const finalSize = isClick ? { width: 80, height: 60 } : { width: widthF, height: heightF };
-    const id = 'rect_' + Math.random().toString(36).slice(2, 9);
-    setSpec(prev => appendNodesToRoot(prev, [{
-      id,
-      type: 'rect',
-      position: { x: x1, y: y1 },
-      size: finalSize,
-      fill: defaults.fill,
-      stroke: defaults.stroke,
-      strokeWidth: defaults.strokeWidth,
-      radius: defaults.radius,
-      opacity: defaults.opacity,
-      strokeDash: defaults.strokeDash,
-    }]));
-  setSelection([id]);
-    onToolChange?.('select');
+    shapeTools.finalizeRect(rectDraft, altPressed, shiftPressed);
     setRectDraft(null);
-  }, [isRectMode, rectDraft, altPressed, shiftPressed, setSpec, onToolChange, rectDefaults, setSelection]);
+  }, [isRectMode, rectDraft, altPressed, shiftPressed, shapeTools]);
 
-  // Helper: finalize ellipse
   const finalizeEllipse = useCallback(() => {
     if (!isEllipseMode || !ellipseDraft) return;
-    const { start, current } = ellipseDraft;
-    let x1 = start.x, y1 = start.y;
-    const x2 = current.x, y2 = current.y;
-    let w = x2 - x1; let h = y2 - y1;
-    const alt = altPressed;
-    const shift = shiftPressed;
-    const defaults = { fill: '#ffffff', stroke: '#334155', strokeWidth: 1, opacity: 1 };
-    
-    if (alt) {
-      w = (current.x - start.x) * 2;
-      h = (current.y - start.y) * 2;
-      if (shift) {
-        const m = Math.max(Math.abs(w), Math.abs(h));
-        w = Math.sign(w || 1) * m; h = Math.sign(h || 1) * m;
-      }
-      const widthF = Math.max(4, Math.abs(w));
-      const heightF = Math.max(4, Math.abs(h));
-      const topLeft = { x: start.x - widthF / 2, y: start.y - heightF / 2 };
-      const isClick = Math.abs(widthF) < 4 && Math.abs(heightF) < 4;
-      const sizeFinal = isClick ? { width: 80, height: 80 } : { width: widthF, height: heightF };
-      const id = 'ellipse_' + Math.random().toString(36).slice(2, 9);
-      const ellipseNode: EllipseNode = {
-        id,
-        type: 'ellipse',
-        position: topLeft,
-        size: sizeFinal,
-        fill: defaults.fill,
-        stroke: defaults.stroke,
-        strokeWidth: defaults.strokeWidth,
-        opacity: defaults.opacity,
-      };
-      setSpec(prev => appendNodesToRoot(prev, [ellipseNode]));
-      onToolChange?.('select');
-      setEllipseDraft(null);
-      return;
-    }
-    if (shift) {
-      const m = Math.max(Math.abs(w), Math.abs(h));
-      w = Math.sign(w || 1) * m; h = Math.sign(h || 1) * m;
-    }
-    if (w < 0) { x1 = x1 + w; w = Math.abs(w); }
-    if (h < 0) { y1 = y1 + h; h = Math.abs(h); }
-    const widthF = Math.max(4, w); const heightF = Math.max(4, h);
-    const isClick = Math.abs(widthF) < 4 && Math.abs(heightF) < 4;
-    const finalSize = isClick ? { width: 80, height: 80 } : { width: widthF, height: heightF };
-    const id = 'ellipse_' + Math.random().toString(36).slice(2, 9);
-    const ellipseNode: EllipseNode = {
-      id,
-      type: 'ellipse',
-      position: { x: x1, y: y1 },
-      size: finalSize,
-      fill: defaults.fill,
-      stroke: defaults.stroke,
-      strokeWidth: defaults.strokeWidth,
-      opacity: defaults.opacity,
-    };
-    setSpec(prev => appendNodesToRoot(prev, [ellipseNode]));
-    setSelection([id]);
-    onToolChange?.('select');
+    shapeTools.finalizeEllipse(ellipseDraft, altPressed, shiftPressed);
     setEllipseDraft(null);
-  }, [isEllipseMode, ellipseDraft, altPressed, shiftPressed, setSpec, onToolChange, setSelection]);
+  }, [isEllipseMode, ellipseDraft, altPressed, shiftPressed, shapeTools]);
 
-  // Helper: finalize line
   const finalizeLine = useCallback(() => {
     if (!isLineMode || !lineDraft) return;
-    const { start, current } = lineDraft;
-    // Calculate line length to check if it's a click vs drag
-    const dx = current.x - start.x;
-    const dy = current.y - start.y;
-    const len = Math.sqrt(dx * dx + dy * dy);
-    const isClick = len < 4;
-    
-    // For lines, store points relative to position (start point)
-    const points: [number, number, number, number] = isClick 
-      ? [0, 0, 100, 0] // default horizontal line
-      : [0, 0, dx, dy];
-    
-    const id = 'line_' + Math.random().toString(36).slice(2, 9);
-    const lineNode: LineNode = {
-      id,
-      type: 'line',
-      position: { x: start.x, y: start.y },
-      points,
-      stroke: '#334155',
-      strokeWidth: 2,
-    };
-    setSpec(prev => appendNodesToRoot(prev, [lineNode]));
-    setSelection([id]);
-    onToolChange?.('select');
+    shapeTools.finalizeLine(lineDraft);
     setLineDraft(null);
-  }, [isLineMode, lineDraft, setSpec, onToolChange, setSelection]);
+  }, [isLineMode, lineDraft, shapeTools]);
 
-  // Helper: finalize curve
   const finalizeCurve = useCallback(() => {
     if (!isCurveMode || !curveDraft) return;
-    const { points, current } = curveDraft;
-    // Need at least start and end points
-    if (points.length < 1) {
-      setCurveDraft(null);
-      return;
-    }
-    
-    // Calculate all points relative to the first point
-    const origin = points[0];
-    const allPoints = [...points, current];
-    const relativePoints: number[] = [];
-    for (const p of allPoints) {
-      relativePoints.push(p.x - origin.x, p.y - origin.y);
-    }
-    
-    // If only 2 points (start + end), create a simple curve with midpoint as control
-    if (relativePoints.length === 4) {
-      // Just a straight line, make it slightly curved
-      const midX = relativePoints[2] / 2;
-      const midY = relativePoints[3] / 2 - 20; // offset for curve effect
-      relativePoints.splice(2, 0, midX, midY);
-    }
-    
-    const id = 'curve_' + Math.random().toString(36).slice(2, 9);
-    const curveNode: CurveNode = {
-      id,
-      type: 'curve',
-      position: { x: origin.x, y: origin.y },
-      points: relativePoints,
-      stroke: '#334155',
-      strokeWidth: 2,
-      tension: 0.5,
-    };
-    setSpec(prev => appendNodesToRoot(prev, [curveNode]));
-    setSelection([id]);
-    onToolChange?.('select');
+    shapeTools.finalizeCurve(curveDraft);
     setCurveDraft(null);
-  }, [isCurveMode, curveDraft, setSpec, onToolChange, setSelection]);
+  }, [isCurveMode, curveDraft, shapeTools]);
 
   // Helper: create text at click position
   // Helper: open image picker at click position
@@ -1937,295 +1641,6 @@ function CanvasStage({
   }, [selected, selectionContext.nodeById]);
 
   // Handle ongoing transform (during drag/resize)
-  const onTransform = useCallback(() => {
-    // Initialize transform session snapshot once per gesture.
-    if (transformSession) return; // already captured
-    const tr = trRef.current; if (!tr) return;
-    const stage = tr.getStage(); if (!stage) return;
-    const nodes = tr.nodes(); if (!nodes.length) return;
-
-    const snapshot: {
-      nodes: Record<string, { topLeft: {x:number;y:number}; size:{width:number;height:number}; center:{x:number;y:number} }>;
-      selectionBox?: { x:number; y:number; width:number; height:number; center:{x:number;y:number} };
-    } = { nodes: {} };
-
-    let minX = Number.POSITIVE_INFINITY, minY = Number.POSITIVE_INFINITY;
-    let maxX = Number.NEGATIVE_INFINITY, maxY = Number.NEGATIVE_INFINITY;
-
-    nodes.forEach(n => {
-      const id = n.id(); if (!id) return;
-      // Derive untransformed size from spec (source of truth)
-      const specNode = findNode(spec.root, id);
-      let width = 0, height = 0;
-      if (specNode && nodeHasSize(specNode)) { width = specNode.size.width; height = specNode.size.height; }
-      else {
-        // Fallback to Konva bounding box (approx for text/etc.)
-        const bb = n.getClientRect({ relativeTo: stage });
-        width = bb.width; height = bb.height;
-      }
-      const topLeft = { x: n.x(), y: n.y() };
-      const center = { x: topLeft.x + width / 2, y: topLeft.y + height / 2 };
-      snapshot.nodes[id] = { topLeft, size: { width, height }, center };
-      minX = Math.min(minX, center.x); minY = Math.min(minY, center.y);
-      maxX = Math.max(maxX, center.x); maxY = Math.max(maxY, center.y);
-    });
-
-    if (nodes.length > 1 && isFinite(minX) && isFinite(minY) && isFinite(maxX) && isFinite(maxY)) {
-      const selW = maxX - minX;
-      const selH = maxY - minY;
-      snapshot.selectionBox = { x: minX, y: minY, width: selW, height: selH, center: { x: minX + selW/2, y: minY + selH/2 } };
-    }
-
-    setTransformSession(snapshot);
-  }, [transformSession, spec.root, findNode]);
-
-  // Commit transform (resize, scale, rotate)
-  const onTransformEnd = useCallback(() => {
-    const nodes = trRef.current?.nodes() ?? [];
-    if (nodes.length === 0) return;
-  // const session = transformSession; // snapshot no longer used in current simplified bake
-    
-    // For multi-selection, we need to get the transform values that were applied to all nodes
-    // and apply them uniformly to our spec
-  if (nodes.length > 1) {
-  // multi-selection transform bake
-      // NOTE: Current implementation still naive for relative offsets; we only remove cumulative rotation bug here.
-      const firstNode = nodes[0];
-      const scaleX = firstNode.scaleX();
-      const scaleY = firstNode.scaleY();
-      const rotationDeg = firstNode.rotation(); // absolute final rotation
-  // collective transform values captured
-      nodes.forEach(node => {
-        const nodeId = node.id(); if (!nodeId) return;
-        const currentNode = findNode(spec.root, nodeId); if (!currentNode) return;
-        const newPos = { x: node.x(), y: node.y() }; // Konva final top-left already adjusted for center-rotation illusion
-        // Store position directly (remove prior inverse compensation)
-        setSpec(prev => applyPosition(prev, nodeId, newPos));
-        // Store absolute rotation (no cumulative addition)
-        setSpec(prev => ({
-          ...prev,
-                          root: mapNode<FrameNode>(prev.root, nodeId, (n) => ({
-              ...n,
-              rotation: rotationDeg
-            }))
-        }));
-        // Scaling logic: text nodes update fontSize; others resize as before
-        if (scaleX !== 1 || scaleY !== 1) {
-          if (currentNode.type === 'text') {
-            // For text nodes, update fontSize based on average scale (or Y scale for vertical sizing)
-            const textNode = currentNode as TextNode;
-            const baseFontSize = textNode.fontSize ?? (textNode.variant === 'h1' ? 28 : textNode.variant === 'h2' ? 22 : textNode.variant === 'h3' ? 18 : 14);
-            const scaleFactor = Math.max(0.1, scaleY); // Use Y scale for font size
-            const newFontSize = Math.round(Math.max(8, baseFontSize * scaleFactor));
-            
-            setSpec(prev => ({
-              ...prev,
-              root: mapNode<FrameNode>(prev.root, nodeId, (n) => {
-                if (n.type !== 'text') return n;
-                const textN = n as TextNode;
-                // Update base fontSize and all span fontSizes proportionally
-                const result: TextNode = {
-                  ...textN,
-                  fontSize: newFontSize,
-                  position: { x: newPos.x, y: newPos.y },
-                };
-                // Scale spans if they exist
-                if (textN.spans && textN.spans.length > 0) {
-                  result.spans = textN.spans.map(span => {
-                    if (span.fontSize) {
-                      return { ...span, fontSize: Math.round(Math.max(8, span.fontSize * scaleFactor)) };
-                    }
-                    return span;
-                  });
-                }
-                return result;
-              })
-            }));
-          } else if (nodeHasSize(currentNode)) {
-            const newSize = {
-              width: Math.round(currentNode.size.width * scaleX),
-              height: Math.round(currentNode.size.height * scaleY)
-            };
-            if (currentNode.type === 'image') {
-              const nonUniform = Math.abs(scaleX - scaleY) > 0.0001;
-              setSpec(prev => ({
-                ...prev,
-                root: mapNode<FrameNode>(prev.root, nodeId, (n) => {
-                  if (n.type !== 'image') return n;
-                  return {
-                    ...n,
-                    position: { x: newPos.x, y: newPos.y },
-                    size: newSize,
-                    preserveAspect: nonUniform ? false : (n.preserveAspect !== undefined ? n.preserveAspect : true),
-                    objectFit: nonUniform ? undefined : n.objectFit
-                  };
-                })
-              }));
-            } else {
-              setSpec(prev => applyPositionAndSize(prev, nodeId, newPos, newSize));
-            }
-          }
-        }
-        node.scaleX(1); node.scaleY(1); node.rotation(0);
-      });
-    } else {
-      // Single node transform
-      const node = nodes[0];
-      const nodeId = node.id();
-      if (!nodeId) return;
-
-      const newPos = { x: node.x(), y: node.y() };
-      const scaleX = node.scaleX();
-      const scaleY = node.scaleY();
-      const rotationDeg = node.rotation(); // absolute degrees
-
-  // single node transform bake
-
-      const currentNode = findNode(spec.root, nodeId);
-      if (!currentNode) return;
-      
-      const isGroup = currentNode?.type === 'group';
-
-      // Store the position exactly as provided by Konva (already adjusted for center-rotation illusion)
-      setSpec(prev => applyPosition(prev, nodeId, newPos));
-      // Set absolute rotation (no cumulative add)
-      setSpec(prev => ({
-        ...prev,
-        root: mapNode<FrameNode>(prev.root, nodeId, (n) => ({
-          ...n,
-          rotation: rotationDeg
-        }))
-      }));
-      
-      // Handle scaling
-      if (scaleX !== 1 || scaleY !== 1) {
-        if (isGroup && currentNode.children) {
-          // For groups: scale the group container and all children
-          // scaling group and children
-          
-          setSpec(prev => ({
-            ...prev,
-            root: mapNode<FrameNode>(prev.root, nodeId, (groupNode) => {
-              if (groupNode.type !== 'group') return groupNode;
-            
-              // Scale the group's size if it has one
-              let newGroupSize = groupNode.size;
-              if (groupNode.size) {
-                newGroupSize = {
-                  width: Math.round(groupNode.size.width * scaleX),
-                  height: Math.round(groupNode.size.height * scaleY)
-                };
-              }
-            
-              // Scale all children positions and sizes
-              const scaledChildren = groupNode.children.map((child) => {
-                const scaledChild = { ...child };
-              
-                if (child.position) {
-                  scaledChild.position = {
-                    x: Math.round(child.position.x * scaleX),
-                    y: Math.round(child.position.y * scaleY)
-                  };
-                }
-                
-                if (nodeHasSize(child)) {
-                  scaledChild.size = {
-                    width: Math.round(child.size.width * scaleX),
-                    height: Math.round(child.size.height * scaleY)
-                  };
-                }
-              
-                return scaledChild;
-              });
-            
-              return {
-                ...groupNode,
-                size: newGroupSize,
-                children: scaledChildren
-              };
-            })
-          }));
-        } else if (currentNode.type === 'text') {
-          // For individual text nodes: update fontSize based on scale
-          const textNode = currentNode as TextNode;
-          const baseFontSize = textNode.fontSize ?? (textNode.variant === 'h1' ? 28 : textNode.variant === 'h2' ? 22 : textNode.variant === 'h3' ? 18 : 14);
-          const scaleFactor = Math.max(0.1, scaleY); // Use Y scale for font size
-          const newFontSize = Math.round(Math.max(8, baseFontSize * scaleFactor));
-          
-          setSpec(prev => ({
-            ...prev,
-            root: mapNode<FrameNode>(prev.root, nodeId, (n) => {
-              if (n.type !== 'text') return n;
-              const textN = n as TextNode;
-              const result: TextNode = {
-                ...textN,
-                fontSize: newFontSize,
-              };
-              // Scale spans if they exist
-              if (textN.spans && textN.spans.length > 0) {
-                result.spans = textN.spans.map(span => {
-                  if (span.fontSize) {
-                    return { ...span, fontSize: Math.round(Math.max(8, span.fontSize * scaleFactor)) };
-                  }
-                  return span;
-                });
-              }
-              return result;
-            })
-          }));
-        } else {
-          // For individual non-text nodes: scale size
-          if (currentNode && nodeHasSize(currentNode)) {
-            const newSize = {
-              width: Math.round(currentNode.size.width * scaleX),
-              height: Math.round(currentNode.size.height * scaleY)
-            };
-            if (currentNode.type === 'image') {
-              const nonUniform = Math.abs(scaleX - scaleY) > 0.0001;
-              setSpec(prev => ({
-                ...prev,
-                root: mapNode<FrameNode>(prev.root, nodeId, (n) => {
-                  if (n.type !== 'image') return n;
-                  return {
-                    ...n,
-                    position: { x: newPos.x, y: newPos.y },
-                    size: newSize,
-                    preserveAspect: nonUniform ? false : (n.preserveAspect !== undefined ? n.preserveAspect : true),
-                    objectFit: nonUniform ? undefined : n.objectFit
-                  };
-                })
-              }));
-            } else {
-              setSpec(prev => applyPositionAndSize(prev, nodeId, newPos, newSize));
-            }
-          }
-        }
-      }
-
-      // Reset the node's transform properties
-      node.scaleX(1);
-      node.scaleY(1);
-      node.rotation(0);
-    }
-
-    // Clear transform session after bake
-    setTransformSession(null);
-
-    // Force transformer to update its targets after React re-renders
-    setTimeout(() => {
-      const tr = trRef.current;
-      if (!tr) return;
-      const stage = tr.getStage();
-      if (!stage) return;
-      
-      // Re-attach transformer to the updated nodes
-      const targets = selected.map(id => stage.findOne(`#${CSS.escape(id)}`)).filter(Boolean) as Konva.Node[];
-  // re-attaching transformer after bake
-      tr.nodes(targets);
-      tr.forceUpdate();
-      tr.getLayer()?.batchDraw();
-    }, 0);
-  }, [setSpec, spec.root, selected, findNode]);
 
 
   return (
