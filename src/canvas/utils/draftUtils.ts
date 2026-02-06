@@ -20,11 +20,11 @@ export function setupGlobalDraftListeners<T extends DraftState>(
 
   const onMove = (ev: MouseEvent) => {
     const rect = stage.container().getBoundingClientRect();
-    const px = ev.clientX - rect.left;
-    const py = ev.clientY - rect.top;
+    const clientX = ev.clientX - rect.left;
+    const clientY = ev.clientY - rect.top;
     const world = {
-      x: (px - stage.x()) / stage.scaleX(),
-      y: (py - stage.y()) / stage.scaleY()
+      x: (clientX - stage.x()) / stage.scaleX(),
+      y: (clientY - stage.y()) / stage.scaleY()
     };
     setDraft(prev => prev ? { ...prev, current: world } as T : prev);
   };
