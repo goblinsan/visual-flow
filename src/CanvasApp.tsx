@@ -1,14 +1,5 @@
 import { useCallback, useRef, useState, useEffect, useMemo } from "react";
 import type { JSX } from "react";
-import { findNode, findParentNode, updateNode, type SpecPatch } from './utils/specUtils';
-import RectAttributesPanel from './components/RectAttributesPanel';
-import EllipseAttributesPanel from './components/EllipseAttributesPanel';
-import LineAttributesPanel from './components/LineAttributesPanel';
-import CurveAttributesPanel from './components/CurveAttributesPanel';
-import TextAttributesPanel from './components/TextAttributesPanel';
-import ImageAttributesPanel from './components/ImageAttributesPanel';
-import DefaultsPanel from './components/DefaultsPanel';
-import { FlowAttributesPanel } from './components/FlowAttributesPanel';
 import { usePersistentRectDefaults } from './hooks/usePersistentRectDefaults';
 import { useRecentColors } from './hooks/useRecentColors';
 import { useDesignPersistence } from './hooks/useDesignPersistence';
@@ -20,17 +11,9 @@ import { useLibraryState } from './hooks/canvas/useLibraryState';
 import { useProposalState } from './hooks/canvas/useProposalState';
 import { Modal } from "./components/Modal";
 import { logger } from "./utils/logger";
-import { dashArrayToInput } from './utils/paint';
 import CanvasStage from "./canvas/CanvasStage.tsx";
 import type {
   LayoutSpec,
-  LayoutNode,
-  RectNode,
-  EllipseNode,
-  LineNode,
-  CurveNode,
-  TextNode,
-  ImageNode,
   FlowTransition,
   Flow,
 } from "./layout-schema.ts";
@@ -42,9 +25,10 @@ import { useRealtimeCanvas } from './collaboration';
 import { CursorOverlay } from './components/CursorOverlay';
 import { SelectionOverlay } from './components/SelectionOverlay';
 import { useProposals } from './hooks/useProposals';
-import { applyProposalOperations } from './utils/proposalHelpers';
 import { HeaderToolbar } from './components/canvas/HeaderToolbar';
 import { LeftToolbar } from './components/canvas/LeftToolbar';
+import { AttributesSidebar } from './components/canvas/AttributesSidebar';
+import { AgentPanel } from './components/canvas/AgentPanel';
 
 /** Get room ID from URL query param ?room=xxx */
 function getRoomIdFromURL(): string | null {
@@ -1182,11 +1166,71 @@ export default function CanvasApp() {
             </div>
             <div className="p-4 text-xs text-gray-600 space-y-4 overflow-auto flex-1">
               {panelMode === 'attributes' && (
-                <>
-              {/* Show CV panel when editing a curve */}
-              {editingCurveId && (() => {
-                const curveNode = findNode(spec.root, editingCurveId) as CurveNode | null;
-                if (!curveNode || curveNode.type !== 'curve') return null;
+                <AttributesSidebar
+                  spec={spec}
+                  setSpec={setSpec}
+                  selectedIds={selectedIds}
+                  tool={tool}
+                  editingCurveId={editingCurveId}
+                  setEditingCurveId={setEditingCurveId}
+                  selectedCurvePointIndex={selectedCurvePointIndex}
+                  setSelectedCurvePointIndex={setSelectedCurvePointIndex}
+                  attributeTab={attributeTab}
+                  setAttributeTab={setAttributeTab}
+                  draggingGroupIndex={draggingGroupIndex}
+                  setDraggingGroupIndex={setDraggingGroupIndex}
+                  dragOverGroupIndex={dragOverGroupIndex}
+                  setDragOverGroupIndex={setDragOverGroupIndex}
+                  lastFillById={lastFillById}
+                  setLastFillById={setLastFillById}
+                  lastStrokeById={lastStrokeById}
+                  setLastStrokeById={setLastStrokeById}
+                  rawDashInput={rawDashInput}
+                  setRawDashInput={setRawDashInput}
+                  beginRecentSession={beginRecentSession}
+                  previewRecent={previewRecent}
+                  commitRecent={commitRecent}
+                  pushRecent={pushRecent}
+                  recentColors={recentColors}
+                  rectDefaults={rectDefaults}
+                  updateRectDefaults={updateRectDefaults}
+                  activeFlowId={activeFlowId}
+                  setActiveFlowId={setActiveFlowId}
+                  updateFlows={updateFlows}
+                  focusScreen={focusScreen}
+                  playTransitionPreview={playTransitionPreview}
+                  setSelection={setSelection}
+                  isCollaborative={isCollaborative}
+                  updateSelection={updateSelection}
+                  blockCanvasClicksRef={blockCanvasClicksRef}
+                  skipNormalizationRef={skipNormalizationRef}
+                />
+              )}
+
+              {/* Agent Panel Content */}
+              {panelMode === 'agent' && (
+                <AgentPanel
+                  currentCanvasId={currentCanvasId}
+                  setCurrentCanvasId={setCurrentCanvasId}
+                  creatingCanvasId={creatingCanvasId}
+                  setCreatingCanvasId={setCreatingCanvasId}
+                  currentDesignName={currentDesignName}
+                  spec={spec}
+                  proposals={proposals}
+                  selectedProposalId={selectedProposalId}
+                  setSelectedProposalId={setSelectedProposalId}
+                  viewingProposedSpec={viewingProposedSpec}
+                  setViewingProposedSpec={setViewingProposedSpec}
+                  setSpec={setSpec}
+                />
+              )}
+            </div>
+          </aside>
+        )}
+      </div>
+    </div>
+  );
+}
                 
                 const points = curveNode.points as number[];
                 const cvPoints: Array<{x: number, y: number, index: number}> = [];
