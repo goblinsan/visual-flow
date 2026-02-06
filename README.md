@@ -27,10 +27,10 @@ A visual canvas editor built with **React**, **TypeScript**, **Vite**, and **Kon
 ---
 ## Quick Start
 ```bash
-pnpm install   # or npm install / yarn
-pnpm dev       # start Vite dev server
-pnpm test      # run vitest suite
-pnpm build     # production bundle (if required later)
+npm install        # or yarn install
+npm run dev        # start Vite dev server
+npm test           # run vitest suite
+npm run build      # production bundle
 ```
 
 Open the app, create rectangles (`R`), experiment with grouping, resizing, and context menu actions.

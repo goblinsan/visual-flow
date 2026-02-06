@@ -421,7 +421,8 @@ export default function CanvasApp() {
     refreshInterval: currentCanvasId ? 30000 : 0, // Poll every 30s when shared
   });
 
-  const pushRecent = useCallback((col: string) => { commitRecent(col); }, [commitRecent]);
+  const pushRecent = useCallback((col?: string) => { if (col) commitRecent(col); }, [commitRecent]);
+  const wrappedPreviewRecent = useCallback((col?: string) => { if (col) previewRecent(col); }, [previewRecent]);
 
   const updateFlows = useCallback((nextFlows: Flow[]) => {
     setSpec(prev => ({ ...prev, flows: nextFlows }));
@@ -992,7 +993,7 @@ export default function CanvasApp() {
                   rawDashInput={rawDashInput}
                   setRawDashInput={setRawDashInput}
                   beginRecentSession={beginRecentSession}
-                  previewRecent={previewRecent}
+                  previewRecent={wrappedPreviewRecent}
                   commitRecent={commitRecent}
                   pushRecent={pushRecent}
                   recentColors={recentColors}

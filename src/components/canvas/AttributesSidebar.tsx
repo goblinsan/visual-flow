@@ -8,6 +8,7 @@ import TextAttributesPanel from '../TextAttributesPanel';
 import ImageAttributesPanel from '../ImageAttributesPanel';
 import DefaultsPanel from '../DefaultsPanel';
 import { FlowAttributesPanel } from '../FlowAttributesPanel';
+import type { RectDefaults } from '../../hooks/usePersistentRectDefaults';
 import type {
   LayoutSpec,
   LayoutNode,
@@ -37,18 +38,18 @@ interface AttributesSidebarProps {
   dragOverGroupIndex: number | null;
   setDragOverGroupIndex: (index: number | null) => void;
   lastFillById: Record<string, string>;
-  setLastFillById: (value: Record<string, string>) => void;
+  setLastFillById: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   lastStrokeById: Record<string, string>;
-  setLastStrokeById: (value: Record<string, string>) => void;
+  setLastStrokeById: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   rawDashInput: string;
   setRawDashInput: (value: string) => void;
   beginRecentSession: () => void;
-  previewRecent: (color: string) => void;
-  commitRecent: (color: string) => void;
-  pushRecent: (color: string) => void;
+  previewRecent: (c?: string) => void;
+  commitRecent: (c?: string) => void;
+  pushRecent: (c?: string) => void;
   recentColors: string[];
-  rectDefaults: { fill: string; stroke: string; strokeWidth: number; radius: number; opacity: number; strokeDash?: number[] };
-  updateRectDefaults: (updates: Partial<{ fill: string; stroke: string; strokeWidth: number; radius: number; opacity: number; strokeDash?: number[] }>) => void;
+  rectDefaults: RectDefaults;
+  updateRectDefaults: (updates: Partial<RectDefaults>) => void;
   activeFlowId: string | null;
   setActiveFlowId: (id: string | null) => void;
   updateFlows: (flows: Flow[]) => void;
