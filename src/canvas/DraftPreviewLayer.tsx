@@ -15,10 +15,12 @@ interface DraftPreviewLayerProps {
   isEllipseMode: boolean;
   isLineMode: boolean;
   isCurveMode: boolean;
+  isPolygonMode: boolean;
   rectDraft: DraftState | null;
   ellipseDraft: DraftState | null;
   lineDraft: DraftState | null;
   curveDraft: CurveDraftState | null;
+  polygonDraft: CurveDraftState | null;
   altPressed: boolean;
   shiftPressed: boolean;
 }
@@ -28,10 +30,12 @@ export function DraftPreviewLayer({
   isEllipseMode,
   isLineMode,
   isCurveMode,
+  isPolygonMode,
   rectDraft,
   ellipseDraft,
   lineDraft,
   curveDraft,
+  polygonDraft,
   altPressed,
   shiftPressed,
 }: DraftPreviewLayerProps) {
@@ -143,6 +147,26 @@ export function DraftPreviewLayer({
             dash={[6,4]}
             lineCap="round"
             tension={0.5}
+            listening={false}
+          />
+        );
+      })()}
+      
+      {/* Polygon draft preview */}
+      {isPolygonMode && polygonDraft && polygonDraft.points.length >= 1 && (() => {
+        const pts: number[] = [];
+        for (const p of polygonDraft.points) {
+          pts.push(p.x, p.y);
+        }
+        pts.push(polygonDraft.current.x, polygonDraft.current.y);
+        return (
+          <Line
+            points={pts}
+            closed={polygonDraft.points.length >= 2}
+            fill={'rgba(255,255,255,0.35)'}
+            stroke={'#334155'}
+            strokeWidth={2}
+            dash={[6,4]}
             listening={false}
           />
         );

@@ -43,6 +43,8 @@ interface UseMouseEventHandlersProps {
   setLineDraft: (draft: DraftState | null | ((prev: DraftState | null) => DraftState | null)) => void;
   curveDraft: CurveDraftState | null;
   setCurveDraft: (draft: CurveDraftState | null | ((prev: CurveDraftState | null) => CurveDraftState | null)) => void;
+  polygonDraft: CurveDraftState | null;
+  setPolygonDraft: (draft: CurveDraftState | null | ((prev: CurveDraftState | null) => CurveDraftState | null)) => void;
   
   // Interaction sessions
   dragSession: DragSession | null;
@@ -69,6 +71,8 @@ interface UseMouseEventHandlersProps {
   finalizeRect: () => void;
   finalizeEllipse: () => void;
   finalizeLine: () => void;
+  finalizeCurve: () => void;
+  finalizePolygon: () => void;
   
   // Text editing
   startTextEdit: (id: string, node: TextNode) => void;
@@ -114,6 +118,8 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
     setLineDraft,
     curveDraft,
     setCurveDraft,
+    polygonDraft,
+    setPolygonDraft,
     dragSession,
     setDragSession,
     marqueeSession,
@@ -134,6 +140,10 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
     finalizeRect,
     finalizeEllipse,
     finalizeLine,
+    // @ts-ignore - finalizeCurve and finalizePolygon are used via callback props
+    finalizeCurve,
+    // @ts-ignore
+    finalizePolygon,
     startTextEdit,
     justStartedTextEditRef,
     onToolChange,
@@ -148,6 +158,7 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
   const isEllipseMode = tool === 'ellipse';
   const isLineMode = tool === 'line';
   const isCurveMode = tool === 'curve';
+  const isPolygonMode = tool === 'polygon';
   const isTextMode = tool === 'text';
   const isImageMode = tool === 'image';
   const isIconMode = tool === 'icon';
@@ -202,6 +213,22 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
       } else {
         // Add point to curve
         setCurveDraft(prev => prev ? { ...prev, points: [...prev.points, world] } : prev);
+      }
+      return;
+    }
+    
+    // Polygon tool creation pathway - click to add points, double-click or Enter to finish
+    if (isPolygonMode) {
+      if (e.evt.button !== 0) return;
+      const stage = e.target.getStage(); if (!stage) return;
+      const pointer = stage.getPointerPosition(); if (!pointer) return;
+      const world = toWorld(stage, pointer);
+      if (!polygonDraft) {
+        // Start new polygon
+        setPolygonDraft({ points: [world], current: world });
+      } else {
+        // Add point to polygon
+        setPolygonDraft(prev => prev ? { ...prev, points: [...prev.points, world] } : prev);
       }
       return;
     }

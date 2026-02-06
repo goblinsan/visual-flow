@@ -652,4 +652,61 @@ export const COMPONENT_LIBRARY: ComponentTemplate[] = [
       ],
     }),
   },
+  {
+    id: "accordion",
+    name: "Accordion",
+    description: "Collapsible sections",
+    iconClassName: "fa-solid fa-bars-staggered",
+    build: (origin, makeId) => ({
+      id: makeId("group"),
+      type: "group",
+      position: origin,
+      children: [
+        // Accordion container
+        { id: makeId("rect"), type: "rect", position: { x: 0, y: 0 }, size: { width: 300, height: 160 }, fill: "#ffffff", stroke: "#e2e8f0", strokeWidth: 1, radius: 8, opacity: 1 },
+        // Section 1 header
+        { id: makeId("rect"), type: "rect", position: { x: 8, y: 8 }, size: { width: 284, height: 36 }, fill: "#f8fafc", stroke: undefined, strokeWidth: 0, radius: 6, opacity: 1 },
+        { id: makeId("text"), type: "text", position: { x: 20, y: 18 }, text: "Section 1", fontSize: 13, fontFamily: "Arial", fontWeight: "600", color: "#0f172a" },
+        { id: makeId("text"), type: "text", position: { x: 270, y: 18 }, text: "▼", fontSize: 10, fontFamily: "Arial", fontWeight: "400", color: "#64748b" },
+        // Section 1 content (expanded)
+        { id: makeId("text"), type: "text", position: { x: 20, y: 54 }, text: "Content for section 1", fontSize: 12, fontFamily: "Arial", fontWeight: "400", color: "#64748b" },
+        // Section 2 header
+        { id: makeId("rect"), type: "rect", position: { x: 8, y: 86 }, size: { width: 284, height: 36 }, fill: "#f8fafc", stroke: undefined, strokeWidth: 0, radius: 6, opacity: 1 },
+        { id: makeId("text"), type: "text", position: { x: 20, y: 96 }, text: "Section 2", fontSize: 13, fontFamily: "Arial", fontWeight: "600", color: "#0f172a" },
+        { id: makeId("text"), type: "text", position: { x: 270, y: 96 }, text: "▶", fontSize: 10, fontFamily: "Arial", fontWeight: "400", color: "#64748b" },
+        // Section 3 header
+        { id: makeId("rect"), type: "rect", position: { x: 8, y: 124 }, size: { width: 284, height: 36 }, fill: "#f8fafc", stroke: undefined, strokeWidth: 0, radius: 6, opacity: 1 },
+        { id: makeId("text"), type: "text", position: { x: 20, y: 134 }, text: "Section 3", fontSize: 13, fontFamily: "Arial", fontWeight: "600", color: "#0f172a" },
+        { id: makeId("text"), type: "text", position: { x: 270, y: 134 }, text: "▶", fontSize: 10, fontFamily: "Arial", fontWeight: "400", color: "#64748b" },
+      ],
+    }),
+  },
+  {
+    id: "carousel",
+    name: "Carousel",
+    description: "Sliding content panels",
+    iconClassName: "fa-solid fa-images",
+    build: (origin, makeId) => ({
+      id: makeId("group"),
+      type: "group",
+      position: origin,
+      children: [
+        // Carousel container
+        { id: makeId("rect"), type: "rect", position: { x: 0, y: 0 }, size: { width: 300, height: 180 }, fill: "#f8fafc", stroke: "#e2e8f0", strokeWidth: 1, radius: 12, opacity: 1 },
+        // Slide content area
+        { id: makeId("rect"), type: "rect", position: { x: 16, y: 16 }, size: { width: 268, height: 120 }, fill: "#ffffff", stroke: "#cbd5e1", strokeWidth: 1, radius: 8, opacity: 1 },
+        { id: makeId("text"), type: "text", position: { x: 120, y: 64 }, text: "Slide 1", fontSize: 16, fontFamily: "Arial", fontWeight: "600", color: "#0f172a" },
+        // Left arrow
+        { id: makeId("ellipse"), type: "ellipse", position: { x: 24, y: 68 }, size: { width: 32, height: 32 }, fill: "#ffffff", stroke: "#e2e8f0", strokeWidth: 1, opacity: 0.9 },
+        { id: makeId("text"), type: "text", position: { x: 34, y: 75 }, text: "◀", fontSize: 12, fontFamily: "Arial", fontWeight: "400", color: "#334155" },
+        // Right arrow
+        { id: makeId("ellipse"), type: "ellipse", position: { x: 244, y: 68 }, size: { width: 32, height: 32 }, fill: "#ffffff", stroke: "#e2e8f0", strokeWidth: 1, opacity: 0.9 },
+        { id: makeId("text"), type: "text", position: { x: 254, y: 75 }, text: "▶", fontSize: 12, fontFamily: "Arial", fontWeight: "400", color: "#334155" },
+        // Dots indicator
+        { id: makeId("ellipse"), type: "ellipse", position: { x: 130, y: 152 }, size: { width: 8, height: 8 }, fill: "#3b82f6", stroke: undefined, strokeWidth: 0, opacity: 1 },
+        { id: makeId("ellipse"), type: "ellipse", position: { x: 146, y: 152 }, size: { width: 8, height: 8 }, fill: "#cbd5e1", stroke: undefined, strokeWidth: 0, opacity: 1 },
+        { id: makeId("ellipse"), type: "ellipse", position: { x: 162, y: 152 }, size: { width: 8, height: 8 }, fill: "#cbd5e1", stroke: undefined, strokeWidth: 0, opacity: 1 },
+      ],
+    }),
+  },
 ];

@@ -204,6 +204,7 @@ function CanvasStage({
   const isEllipseMode = tool === 'ellipse';
   const isLineMode = tool === 'line';
   const isCurveMode = tool === 'curve';
+  const isPolygonMode = tool === 'polygon';
   const [spacePan, setSpacePan] = useState(false);
   // Track shift key globally for aspect-ratio constrained resize
   const [shiftPressed, setShiftPressed] = useState(false);
@@ -264,6 +265,12 @@ function CanvasStage({
 
   // Curve draft state (collect multiple points for bezier)
   const [curveDraft, setCurveDraft] = useState<null | {
+    points: { x: number; y: number }[];
+    current: { x: number; y: number };
+  }>(null);
+  
+  // Polygon draft
+  const [polygonDraft, setPolygonDraft] = useState<null | {
     points: { x: number; y: number }[];
     current: { x: number; y: number };
   }>(null);
@@ -332,6 +339,12 @@ function CanvasStage({
     setCurveDraft(null);
   }, [isCurveMode, curveDraft, shapeTools]);
 
+  const finalizePolygon = useCallback(() => {
+    if (!isPolygonMode || !polygonDraft) return;
+    shapeTools.finalizePolygon(polygonDraft);
+    setPolygonDraft(null);
+  }, [isPolygonMode, polygonDraft, shapeTools]);
+
   // Helper: open image picker at click position
   const createImage = useCallback((worldPos: { x: number; y: number }) => {
     setPendingImagePosition(worldPos);
@@ -390,6 +403,8 @@ function CanvasStage({
     setLineDraft,
     curveDraft,
     setCurveDraft,
+    polygonDraft,
+    setPolygonDraft,
     dragSession,
     setDragSession,
     marqueeSession,
@@ -410,6 +425,8 @@ function CanvasStage({
     finalizeRect,
     finalizeEllipse,
     finalizeLine,
+    finalizeCurve,
+    finalizePolygon,
     startTextEdit,
     justStartedTextEditRef,
     onToolChange,
@@ -464,6 +481,17 @@ function CanvasStage({
     window.addEventListener('keydown', onKey, CAPTURE_OPTIONS);
     return () => window.removeEventListener('keydown', onKey, CAPTURE_OPTIONS);
   }, [isCurveMode, curveDraft, finalizeCurve]);
+
+  // Polygon: finalize on Enter, cancel on Escape
+  useEffect(() => {
+    if (!isPolygonMode) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setPolygonDraft(null); }
+      if (e.key === 'Enter' && polygonDraft && polygonDraft.points.length >= 3) { finalizePolygon(); }
+    };
+    window.addEventListener('keydown', onKey, CAPTURE_OPTIONS);
+    return () => window.removeEventListener('keydown', onKey, CAPTURE_OPTIONS);
+  }, [isPolygonMode, polygonDraft, finalizePolygon]);
 
   // Curve edit mode: exit on Escape or Enter
   useEffect(() => {
@@ -869,10 +897,12 @@ function CanvasStage({
             isEllipseMode={isEllipseMode}
             isLineMode={isLineMode}
             isCurveMode={isCurveMode}
+            isPolygonMode={isPolygonMode}
             rectDraft={rectDraft}
             ellipseDraft={ellipseDraft}
             lineDraft={lineDraft}
             curveDraft={curveDraft}
+            polygonDraft={polygonDraft}
             altPressed={altPressed}
             shiftPressed={shiftPressed}
           />
