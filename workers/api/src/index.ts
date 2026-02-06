@@ -35,6 +35,7 @@ import {
   approveProposal,
   rejectProposal,
 } from './routes/proposals';
+import { agentDiscoveryResponse } from './routes/discovery';
 
 const CANVAS_ID_ROUTE = new RegExp('^/api/canvases/([^/]+)$');
 const CANVAS_MEMBERS_ROUTE = new RegExp('^/api/canvases/([^/]+)/members$');
@@ -64,10 +65,15 @@ export default {
       });
     }
 
-    // Authenticate user
+    // Public routes (no auth required)
+    if ((url.pathname === '/api/agent/discover' || url.pathname === '/api/openapi.json') && request.method === 'GET') {
+      return agentDiscoveryResponse();
+    }
+
+    // Authenticate user (supports both CF Access headers and agent tokens)
     const user = await authenticateUser(request, env);
     if (!user) {
-      return errorResponse('Unauthorized - Cloudflare Access required', 401);
+      return errorResponse('Unauthorized - provide CF-Access-Authenticated-User-Email header or Authorization: Bearer vz_agent_... token', 401);
     }
 
     // Route handling
