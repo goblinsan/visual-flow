@@ -438,7 +438,7 @@ function CanvasStage({
   }>(null);
 
   // Use shape tools hook
-  const shapeTools = useShapeTools(setSpec, setSelection, onToolChange, rectDefaults);
+  const shapeTools = useShapeTools(setSpec, setSelection, onToolChange, rectDefaults, undefined, undefined, undefined);
 
   // Use selection manager hook
   const selectionManager = useSelectionManager(stageRef, spec.root.id, getTopContainerAncestor);

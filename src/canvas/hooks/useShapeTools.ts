@@ -38,6 +38,12 @@ interface CurveDefaults {
   tension: number;
 }
 
+// Default styling values for shapes (module-level constants to avoid re-creation)
+const DEFAULT_RECT_STYLE: RectDefaults = { fill: '#ffffff', stroke: '#334155', strokeWidth: 1, radius: 0, opacity: 1, strokeDash: undefined };
+const DEFAULT_ELLIPSE_STYLE: EllipseDefaults = { fill: '#ffffff', stroke: '#334155', strokeWidth: 1, opacity: 1 };
+const DEFAULT_LINE_STYLE: LineDefaults = { stroke: '#334155', strokeWidth: 2 };
+const DEFAULT_CURVE_STYLE: CurveDefaults = { stroke: '#334155', strokeWidth: 2, tension: 0.5 };
+
 const updateRootChildren = (spec: LayoutSpec, updater: (children: LayoutNode[]) => LayoutNode[]): LayoutSpec => {
   const root = spec.root;
   return {
@@ -75,7 +81,7 @@ export function useShapeTools(
     let w = x2 - x1; let h = y2 - y1;
     const alt = altPressed;
     const shift = shiftPressed;
-    const defaults = rectDefaults || { fill: '#ffffff', stroke: '#334155', strokeWidth: 1, radius: 0, opacity: 1, strokeDash: undefined };
+    const defaults = rectDefaults || DEFAULT_RECT_STYLE;
     if (alt) {
       w = (current.x - start.x) * 2;
       h = (current.y - start.y) * 2;
@@ -142,7 +148,7 @@ export function useShapeTools(
     let w = x2 - x1; let h = y2 - y1;
     const alt = altPressed;
     const shift = shiftPressed;
-    const defaults = ellipseDefaults || { fill: '#ffffff', stroke: '#334155', strokeWidth: 1, opacity: 1 };
+    const defaults = ellipseDefaults || DEFAULT_ELLIPSE_STYLE;
     
     if (alt) {
       w = (current.x - start.x) * 2;
@@ -208,7 +214,7 @@ export function useShapeTools(
       ? [0, 0, 100, 0]
       : [0, 0, dx, dy];
     
-    const defaults = lineDefaults || { stroke: '#334155', strokeWidth: 2 };
+    const defaults = lineDefaults || DEFAULT_LINE_STYLE;
     const id = 'line_' + Math.random().toString(36).slice(2, 9);
     const lineNode: LineNode = {
       id,
@@ -243,7 +249,7 @@ export function useShapeTools(
       relativePoints.splice(2, 0, midX, midY);
     }
     
-    const defaults = curveDefaults || { stroke: '#334155', strokeWidth: 2, tension: 0.5 };
+    const defaults = curveDefaults || DEFAULT_CURVE_STYLE;
     const id = 'curve_' + Math.random().toString(36).slice(2, 9);
     const curveNode: CurveNode = {
       id,
