@@ -180,6 +180,8 @@ function CanvasStage({
   }, [onEditingCurveIdChange]);
 
   type Bounds = { x: number; y: number; width: number; height: number };
+  // Calculate bounds of a node and its children with accumulated position offsets
+  // Default parameters (accX=0, accY=0) added for adapter pattern compatibility with viewport manager
   const getNodeBounds = useCallback((node: LayoutNode, accX = 0, accY = 0): Bounds | null => {
     const pos = (node as { position?: Pos }).position ?? { x: 0, y: 0 };
     const baseX = accX + (pos.x ?? 0);

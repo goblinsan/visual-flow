@@ -20,6 +20,24 @@ interface RectDefaults {
   strokeDash?: number[];
 }
 
+interface EllipseDefaults {
+  fill?: string;
+  stroke?: string;
+  strokeWidth: number;
+  opacity: number;
+}
+
+interface LineDefaults {
+  stroke?: string;
+  strokeWidth: number;
+}
+
+interface CurveDefaults {
+  stroke?: string;
+  strokeWidth: number;
+  tension: number;
+}
+
 const updateRootChildren = (spec: LayoutSpec, updater: (children: LayoutNode[]) => LayoutNode[]): LayoutSpec => {
   const root = spec.root;
   return {
@@ -40,7 +58,10 @@ export function useShapeTools(
   setSpec: (spec: LayoutSpec | ((prev: LayoutSpec) => LayoutSpec)) => void,
   setSelection: (ids: string[]) => void,
   onToolChange?: (tool: string) => void,
-  rectDefaults?: RectDefaults
+  rectDefaults?: RectDefaults,
+  ellipseDefaults?: EllipseDefaults,
+  lineDefaults?: LineDefaults,
+  curveDefaults?: CurveDefaults
 ) {
   const finalizeRect = useCallback((
     rectDraft: DraftState | null,
@@ -121,7 +142,7 @@ export function useShapeTools(
     let w = x2 - x1; let h = y2 - y1;
     const alt = altPressed;
     const shift = shiftPressed;
-    const defaults = { fill: '#ffffff', stroke: '#334155', strokeWidth: 1, opacity: 1 };
+    const defaults = ellipseDefaults || { fill: '#ffffff', stroke: '#334155', strokeWidth: 1, opacity: 1 };
     
     if (alt) {
       w = (current.x - start.x) * 2;
@@ -173,7 +194,7 @@ export function useShapeTools(
     setSpec(prev => appendNodesToRoot(prev, [ellipseNode]));
     setSelection([id]);
     onToolChange?.('select');
-  }, [setSpec, onToolChange, setSelection]);
+  }, [setSpec, onToolChange, ellipseDefaults, setSelection]);
 
   const finalizeLine = useCallback((lineDraft: DraftState | null) => {
     if (!lineDraft) return;
@@ -187,19 +208,20 @@ export function useShapeTools(
       ? [0, 0, 100, 0]
       : [0, 0, dx, dy];
     
+    const defaults = lineDefaults || { stroke: '#334155', strokeWidth: 2 };
     const id = 'line_' + Math.random().toString(36).slice(2, 9);
     const lineNode: LineNode = {
       id,
       type: 'line',
       position: { x: start.x, y: start.y },
       points,
-      stroke: '#334155',
-      strokeWidth: 2,
+      stroke: defaults.stroke,
+      strokeWidth: defaults.strokeWidth,
     };
     setSpec(prev => appendNodesToRoot(prev, [lineNode]));
     setSelection([id]);
     onToolChange?.('select');
-  }, [setSpec, onToolChange, setSelection]);
+  }, [setSpec, onToolChange, lineDefaults, setSelection]);
 
   const finalizeCurve = useCallback((curveDraft: CurveDraftState | null) => {
     if (!curveDraft) return;
@@ -221,20 +243,21 @@ export function useShapeTools(
       relativePoints.splice(2, 0, midX, midY);
     }
     
+    const defaults = curveDefaults || { stroke: '#334155', strokeWidth: 2, tension: 0.5 };
     const id = 'curve_' + Math.random().toString(36).slice(2, 9);
     const curveNode: CurveNode = {
       id,
       type: 'curve',
       position: { x: origin.x, y: origin.y },
       points: relativePoints,
-      stroke: '#334155',
-      strokeWidth: 2,
-      tension: 0.5,
+      stroke: defaults.stroke,
+      strokeWidth: defaults.strokeWidth,
+      tension: defaults.tension,
     };
     setSpec(prev => appendNodesToRoot(prev, [curveNode]));
     setSelection([id]);
     onToolChange?.('select');
-  }, [setSpec, onToolChange, setSelection]);
+  }, [setSpec, onToolChange, curveDefaults, setSelection]);
 
   return {
     finalizeRect,
