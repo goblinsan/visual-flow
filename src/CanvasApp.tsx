@@ -13,6 +13,11 @@ import { usePersistentRectDefaults } from './hooks/usePersistentRectDefaults';
 import { useRecentColors } from './hooks/useRecentColors';
 import { useDesignPersistence } from './hooks/useDesignPersistence';
 import { useSelection } from './hooks/useSelection';
+import { useToolState } from './hooks/canvas/useToolState';
+import { useDialogState } from './hooks/canvas/useDialogState';
+import { useAttributeState } from './hooks/canvas/useAttributeState';
+import { useLibraryState } from './hooks/canvas/useLibraryState';
+import { useProposalState } from './hooks/canvas/useProposalState';
 import { Modal } from "./components/Modal";
 import { logger } from "./utils/logger";
 import { dashArrayToInput } from './utils/paint';
@@ -251,7 +256,6 @@ const TEMPLATES: { id: string; name: string; icon: string; description: string; 
 export default function CanvasApp() {
   // Collaboration state
   const [roomId, setRoomId] = useState<string | null>(getRoomIdFromURL);
-  const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const userId = useMemo(() => getUserId(), []);
   const displayName = useMemo(() => getDisplayName(), []);
   const wsUrl = useMemo(() => getWebSocketUrl(), []);
@@ -324,44 +328,82 @@ export default function CanvasApp() {
     });
     historyLockRef.current = false;
   }, [setSpecRaw]);
-  const [tool, setTool] = useState<string>("select");
+  
+  // Custom hooks for domain-specific state management
+  const {
+    tool,
+    setTool,
+    editingCurveId,
+    setEditingCurveId,
+    selectedCurvePointIndex,
+    setSelectedCurvePointIndex,
+  } = useToolState();
+  
+  const {
+    helpOpen,
+    setHelpOpen,
+    fileOpen,
+    setFileOpen,
+    aboutOpen,
+    setAboutOpen,
+    cheatOpen,
+    setCheatOpen,
+    iconLibraryOpen,
+    setIconLibraryOpen,
+    componentLibraryOpen,
+    setComponentLibraryOpen,
+    newDialogOpen,
+    setNewDialogOpen,
+    openDialogOpen,
+    setOpenDialogOpen,
+    shareDialogOpen,
+    setShareDialogOpen,
+  } = useDialogState();
+  
+  const {
+    attributeTab,
+    setAttributeTab,
+    panelMode,
+    setPanelMode,
+    rawDashInput,
+    setRawDashInput,
+    lastFillById,
+    setLastFillById,
+    lastStrokeById,
+    setLastStrokeById,
+  } = useAttributeState();
+  
+  const {
+    selectedIconId,
+    setSelectedIconId,
+    selectedComponentId,
+    setSelectedComponentId,
+    iconSearch,
+    setIconSearch,
+  } = useLibraryState();
+  
+  const {
+    selectedProposalId,
+    setSelectedProposalId,
+    viewingProposedSpec,
+    setViewingProposedSpec,
+  } = useProposalState();
+  
   const { selection: selectedIds, setSelection } = useSelection();
   
   // Rectangle default attributes (persisted)
   const { defaults: rectDefaults, update: updateRectDefaults } = usePersistentRectDefaults({ fill: '#ffffff', stroke: '#334155', strokeWidth: 1, radius: 0, opacity: 1, strokeDash: undefined });
-  // Remember last non-undefined colors so toggling off/on restores previous value
-  const [lastFillById, setLastFillById] = useState<Record<string,string>>({});
-  const [lastStrokeById, setLastStrokeById] = useState<Record<string,string>>({});
-  // (Removed lastDefaultFill/Stroke state – now encapsulated in DefaultsPanel)
   // Recent colors via hook
   const { recentColors, beginSession: beginRecentSession, previewColor: previewRecent, commitColor: commitRecent } = useRecentColors();
-  // Raw dash pattern input (for both selected rect and defaults) to preserve user typing
-  const [rawDashInput, setRawDashInput] = useState<string>('');
-  const [canvasRef, canvasSize] = useElementSize<HTMLDivElement>(); // State for default last colors moved into DefaultsPanel component
-  const [helpOpen, setHelpOpen] = useState(false);
-  const [fileOpen, setFileOpen] = useState(false);
-  const [aboutOpen, setAboutOpen] = useState(false);
-  const [cheatOpen, setCheatOpen] = useState(false);
-  const [iconLibraryOpen, setIconLibraryOpen] = useState(false);
-  const [componentLibraryOpen, setComponentLibraryOpen] = useState(false);
-  const [selectedIconId, setSelectedIconId] = useState(ICON_LIBRARY[0]?.id || "star");
-  const [selectedComponentId, setSelectedComponentId] = useState(COMPONENT_LIBRARY[0]?.id || "button");
-  const [iconSearch, setIconSearch] = useState('');
+  const [canvasRef, canvasSize] = useElementSize<HTMLDivElement>();
   const [activeFlowId, setActiveFlowId] = useState<string | null>(null);
   const [focusNodeId, setFocusNodeId] = useState<string | null>(null);
-  const [attributeTab, setAttributeTab] = useState<'element' | 'flow'>('element');
   const [draggingGroupIndex, setDraggingGroupIndex] = useState<number | null>(null);
   const [dragOverGroupIndex, setDragOverGroupIndex] = useState<number | null>(null);
   const [viewportTransition, setViewportTransition] = useState<null | { targetId: string; durationMs?: number; easing?: FlowTransition["easing"]; _key: string }>(null);
-  const [newDialogOpen, setNewDialogOpen] = useState(false); // New design template dialog
-  const [openDialogOpen, setOpenDialogOpen] = useState(false); // Open design dialog
   const [currentDesignName, setCurrentDesignNameState] = useState<string | null>(getCurrentDesignName);
-  const [panelMode, setPanelMode] = useState<'attributes' | 'agent'>('attributes');
   const [fitToContentKey, setFitToContentKey] = useState(0); // Increment to trigger fit-to-content in CanvasStage
-  // Curve control point selection
-  const [selectedCurvePointIndex, setSelectedCurvePointIndex] = useState<number | null>(null);
   const [sidebarVisible, setSidebarVisible] = useState(true);
-  const [editingCurveId, setEditingCurveId] = useState<string | null>(null);
   const blockCanvasClicksRef = useRef(false);
   const skipNormalizationRef = useRef(false);
   const appVersion = import.meta.env.VITE_APP_VERSION ?? '0.0.0';
@@ -385,8 +427,6 @@ export default function CanvasApp() {
       setCurrentCanvasIdRaw(localStorage.getItem(canvasIdStorageKey));
     } catch { setCurrentCanvasIdRaw(null); }
   }, [canvasIdStorageKey]);
-  const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
-  const [viewingProposedSpec, setViewingProposedSpec] = useState(false);
   const [creatingCanvasId, setCreatingCanvasId] = useState(false);
   
   const proposals = useProposals({
