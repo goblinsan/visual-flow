@@ -33,6 +33,39 @@ export interface CloudMember {
   created_at: number;
 }
 
+/** Map snake_case API response keys to camelCase for frontend types */
+function mapBranch(raw: Record<string, unknown>): AgentBranch {
+  return {
+    id: raw.id as string,
+    canvasId: (raw.canvas_id ?? raw.canvasId) as string,
+    agentId: (raw.agent_id ?? raw.agentId) as string,
+    ownerId: (raw.owner_id ?? raw.ownerId ?? '') as string,
+    status: (raw.status as AgentBranch['status']) ?? 'active',
+    baseVersion: (raw.base_version ?? raw.baseVersion ?? 1) as number,
+    createdAt: (raw.created_at ?? raw.createdAt ?? 0) as number,
+    updatedAt: (raw.updated_at ?? raw.updatedAt ?? 0) as number,
+  };
+}
+
+function mapProposal(raw: Record<string, unknown>): AgentProposal {
+  return {
+    id: raw.id as string,
+    branchId: (raw.branch_id ?? raw.branchId) as string,
+    canvasId: (raw.canvas_id ?? raw.canvasId) as string,
+    agentId: (raw.agent_id ?? raw.agentId) as string,
+    status: (raw.status as AgentProposal['status']) ?? 'pending',
+    title: (raw.title ?? '') as string,
+    description: (raw.description ?? '') as string,
+    operations: (raw.operations ?? []) as ProposalOperation[],
+    rationale: (raw.rationale ?? '') as string,
+    assumptions: (raw.assumptions ?? []) as string[],
+    confidence: (raw.confidence ?? 0) as number,
+    createdAt: (raw.created_at ?? raw.createdAt ?? 0) as number,
+    reviewedAt: (raw.reviewed_at ?? raw.reviewedAt) as number | undefined,
+    reviewedBy: (raw.reviewed_by ?? raw.reviewedBy) as string | undefined,
+  };
+}
+
 export class ApiClient {
   private baseUrl: string;
 
@@ -149,7 +182,9 @@ export class ApiClient {
 
   // Branch methods
   async listBranches(canvasId: string): Promise<{ data?: AgentBranch[]; error?: string }> {
-    return this.request<AgentBranch[]>(`/canvases/${canvasId}/branches`, { method: 'GET' });
+    const result = await this.request<Record<string, unknown>[]>(`/canvases/${canvasId}/branches`, { method: 'GET' });
+    if (result.error) return { error: result.error };
+    return { data: (result.data || []).map(mapBranch) };
   }
 
   async createBranch(
@@ -157,14 +192,18 @@ export class ApiClient {
     agentId: string,
     baseVersion: number
   ): Promise<{ data?: AgentBranch; error?: string }> {
-    return this.request<AgentBranch>(`/canvases/${canvasId}/branches`, {
+    const result = await this.request<Record<string, unknown>>(`/canvases/${canvasId}/branches`, {
       method: 'POST',
       body: JSON.stringify({ agentId, baseVersion }),
     });
+    if (result.error) return { error: result.error };
+    return { data: result.data ? mapBranch(result.data) : undefined };
   }
 
   async getBranch(branchId: string): Promise<{ data?: AgentBranch; error?: string }> {
-    return this.request<AgentBranch>(`/branches/${branchId}`, { method: 'GET' });
+    const result = await this.request<Record<string, unknown>>(`/branches/${branchId}`, { method: 'GET' });
+    if (result.error) return { error: result.error };
+    return { data: result.data ? mapBranch(result.data) : undefined };
   }
 
   async deleteBranch(branchId: string): Promise<{ data?: { success: boolean }; error?: string }> {
@@ -173,7 +212,9 @@ export class ApiClient {
 
   // Proposal methods
   async listProposals(canvasId: string): Promise<{ data?: AgentProposal[]; error?: string }> {
-    return this.request<AgentProposal[]>(`/canvases/${canvasId}/proposals`, { method: 'GET' });
+    const result = await this.request<Record<string, unknown>[]>(`/canvases/${canvasId}/proposals`, { method: 'GET' });
+    if (result.error) return { error: result.error };
+    return { data: (result.data || []).map(mapProposal) };
   }
 
   async createProposal(
@@ -187,28 +228,36 @@ export class ApiClient {
       confidence: number;
     }
   ): Promise<{ data?: AgentProposal; error?: string }> {
-    return this.request<AgentProposal>(`/branches/${branchId}/proposals`, {
+    const result = await this.request<Record<string, unknown>>(`/branches/${branchId}/proposals`, {
       method: 'POST',
       body: JSON.stringify(proposal),
     });
+    if (result.error) return { error: result.error };
+    return { data: result.data ? mapProposal(result.data) : undefined };
   }
 
   async getProposal(proposalId: string): Promise<{ data?: AgentProposal; error?: string }> {
-    return this.request<AgentProposal>(`/proposals/${proposalId}`, { method: 'GET' });
+    const result = await this.request<Record<string, unknown>>(`/proposals/${proposalId}`, { method: 'GET' });
+    if (result.error) return { error: result.error };
+    return { data: result.data ? mapProposal(result.data) : undefined };
   }
 
   async approveProposal(proposalId: string): Promise<{ data?: AgentProposal; error?: string }> {
-    return this.request<AgentProposal>(`/proposals/${proposalId}/approve`, { method: 'POST' });
+    const result = await this.request<Record<string, unknown>>(`/proposals/${proposalId}/approve`, { method: 'POST' });
+    if (result.error) return { error: result.error };
+    return { data: result.data ? mapProposal(result.data) : undefined };
   }
 
   async rejectProposal(
     proposalId: string,
     reason?: string
   ): Promise<{ data?: AgentProposal; error?: string }> {
-    return this.request<AgentProposal>(`/proposals/${proposalId}/reject`, {
+    const result = await this.request<Record<string, unknown>>(`/proposals/${proposalId}/reject`, {
       method: 'POST',
       body: JSON.stringify({ reason }),
     });
+    if (result.error) return { error: result.error };
+    return { data: result.data ? mapProposal(result.data) : undefined };
   }
 }
 

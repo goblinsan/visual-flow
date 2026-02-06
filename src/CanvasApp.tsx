@@ -40,7 +40,6 @@ import { SelectionOverlay } from './components/SelectionOverlay';
 import { ActiveUsersList } from './components/ActiveUsersList';
 import { useProposals } from './hooks/useProposals';
 import { applyProposalOperations } from './utils/proposalHelpers';
-import type { AgentProposal } from './types/agent';
 
 /** Get room ID from URL query param ?room=xxx */
 function getRoomIdFromURL(): string | null {

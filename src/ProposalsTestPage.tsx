@@ -174,11 +174,11 @@ export default function ProposalsTestPage() {
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div>
                       <span className="text-gray-500">Agent:</span>{' '}
-                      <span className="font-medium">{branch.agent_id || 'N/A'}</span>
+                      <span className="font-medium">{branch.agentId || 'N/A'}</span>
                     </div>
                     <div>
                       <span className="text-gray-500">Base Version:</span>{' '}
-                      <span className="font-medium">{branch.base_version}</span>
+                      <span className="font-medium">{branch.baseVersion}</span>
                     </div>
                   </div>
                 </div>
@@ -232,11 +232,11 @@ export default function ProposalsTestPage() {
                     </div>
                     <div>
                       <span className="text-gray-500">Agent:</span>{' '}
-                      <span className="font-medium">{proposal.agent_id || 'N/A'}</span>
+                      <span className="font-medium">{proposal.agentId || 'N/A'}</span>
                     </div>
                     <div>
                       <span className="text-gray-500">Branch:</span>{' '}
-                      <span className="font-mono text-xs">{proposal.branch_id}</span>
+                      <span className="font-mono text-xs">{proposal.branchId}</span>
                     </div>
                     <div>
                       <span className="text-gray-500">Confidence:</span>{' '}
@@ -331,10 +331,10 @@ export default function ProposalsTestPage() {
                   )}
 
                   {/* Review info */}
-                  {proposal.reviewed_at && (
+                  {proposal.reviewedAt && (
                     <div className="mt-3 pt-3 border-t border-gray-200 text-xs text-gray-500">
-                      Reviewed by {proposal.reviewed_by} on{' '}
-                      {new Date(proposal.reviewed_at).toLocaleString()}
+                      Reviewed by {proposal.reviewedBy} on{' '}
+                      {new Date(proposal.reviewedAt).toLocaleString()}
                     </div>
                   )}
                 </div>

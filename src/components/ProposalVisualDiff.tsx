@@ -46,7 +46,7 @@ export function ProposalVisualDiff(props: ProposalVisualDiffProps) {
           <div className="flex items-center gap-6 mt-4 text-sm">
             <div className="flex items-center gap-2">
               <span className="text-gray-500">Agent:</span>
-              <span className="font-medium text-gray-900">{proposal.agent_id || 'Unknown'}</span>
+              <span className="font-medium text-gray-900">{proposal.agentId || 'Unknown'}</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-gray-500">Operations:</span>
@@ -179,8 +179,8 @@ export function ProposalVisualDiff(props: ProposalVisualDiffProps) {
         {proposal.status !== 'pending' && (
           <div className="p-4 border-t border-gray-200 bg-gray-50 text-center text-gray-600">
             This proposal has been {proposal.status}
-            {proposal.reviewed_by && ` by ${proposal.reviewed_by}`}
-            {proposal.reviewed_at && ` on ${new Date(proposal.reviewed_at).toLocaleString()}`}
+            {proposal.reviewedBy && ` by ${proposal.reviewedBy}`}
+            {proposal.reviewedAt && ` on ${new Date(proposal.reviewedAt).toLocaleString()}`}
           </div>
         )}
       </div>
