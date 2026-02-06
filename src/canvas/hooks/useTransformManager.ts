@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useRef, useEffect } from 'react';
 import type Konva from 'konva';
 import type { LayoutSpec, LayoutNode, FrameNode, TextNode, Size } from '../../layout-schema';
 import { mapNode } from '../../commands/types';
@@ -20,9 +20,14 @@ export function useTransformManager(
   findNode: (root: LayoutNode, id: string) => LayoutNode | null
 ) {
   const [transformSession, setTransformSession] = useState<TransformSession | null>(null);
+  const transformSessionRef = useRef<TransformSession | null>(null);
+  
+  useEffect(() => {
+    transformSessionRef.current = transformSession;
+  }, [transformSession]);
 
   const onTransform = useCallback(() => {
-    if (transformSession) return;
+    if (transformSessionRef.current) return;
     const tr = trRef.current; if (!tr) return;
     const stage = tr.getStage(); if (!stage) return;
     const nodes = tr.nodes(); if (!nodes.length) return;
@@ -55,7 +60,7 @@ export function useTransformManager(
     }
 
     setTransformSession(snapshot);
-  }, [transformSession, spec.root, findNode, trRef]);
+  }, [spec.root, findNode, trRef]);
 
   const onTransformEnd = useCallback(() => {
     const nodes = trRef.current?.nodes() ?? [];

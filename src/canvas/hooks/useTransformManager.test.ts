@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { renderHook } from '@testing-library/react';
+import { renderHook, act } from '@testing-library/react';
 import { useTransformManager } from './useTransformManager';
 import type { LayoutSpec } from '../../layout-schema';
 
@@ -34,7 +34,7 @@ describe('useTransformManager', () => {
       id: () => 'a',
       x: () => 10,
       y: () => 10,
-      getClientRect: () => ({ width: 100, height: 50 })
+      getClientRect: (_opts?: any) => ({ width: 100, height: 50 })
     };
     const mockStage = {};
     const mockTransformer = {
@@ -52,7 +52,9 @@ describe('useTransformManager', () => {
       useTransformManager(trRef, mkSpec(), setSpec, ['a'], findNode)
     );
 
-    result.current.onTransform();
+    act(() => {
+      result.current.onTransform();
+    });
 
     expect(result.current.transformSession).not.toBeNull();
     expect(result.current.transformSession?.nodes).toBeDefined();
@@ -63,7 +65,7 @@ describe('useTransformManager', () => {
       id: () => 'a',
       x: () => 10,
       y: () => 10,
-      getClientRect: () => ({ width: 100, height: 50 })
+      getClientRect: (_opts?: any) => ({ width: 100, height: 50 })
     };
     const mockStage = {};
     const mockTransformer = {
@@ -114,7 +116,8 @@ describe('useTransformManager', () => {
       y: () => 10,
       scaleX: () => 1,
       scaleY: () => 1,
-      rotation: () => 0
+      rotation: () => 0,
+      getClientRect: (_opts?: any) => ({ width: 100, height: 50 })
     };
     const mockStage = {
       findOne: () => mockNode
@@ -136,11 +139,15 @@ describe('useTransformManager', () => {
       useTransformManager(trRef, mkSpec(), setSpec, ['a'], findNode)
     );
 
-    result.current.onTransform();
+    act(() => {
+      result.current.onTransform();
+    });
     expect(result.current.transformSession).not.toBeNull();
 
     vi.useFakeTimers();
-    result.current.onTransformEnd();
+    act(() => {
+      result.current.onTransformEnd();
+    });
     vi.runAllTimers();
     vi.useRealTimers();
 
