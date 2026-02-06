@@ -5,6 +5,7 @@ import { estimateNodeHeight } from "../renderer/measurement";
 import type { LayoutNode, FrameNode, StackNode, TextNode, BoxNode, GridNode, GroupNode, ImageNode, RectNode, EllipseNode, LineNode, CurveNode, PolygonNode } from "../layout-schema.ts";
 import { CanvasImage } from "./components/CanvasImage";
 import { debugOnce, logger } from "../utils/logger";
+import { parseColor } from "../utils/color";
 
 // Font loading cache and callbacks
 const loadedFonts = new Set<string>();
@@ -504,7 +505,10 @@ function renderPolygon(n: PolygonNode) {
     const colorStops: number[] = [];
     n.fillGradient.colors.forEach((color, index) => {
       const position = index / (n.fillGradient!.colors.length - 1);
-      colorStops.push(position, ...hexToRgb(color).map(c => c / 255));
+      const rgba = parseColor(color);
+      if (rgba) {
+        colorStops.push(position, rgba.r / 255, rgba.g / 255, rgba.b / 255);
+      }
     });
     
     if (n.fillGradient.type === 'linear') {
@@ -551,14 +555,6 @@ function renderPolygon(n: PolygonNode) {
       />
     </Group>
   );
-}
-
-// Helper function to convert hex color to RGB
-function hexToRgb(hex: string): [number, number, number] {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  return result
-    ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)]
-    : [255, 255, 255];
 }
 
 export function renderNode(n: LayoutNode): ReactNode {

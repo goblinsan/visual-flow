@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
-import { Renderer } from '../renderer/Renderer';
-import type { RootSpec } from '../dsl';
+import { Renderer } from './renderer/Renderer';
+import type { RootSpec } from './dsl';
 
 const meta: Meta<typeof Renderer> = {
   title: 'Components/Design Tools',
