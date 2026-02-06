@@ -1,5 +1,4 @@
 import { useCallback, useRef, useState, useEffect, useMemo } from "react";
-import type { JSX } from "react";
 import { usePersistentRectDefaults } from './hooks/usePersistentRectDefaults';
 import { useRecentColors } from './hooks/useRecentColors';
 import { useDesignPersistence } from './hooks/useDesignPersistence';
@@ -9,17 +8,20 @@ import { useDialogState } from './hooks/canvas/useDialogState';
 import { useAttributeState } from './hooks/canvas/useAttributeState';
 import { useLibraryState } from './hooks/canvas/useLibraryState';
 import { useProposalState } from './hooks/canvas/useProposalState';
-import { Modal } from "./components/Modal";
 import { logger } from "./utils/logger";
+import { DialogManager } from "./components/dialogs/DialogManager";
+import { findNode } from './utils/specUtils';
+import { dashArrayToInput } from './utils/paint';
+import { applyProposalOperations } from './utils/proposalHelpers';
 import CanvasStage from "./canvas/CanvasStage.tsx";
 import type {
   LayoutSpec,
+  LayoutNode,
   FlowTransition,
   Flow,
 } from "./layout-schema.ts";
-import { saveNamedDesign, getSavedDesigns, getCurrentDesignName, setCurrentDesignName, type SavedDesign } from './utils/persistence';
+import { saveNamedDesign, getCurrentDesignName, setCurrentDesignName, type SavedDesign } from './utils/persistence';
 import useElementSize from './hooks/useElementSize';
-import { COMPONENT_LIBRARY, ICON_LIBRARY } from "./library";
 // Collaboration imports
 import { useRealtimeCanvas } from './collaboration';
 import { CursorOverlay } from './components/CursorOverlay';
@@ -569,6 +571,27 @@ export default function CanvasApp() {
     setNewDialogOpen(false);
   }, [setSpec, setSelection, isCollaborative]);
 
+  // Dialog action callbacks
+  const handleStartCollaborativeSession = useCallback(() => {
+    const newRoomId = generateRoomId();
+    const url = new URL(window.location.href);
+    url.searchParams.set('room', newRoomId);
+    window.history.pushState({}, '', url.toString());
+    setRoomId(newRoomId);
+  }, []);
+
+  const handleLeaveCollaborativeSession = useCallback(() => {
+    // Leave collaborative mode
+    const url = new URL(window.location.href);
+    url.searchParams.delete('room');
+    window.history.pushState({}, '', url.toString());
+    setRoomId(null);
+    setShareDialogOpen(false);
+  }, []);
+
+  const handleCopyShareLink = useCallback(() => {
+    navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}?room=${roomId}`);
+  }, [roomId]);
 
   // Derive stage width/height from container size (padding adjustments if needed)
   const stageWidth = Math.max(0, canvasSize.width);
@@ -636,257 +659,38 @@ export default function CanvasApp() {
         setShareDialogOpen={setShareDialogOpen}
         tool={tool}
       />
-      {/* Modals */}
-      {/* Share / Collaboration Dialog */}
-      <Modal open={shareDialogOpen} onClose={() => setShareDialogOpen(false)} title="Share & Collaborate" size="md" variant="light">
-        <div className="space-y-4">
-          {isCollaborative ? (
-            <>
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <div className="flex items-center gap-2 text-green-700 font-medium mb-2">
-                  <i className="fa-solid fa-check-circle" />
-                  You're in a collaborative session
-                </div>
-                <p className="text-sm text-green-600">
-                  Share this link with others to collaborate in real-time:
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  readOnly
-                  value={`${window.location.origin}${window.location.pathname}?room=${roomId}`}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-sm font-mono"
-                  onClick={(e) => (e.target as HTMLInputElement).select()}
-                />
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}?room=${roomId}`);
-                  }}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
-                >
-                  <i className="fa-regular fa-copy mr-1.5" />
-                  Copy
-                </button>
-              </div>
-              <div className="border-t border-gray-200 pt-4">
-                <button
-                  onClick={() => {
-                    // Leave collaborative mode
-                    const url = new URL(window.location.href);
-                    url.searchParams.delete('room');
-                    window.history.pushState({}, '', url.toString());
-                    setRoomId(null);
-                    setShareDialogOpen(false);
-                  }}
-                  className="text-sm text-red-600 hover:text-red-700"
-                >
-                  <i className="fa-solid fa-arrow-right-from-bracket mr-1.5" />
-                  Leave collaborative session
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <p className="text-sm text-gray-600">
-                Start a collaborative session to work with others in real-time. 
-                Everyone with the link can see and edit the design together.
-              </p>
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div className="flex items-center gap-2 text-blue-700 font-medium mb-2">
-                  <i className="fa-solid fa-users" />
-                  Real-time collaboration features:
-                </div>
-                <ul className="text-sm text-blue-600 space-y-1 ml-6 list-disc">
-                  <li>See other users' cursors in real-time</li>
-                  <li>View who has what selected</li>
-                  <li>Changes sync instantly across all users</li>
-                  <li>Works with humans and AI agents</li>
-                </ul>
-              </div>
-              <button
-                onClick={() => {
-                  const newRoomId = generateRoomId();
-                  const url = new URL(window.location.href);
-                  url.searchParams.set('room', newRoomId);
-                  window.history.pushState({}, '', url.toString());
-                  setRoomId(newRoomId);
-                }}
-                className="w-full px-4 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-lg hover:from-cyan-400 hover:to-blue-400 transition-all text-sm font-medium shadow-md"
-              >
-                <i className="fa-solid fa-play mr-2" />
-                Start Collaborative Session
-              </button>
-            </>
-          )}
-        </div>
-      </Modal>
-      <Modal open={aboutOpen} onClose={() => setAboutOpen(false)} title="About Vizail" size="sm" variant="light">
-        <p><strong>Vizail</strong> version <code>{appVersion}</code></p>
-        <p className="mt-2">Experimental canvas + layout editor. Transforms are baked to schema on release.</p>
-        <p className="mt-4 opacity-70 text-[10px]">© {new Date().getFullYear()} Vizail</p>
-      </Modal>
-      <Modal open={cheatOpen} onClose={() => setCheatOpen(false)} title="Interaction Cheatsheet" size="sm" variant="light">
-        <ul className="space-y-1 list-disc pl-4 pr-1 max-h-72 overflow-auto text-xs">
-          <li>Select: Click; Shift/Ctrl multi; marquee drag empty space.</li>
-          <li>Pan: Space+Drag / Middle / Alt+Drag.</li>
-          <li>Zoom: Wheel (cursor focus).</li>
-          <li>Resize: Drag handles; Shift=aspect; Alt=center; Shift+Alt=center+aspect.</li>
-          <li>Rotate: Handle (snaps 0/90/180/270).</li>
-          <li>Images: Non-uniform stretch disables aspect; context menu to restore.</li>
-          <li><strong>Tool Shortcuts:</strong> V=Select, R=Rectangle, O=Ellipse, L=Line, P=Curve, T=Text, I=Image.</li>
-          <li>Rectangle/Ellipse: Drag to draw; Shift=circle/square; Alt=center-out.</li>
-          <li>Line: Click and drag to draw a straight line.</li>
-          <li>Curve: Click to add points, Enter or double-click to finish.</li>
-          <li>Text/Image: Click to place at cursor position.</li>
-          <li>Group: Ctrl/Cmd+G; Ungroup: Ctrl/Cmd+Shift+G.</li>
-          <li>Duplicate: Ctrl/Cmd+D. Delete: Del/Backspace.</li>
-          <li>Nudge: Arrows (1px) / Shift+Arrows (10px).</li>
-        </ul>
-      </Modal>
-      <Modal open={iconLibraryOpen} onClose={() => setIconLibraryOpen(false)} title="Icons" size="md" variant="light">
-        <p className="text-xs text-gray-600 mb-3">Choose an icon to place on the canvas.</p>
-        <div className="relative mb-3">
-          <i className="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-[10px]" />
-          <input
-            value={iconSearch}
-            onChange={(e) => setIconSearch(e.target.value)}
-            placeholder="Search icons..."
-            className="w-full border border-gray-200 rounded-md pl-7 pr-2 py-2 text-[11px] bg-white focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition-colors"
-          />
-        </div>
-        {(() => {
-          const q = iconSearch.trim().toLowerCase();
-          const filteredIcons = q
-            ? ICON_LIBRARY.filter((icon) => icon.label.toLowerCase().includes(q) || icon.id.toLowerCase().includes(q))
-            : ICON_LIBRARY;
-
-          return (
-            <>
-              <div className="grid grid-cols-4 gap-2 max-h-[50vh] overflow-y-auto pr-1">
-                {filteredIcons.map((icon) => {
-                  const [w, h, , , d] = icon.icon.icon;
-                  const path = Array.isArray(d) ? d.join(' ') : d;
-                  return (
-                    <button
-                      key={icon.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedIconId(icon.id);
-                        setIconLibraryOpen(false);
-                      }}
-                      className={`flex flex-col items-center justify-center gap-1.5 px-2 py-2 rounded-lg border text-[10px] transition-colors ${
-                        selectedIconId === icon.id
-                          ? 'border-blue-500 bg-blue-50 text-blue-700'
-                          : 'border-gray-200 hover:bg-gray-50 text-gray-600'
-                      }`}
-                    >
-                      <svg viewBox={`0 0 ${w} ${h}`} className="w-4 h-4" fill="currentColor" aria-hidden="true">
-                        <path d={path} />
-                      </svg>
-                      <span className="truncate w-full text-center">{icon.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-              {filteredIcons.length === 0 && (
-                <div className="mt-3 text-[11px] text-gray-500">No icons match “{iconSearch}”.</div>
-              )}
-            </>
-          );
-        })()}
-      </Modal>
-      <Modal open={componentLibraryOpen} onClose={() => setComponentLibraryOpen(false)} title="Components" size="md" variant="light">
-        <p className="text-xs text-gray-600 mb-3">Choose a component to place on the canvas.</p>
-        <div className="grid grid-cols-1 gap-2 max-h-[50vh] overflow-y-auto pr-1">
-          {COMPONENT_LIBRARY.map((component) => (
-            <button
-              key={component.id}
-              type="button"
-              onClick={() => {
-                setSelectedComponentId(component.id);
-                setComponentLibraryOpen(false);
-              }}
-              className={`flex items-center gap-3 px-3 py-2 rounded-lg border text-left transition-colors ${
-                selectedComponentId === component.id
-                  ? 'border-blue-500 bg-blue-50'
-                  : 'border-gray-200 hover:bg-gray-50'
-              }`}
-            >
-              <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center text-gray-500">
-                <i className={`${component.iconClassName}`} />
-              </div>
-              <div>
-                <div className="text-sm font-medium text-gray-800">{component.name}</div>
-                <div className="text-[11px] text-gray-500">{component.description}</div>
-              </div>
-            </button>
-          ))}
-        </div>
-      </Modal>
-      {/* New Design Template Dialog */}
-      <Modal open={newDialogOpen} onClose={() => setNewDialogOpen(false)} title="Create New Design" size="lg" variant="light">
-        <p className="text-sm text-gray-600 mb-4">Choose a template to get started:</p>
-        <div className="grid grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto pr-1">
-          {TEMPLATES.map((template) => (
-            <button
-              key={template.id}
-              onClick={() => applyTemplate(template.id)}
-              className="flex flex-col items-start p-4 rounded-lg border border-gray-200 bg-white hover:border-blue-400 hover:bg-blue-50 transition-all duration-150 text-left group"
-            >
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white shadow-sm group-hover:scale-105 transition-transform">
-                  <i className={`${template.icon} text-lg`} />
-                </div>
-                <span className="font-medium text-gray-900">{template.name}</span>
-              </div>
-              <p className="text-xs text-gray-500 leading-relaxed">{template.description}</p>
-            </button>
-          ))}
-        </div>
-      </Modal>
-      {/* Open Design Dialog */}
-      <Modal open={openDialogOpen} onClose={() => setOpenDialogOpen(false)} title="Open Design" size="lg" variant="light">
-        <p className="text-sm text-gray-600 mb-4">Select a saved design to open:</p>
-        {(() => {
-          const designs = getSavedDesigns();
-          if (designs.length === 0) {
-            return (
-              <div className="text-center py-8 text-gray-500">
-                <i className="fa-regular fa-folder-open text-4xl mb-3 text-gray-300" />
-                <p>No saved designs yet.</p>
-                <p className="text-sm mt-1">Use "Save" or "Save As" to save your work.</p>
-              </div>
-            );
-          }
-          return (
-            <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
-              {designs
-                .sort((a, b) => b.savedAt - a.savedAt)
-                .map((design) => (
-                  <button
-                    key={design.name}
-                    onClick={() => loadDesign(design)}
-                    className="w-full flex items-center justify-between p-4 rounded-lg border border-gray-200 bg-white hover:border-blue-400 hover:bg-blue-50 transition-all duration-150 text-left group"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white shadow-sm group-hover:scale-105 transition-transform">
-                        <i className="fa-regular fa-file text-lg" />
-                      </div>
-                      <div>
-                        <span className="font-medium text-gray-900 block">{design.name}</span>
-                        <span className="text-xs text-gray-500">
-                          {new Date(design.savedAt).toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
-                    <i className="fa-solid fa-arrow-right text-gray-400 group-hover:text-blue-500 transition-colors" />
-                  </button>
-                ))}
-            </div>
-          );
-        })()}
-      </Modal>
+      {/* Dialogs */}
+      <DialogManager
+        shareDialogOpen={shareDialogOpen}
+        setShareDialogOpen={setShareDialogOpen}
+        aboutOpen={aboutOpen}
+        setAboutOpen={setAboutOpen}
+        cheatOpen={cheatOpen}
+        setCheatOpen={setCheatOpen}
+        iconLibraryOpen={iconLibraryOpen}
+        setIconLibraryOpen={setIconLibraryOpen}
+        componentLibraryOpen={componentLibraryOpen}
+        setComponentLibraryOpen={setComponentLibraryOpen}
+        newDialogOpen={newDialogOpen}
+        setNewDialogOpen={setNewDialogOpen}
+        openDialogOpen={openDialogOpen}
+        setOpenDialogOpen={setOpenDialogOpen}
+        isCollaborative={isCollaborative}
+        roomId={roomId}
+        selectedIconId={selectedIconId}
+        setSelectedIconId={setSelectedIconId}
+        iconSearch={iconSearch}
+        setIconSearch={setIconSearch}
+        selectedComponentId={selectedComponentId}
+        setSelectedComponentId={setSelectedComponentId}
+        appVersion={appVersion}
+        onApplyTemplate={applyTemplate}
+        onLoadDesign={loadDesign}
+        onStartCollaborativeSession={handleStartCollaborativeSession}
+        onLeaveCollaborativeSession={handleLeaveCollaborativeSession}
+        onCopyShareLink={handleCopyShareLink}
+        templates={TEMPLATES}
+      />
       {/* Body layout */}
       <div className="flex flex-1 min-h-0">
         {/* Left toolbar */}
