@@ -5,6 +5,8 @@
 import type { Env, User } from '../types';
 import { generateId, jsonResponse, errorResponse } from '../utils';
 import { checkCanvasAccess } from '../auth';
+import { generateSecureToken, hashToken } from '../tokenHash';
+import { validateRequestBody, generateAgentTokenSchema } from '../validation';
 
 interface AgentToken {
   id: string;
@@ -32,36 +34,34 @@ export async function generateAgentToken(
     return errorResponse('Canvas not found or insufficient permissions', 404);
   }
 
+  // Validate request body
+  const validation = await validateRequestBody(request, generateAgentTokenSchema);
+  if (!validation.success) {
+    return errorResponse(validation.error, 400);
+  }
+
+  const { agentId, scope } = validation.data;
+
   try {
-    const body = await request.json() as { agentId: string; scope: string };
-    const { agentId, scope } = body;
-
-    if (!agentId || !scope) {
-      return errorResponse('Missing required fields: agentId, scope', 400);
-    }
-
-    if (!['read', 'propose', 'trusted-propose'].includes(scope)) {
-      return errorResponse('Invalid scope. Must be: read, propose, or trusted-propose', 400);
-    }
-
     const now = Date.now();
     const tokenId = generateId();
-    const token = `vz_agent_${generateId()}_${generateId()}`; // Generate secure token
-    const expiresAt = now + (24 * 60 * 60 * 1000); // 24 hours
+    const token = generateSecureToken(); // Generate secure token
+    const tokenHash = await hashToken(token); // Hash before storing
+    const expiresAt = now + (365 * 24 * 60 * 60 * 1000); // 365 days
 
     await env.DB
       .prepare(`
-        INSERT INTO agent_tokens (id, canvas_id, agent_id, token, scope, expires_at, created_at)
+        INSERT INTO agent_tokens (id, canvas_id, agent_id, token_hash, scope, expires_at, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)
       `)
-      .bind(tokenId, canvasId, agentId, token, scope, expiresAt, now)
+      .bind(tokenId, canvasId, agentId, tokenHash, scope, expiresAt, now)
       .run();
 
     const agentToken: AgentToken = {
       id: tokenId,
       canvas_id: canvasId,
       agent_id: agentId,
-      token,
+      token, // Return plaintext token only once
       scope: scope as AgentToken['scope'],
       expires_at: expiresAt,
       created_at: now,
