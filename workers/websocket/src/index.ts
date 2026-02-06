@@ -1,9 +1,11 @@
 /**
  * Durable Object for real-time collaboration
  * Manages WebSocket connections and Yjs synchronization for a single canvas
+ * Security: Requires authentication before accepting connections
  */
 
 import * as Y from 'yjs';
+import { authenticateWebSocket, checkCanvasAccess } from './auth';
 
 interface Env {
   CANVAS_ROOM: DurableObjectNamespace;
@@ -132,6 +134,18 @@ export default {
 
     if (!canvasId) {
       return new Response('Canvas ID required', { status: 400 });
+    }
+
+    // Authenticate the WebSocket connection
+    const userId = await authenticateWebSocket(request);
+    if (!userId) {
+      return new Response('Unauthorized - authentication required', { status: 401 });
+    }
+
+    // Check if user has access to this canvas
+    const hasAccess = await checkCanvasAccess(userId, canvasId);
+    if (!hasAccess) {
+      return new Response('Forbidden - no access to this canvas', { status: 403 });
     }
 
     // Get Durable Object instance

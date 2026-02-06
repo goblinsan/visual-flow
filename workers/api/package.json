@@ -12,5 +12,8 @@
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20241127.0",
     "wrangler": "^3.94.0"
+  },
+  "dependencies": {
+    "zod": "^4.3.6"
   }
 }

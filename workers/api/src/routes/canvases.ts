@@ -6,6 +6,7 @@ import type { Env, User, Canvas } from '../types';
 import type { LayoutSpec } from '../../src/layout-schema';
 import { generateId, jsonResponse, errorResponse } from '../utils';
 import { checkCanvasAccess } from '../auth';
+import { checkCanvasQuota } from '../quota';
 
 interface CreateCanvasBody {
   name: string;
@@ -85,6 +86,12 @@ export async function listCanvases(user: User, env: Env): Promise<Response> {
  * Create a new canvas
  */
 export async function createCanvas(user: User, env: Env, request: Request): Promise<Response> {
+  // Check quota before creating
+  const quota = await checkCanvasQuota(env, user.id);
+  if (!quota.allowed) {
+    return errorResponse(quota.error || 'Canvas quota exceeded', 403);
+  }
+
   try {
     const body = await request.json();
     if (!isCreateCanvasBody(body)) {

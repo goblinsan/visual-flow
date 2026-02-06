@@ -3,9 +3,12 @@
  * Supports two auth methods:
  *   1. CF-Access-Authenticated-User-Email header (human users via Cloudflare Access)
  *   2. Authorization: Bearer vz_agent_... (agent tokens from Phase 4)
+ * 
+ * Security: Agent tokens are hashed in the database using SHA-256
  */
 
 import type { Env, User } from './types';
+import { hashToken } from './tokenHash';
 
 export interface AuthResult {
   user: User;
@@ -29,11 +32,11 @@ export async function authenticateUser(request: Request, env: Env): Promise<User
   }
 
   // Method 2: Cloudflare Access email header (set by CF Access proxy)
-  //   Also accept X-User-Email as a fallback for direct worker access
-  //   (CF strips CF-Access-* headers when not going through Access)
-  const email =
-    request.headers.get('CF-Access-Authenticated-User-Email') ||
-    request.headers.get('X-User-Email');
+  // Production: Only accept CF-Access-Authenticated-User-Email (set by Cloudflare Access)
+  // Development: Accept X-User-Email for local testing
+  const email = env.ENVIRONMENT === 'production'
+    ? request.headers.get('CF-Access-Authenticated-User-Email')
+    : request.headers.get('CF-Access-Authenticated-User-Email') || request.headers.get('X-User-Email');
   
   if (!email) {
     return null;
@@ -50,12 +53,14 @@ export async function authenticateRequest(request: Request, env: Env): Promise<A
   
   if (authHeader?.startsWith('Bearer vz_agent_')) {
     const token = authHeader.slice(7);
+    const tokenHash = await hashToken(token);
+    
     const tokenRow = await env.DB
       .prepare(`
         SELECT id, canvas_id, agent_id, scope, expires_at
-        FROM agent_tokens WHERE token = ?
+        FROM agent_tokens WHERE token_hash = ?
       `)
-      .bind(token)
+      .bind(tokenHash)
       .first<{ id: string; canvas_id: string; agent_id: string; scope: string; expires_at: number }>();
 
     if (!tokenRow || tokenRow.expires_at < Date.now()) {
@@ -84,8 +89,11 @@ export async function authenticateRequest(request: Request, env: Env): Promise<A
     };
   }
 
-  // Cloudflare Access fallback
-  const email = request.headers.get('CF-Access-Authenticated-User-Email');
+  // Cloudflare Access fallback - only in non-production environments
+  const email = env.ENVIRONMENT === 'production'
+    ? request.headers.get('CF-Access-Authenticated-User-Email')
+    : request.headers.get('CF-Access-Authenticated-User-Email') || request.headers.get('X-User-Email');
+  
   if (!email) return null;
 
   const user = await getOrCreateUser(env, email);
@@ -96,16 +104,19 @@ export async function authenticateRequest(request: Request, env: Env): Promise<A
 
 /**
  * Validate an agent token and return a synthetic user
+ * Tokens are hashed in the database for security
  */
 async function authenticateAgentToken(token: string, env: Env): Promise<User | null> {
+  const tokenHash = await hashToken(token);
+  
   const tokenRow = await env.DB
     .prepare(`
       SELECT t.canvas_id, t.agent_id, t.scope, t.expires_at, c.owner_id
       FROM agent_tokens t
       JOIN canvases c ON c.id = t.canvas_id
-      WHERE t.token = ?
+      WHERE t.token_hash = ?
     `)
-    .bind(token)
+    .bind(tokenHash)
     .first<{ canvas_id: string; agent_id: string; scope: string; expires_at: number; owner_id: string }>();
 
   if (!tokenRow) return null;
@@ -170,4 +181,48 @@ export async function checkCanvasAccess(
   }
 
   return { allowed: true, role: membership.role };
+}
+
+/**
+ * Enforce agent token scope for operations
+ * Returns true if the operation is allowed, false otherwise
+ */
+export function checkAgentScope(
+  authResult: AuthResult | null,
+  requiredScope: 'read' | 'propose' | 'trusted-propose',
+  canvasId?: string
+): { allowed: boolean; error?: string } {
+  // Human users (no agent token) have full access
+  if (!authResult?.agentToken) {
+    return { allowed: true };
+  }
+
+  const { agentToken } = authResult;
+
+  // If canvasId is provided, verify the token is for this canvas
+  if (canvasId && agentToken.canvas_id !== canvasId) {
+    return {
+      allowed: false,
+      error: 'Agent token is not valid for this canvas',
+    };
+  }
+
+  // Scope hierarchy: trusted-propose > propose > read
+  const scopeHierarchy = {
+    'read': 0,
+    'propose': 1,
+    'trusted-propose': 2,
+  };
+
+  const tokenScopeLevel = scopeHierarchy[agentToken.scope];
+  const requiredScopeLevel = scopeHierarchy[requiredScope];
+
+  if (tokenScopeLevel < requiredScopeLevel) {
+    return {
+      allowed: false,
+      error: `Insufficient scope. Required: ${requiredScope}, has: ${agentToken.scope}`,
+    };
+  }
+
+  return { allowed: true };
 }

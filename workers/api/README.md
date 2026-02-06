@@ -2,6 +2,20 @@
 
 Cloudflare Worker providing REST API for canvas persistence and sharing.
 
+## Security
+
+**Production-ready security features:**
+- ✅ Cloudflare Access authentication (OAuth via Google, GitHub, etc.)
+- ✅ CORS restricted to vizail.com and *.visual-flow.pages.dev
+- ✅ Agent tokens hashed at rest (SHA-256)
+- ✅ Rate limiting on all endpoints (tiered: read/write/sensitive)
+- ✅ Request body validation with Zod
+- ✅ Free-plan quota enforcement
+- ✅ Agent scope enforcement (read/propose/trusted-propose)
+- ✅ WebSocket authentication
+
+📖 **See [SECURITY.md](../../docs/SECURITY.md) for complete security documentation**
+
 ## Features
 
 - Canvas CRUD operations (Create, Read, Update, Delete)
@@ -32,7 +46,13 @@ Cloudflare Worker providing REST API for canvas persistence and sharing.
 
 ## Authentication
 
-Phase 1 uses Cloudflare Access for authentication. The worker extracts the user email from the `CF-Access-Authenticated-User-Email` header.
+**Production:** Uses Cloudflare Access for OAuth authentication (Google, GitHub, Apple).
+
+**Development:** Accepts `X-User-Email` header for local testing.
+
+**Agent Tokens:** Programmatic access via `Authorization: Bearer vz_agent_...` tokens with scoped permissions.
+
+See [SECURITY.md](../../docs/SECURITY.md) for details on authentication, rate limiting, and quotas.
 
 ## Development
 
@@ -68,10 +88,21 @@ Tables:
 
 ## Role-Based Access Control
 
-- **Owner**: Full control (edit, delete, manage members)
+- **Owner**: Full control (edit, delete, manage members, generate tokens)
 - **Editor**: Can edit canvas, can invite viewers
 - **Viewer**: Read-only access
 
+## Agent Token Scopes
+
+- **read**: Read-only access to canvas data
+- **propose**: Can create proposals (requires human approval)
+- **trusted-propose**: Can auto-approve certain proposals
+
 ## CORS
 
-The API includes CORS headers to allow cross-origin requests. In production, configure `Access-Control-Allow-Origin` to specific domains.
+**Production:** CORS restricted to:
+- `https://vizail.com`
+- `https://www.vizail.com`  
+- `https://*.visual-flow.pages.dev`
+
+**Development:** Allows `localhost` and `127.0.0.1`

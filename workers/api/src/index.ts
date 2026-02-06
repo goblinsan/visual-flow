@@ -1,11 +1,14 @@
 /**
  * Vizail API Worker
  * Phase 1: Cloud Persistence & Sharing
+ * Security: CORS lockdown, rate limiting, token hashing, scope enforcement
  */
 
 import { authenticateUser } from './auth';
 import type { Env } from './types';
 import { errorResponse, jsonResponse } from './utils';
+import { getCorsHeaders } from './cors';
+import { checkRateLimit, getRateLimitType } from './rateLimit';
 import {
   listCanvases,
   createCanvas,
@@ -53,31 +56,63 @@ const PROPOSAL_REJECT_ROUTE = new RegExp('^/api/proposals/([^/]+)/reject$');
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+    const origin = request.headers.get('Origin');
+    const corsHeaders = getCorsHeaders(origin, env);
     
     // CORS preflight
     if (request.method === 'OPTIONS') {
       return new Response(null, {
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, CF-Access-Authenticated-User-Email, X-User-Email, Authorization',
-        },
+        headers: corsHeaders,
       });
     }
 
     // Public routes (no auth required)
     if (url.pathname === '/health' || url.pathname === '/api/health') {
-      return jsonResponse({ status: 'ok', timestamp: Date.now() });
+      return new Response(JSON.stringify({ status: 'ok', timestamp: Date.now() }), {
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders,
+        },
+      });
     }
 
     if ((url.pathname === '/api/agent/discover' || url.pathname === '/api/openapi.json') && request.method === 'GET') {
-      return agentDiscoveryResponse();
+      const response = agentDiscoveryResponse();
+      return new Response(response.body, {
+        status: response.status,
+        headers: {
+          ...Object.fromEntries(response.headers.entries()),
+          ...corsHeaders,
+        },
+      });
     }
 
     // Authenticate user (supports both CF Access headers and agent tokens)
     const user = await authenticateUser(request, env);
     if (!user) {
-      return errorResponse('Unauthorized - provide CF-Access-Authenticated-User-Email header or Authorization: Bearer vz_agent_... token', 401);
+      return new Response(JSON.stringify({
+        error: 'Unauthorized - authenticate via Cloudflare Access or provide Authorization: Bearer vz_agent_... token'
+      }), {
+        status: 401,
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders,
+        },
+      });
+    }
+
+    // Rate limiting
+    const rateLimitType = getRateLimitType(request.method, url.pathname);
+    const rateLimit = checkRateLimit(user.id, rateLimitType);
+    if (!rateLimit.allowed) {
+      return new Response(JSON.stringify({ error: rateLimit.error }), {
+        status: 429,
+        headers: {
+          'Content-Type': 'application/json',
+          'Retry-After': '60',
+          ...corsHeaders,
+        },
+      });
     }
 
     // Route handling

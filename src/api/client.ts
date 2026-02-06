@@ -82,10 +82,9 @@ export class ApiClient {
         ...options,
         headers: {
           'Content-Type': 'application/json',
-          // Send both headers — CF-Access- works behind Access proxy,
-          // X-User-Email works when hitting the worker directly
-          'CF-Access-Authenticated-User-Email': 'your@email.com',
-          'X-User-Email': 'your@email.com',
+          // In development, send X-User-Email for testing
+          // In production, rely on Cloudflare Access which sets CF-Access-Authenticated-User-Email
+          ...(import.meta.env.DEV ? { 'X-User-Email': 'dev@localhost' } : {}),
           ...options.headers,
         },
       });

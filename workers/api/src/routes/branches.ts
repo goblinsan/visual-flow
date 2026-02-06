@@ -1,10 +1,11 @@
 /**
- * Branch routes for Phase 4
+ * Branch routes for Phase 4 (Agent Collaboration)
  */
 
 import type { Env, User } from '../types';
 import { generateId, jsonResponse, errorResponse } from '../utils';
 import { checkCanvasAccess } from '../auth';
+import { checkBranchQuota } from '../quota';
 
 interface AgentBranch {
   id: string;
@@ -61,6 +62,12 @@ export async function createBranch(
   const access = await checkCanvasAccess(env, user.id, canvasId, 'editor');
   if (!access.allowed) {
     return errorResponse('Canvas not found or insufficient permissions', 404);
+  }
+
+  // Check quota before creating branch
+  const quota = await checkBranchQuota(env, canvasId);
+  if (!quota.allowed) {
+    return errorResponse(quota.error || 'Branch quota exceeded', 403);
   }
 
   try {

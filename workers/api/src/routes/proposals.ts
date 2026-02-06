@@ -1,10 +1,11 @@
 /**
- * Proposal routes for Phase 4
+ * Proposal routes for Phase 4 (Agent Collaboration)
  */
 
 import type { Env, User } from '../types';
 import { generateId, jsonResponse, errorResponse } from '../utils';
-import { checkCanvasAccess } from '../auth';
+import { checkCanvasAccess, authenticateRequest, checkAgentScope } from '../auth';
+import { validateRequestBody, createProposalSchema, rejectProposalSchema } from '../validation';
 
 interface ProposalOperation {
   type: 'create' | 'update' | 'delete' | 'move';
