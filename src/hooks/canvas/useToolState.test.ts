@@ -30,14 +30,14 @@ describe('useToolState', () => {
     expect(result.current.selectedCurvePointIndex).toBe(2);
   });
 
-  it('resets curve editing', () => {
+  it('clears selected curve point', () => {
     const { result } = renderHook(() => useToolState());
     act(() => {
       result.current.setEditingCurveId('curve-456');
       result.current.setSelectedCurvePointIndex(3);
     });
-    act(() => { result.current.resetCurveEditing(); });
+    act(() => { result.current.clearSelectedCurvePoint(); });
     expect(result.current.selectedCurvePointIndex).toBeNull();
-    expect(result.current.editingCurveId).toBe('curve-456'); // only point index reset
+    expect(result.current.editingCurveId).toBe('curve-456');
   });
 });

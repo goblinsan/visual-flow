@@ -10,7 +10,7 @@ export interface UseToolStateReturn extends ToolState {
   setTool: React.Dispatch<React.SetStateAction<string>>;
   setEditingCurveId: React.Dispatch<React.SetStateAction<string | null>>;
   setSelectedCurvePointIndex: React.Dispatch<React.SetStateAction<number | null>>;
-  resetCurveEditing: () => void;
+  clearSelectedCurvePoint: () => void;
 }
 
 /**
@@ -21,7 +21,7 @@ export function useToolState(initialTool = 'select'): UseToolStateReturn {
   const [editingCurveId, setEditingCurveId] = useState<string | null>(null);
   const [selectedCurvePointIndex, setSelectedCurvePointIndex] = useState<number | null>(null);
 
-  const resetCurveEditing = useCallback(() => {
+  const clearSelectedCurvePoint = useCallback(() => {
     setSelectedCurvePointIndex(null);
   }, []);
 
@@ -32,6 +32,6 @@ export function useToolState(initialTool = 'select'): UseToolStateReturn {
     setEditingCurveId,
     selectedCurvePointIndex,
     setSelectedCurvePointIndex,
-    resetCurveEditing,
+    clearSelectedCurvePoint,
   };
 }
