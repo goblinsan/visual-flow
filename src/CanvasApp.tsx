@@ -1,45 +1,36 @@
 import { useCallback, useRef, useState, useEffect, useMemo } from "react";
-import type { JSX } from "react";
-import { findNode, findParentNode, updateNode, type SpecPatch } from './utils/specUtils';
-import RectAttributesPanel from './components/RectAttributesPanel';
-import EllipseAttributesPanel from './components/EllipseAttributesPanel';
-import LineAttributesPanel from './components/LineAttributesPanel';
-import CurveAttributesPanel from './components/CurveAttributesPanel';
-import TextAttributesPanel from './components/TextAttributesPanel';
-import ImageAttributesPanel from './components/ImageAttributesPanel';
-import DefaultsPanel from './components/DefaultsPanel';
-import { FlowAttributesPanel } from './components/FlowAttributesPanel';
 import { usePersistentRectDefaults } from './hooks/usePersistentRectDefaults';
 import { useRecentColors } from './hooks/useRecentColors';
 import { useDesignPersistence } from './hooks/useDesignPersistence';
 import { useSelection } from './hooks/useSelection';
-import { Modal } from "./components/Modal";
+import { useToolState } from './hooks/canvas/useToolState';
+import { useDialogState } from './hooks/canvas/useDialogState';
+import { useAttributeState } from './hooks/canvas/useAttributeState';
+import { useLibraryState } from './hooks/canvas/useLibraryState';
+import { useProposalState } from './hooks/canvas/useProposalState';
 import { logger } from "./utils/logger";
+import { DialogManager } from "./components/dialogs/DialogManager";
+import { findNode } from './utils/specUtils';
 import { dashArrayToInput } from './utils/paint';
+import { applyProposalOperations } from './utils/proposalHelpers';
 import CanvasStage from "./canvas/CanvasStage.tsx";
 import type {
   LayoutSpec,
   LayoutNode,
-  RectNode,
-  EllipseNode,
-  LineNode,
-  CurveNode,
-  TextNode,
-  ImageNode,
   FlowTransition,
   Flow,
 } from "./layout-schema.ts";
-import { saveNamedDesign, getSavedDesigns, getCurrentDesignName, setCurrentDesignName, type SavedDesign } from './utils/persistence';
+import { saveNamedDesign, getCurrentDesignName, setCurrentDesignName, type SavedDesign } from './utils/persistence';
 import useElementSize from './hooks/useElementSize';
-import { COMPONENT_LIBRARY, ICON_LIBRARY } from "./library";
 // Collaboration imports
 import { useRealtimeCanvas } from './collaboration';
-import { ConnectionStatusIndicator } from './components/ConnectionStatusIndicator';
 import { CursorOverlay } from './components/CursorOverlay';
 import { SelectionOverlay } from './components/SelectionOverlay';
-import { ActiveUsersList } from './components/ActiveUsersList';
 import { useProposals } from './hooks/useProposals';
-import { applyProposalOperations } from './utils/proposalHelpers';
+import { HeaderToolbar } from './components/canvas/HeaderToolbar';
+import { LeftToolbar } from './components/canvas/LeftToolbar';
+import { AttributesSidebar } from './components/canvas/AttributesSidebar';
+import { AgentPanel } from './components/canvas/AgentPanel';
 
 /** Get room ID from URL query param ?room=xxx */
 function getRoomIdFromURL(): string | null {
@@ -251,7 +242,6 @@ const TEMPLATES: { id: string; name: string; icon: string; description: string; 
 export default function CanvasApp() {
   // Collaboration state
   const [roomId, setRoomId] = useState<string | null>(getRoomIdFromURL);
-  const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const userId = useMemo(() => getUserId(), []);
   const displayName = useMemo(() => getDisplayName(), []);
   const wsUrl = useMemo(() => getWebSocketUrl(), []);
@@ -324,44 +314,82 @@ export default function CanvasApp() {
     });
     historyLockRef.current = false;
   }, [setSpecRaw]);
-  const [tool, setTool] = useState<string>("select");
+  
+  // Custom hooks for domain-specific state management
+  const {
+    tool,
+    setTool,
+    editingCurveId,
+    setEditingCurveId,
+    selectedCurvePointIndex,
+    setSelectedCurvePointIndex,
+  } = useToolState();
+  
+  const {
+    helpOpen,
+    setHelpOpen,
+    fileOpen,
+    setFileOpen,
+    aboutOpen,
+    setAboutOpen,
+    cheatOpen,
+    setCheatOpen,
+    iconLibraryOpen,
+    setIconLibraryOpen,
+    componentLibraryOpen,
+    setComponentLibraryOpen,
+    newDialogOpen,
+    setNewDialogOpen,
+    openDialogOpen,
+    setOpenDialogOpen,
+    shareDialogOpen,
+    setShareDialogOpen,
+  } = useDialogState();
+  
+  const {
+    attributeTab,
+    setAttributeTab,
+    panelMode,
+    setPanelMode,
+    rawDashInput,
+    setRawDashInput,
+    lastFillById,
+    setLastFillById,
+    lastStrokeById,
+    setLastStrokeById,
+  } = useAttributeState();
+  
+  const {
+    selectedIconId,
+    setSelectedIconId,
+    selectedComponentId,
+    setSelectedComponentId,
+    iconSearch,
+    setIconSearch,
+  } = useLibraryState();
+  
+  const {
+    selectedProposalId,
+    setSelectedProposalId,
+    viewingProposedSpec,
+    setViewingProposedSpec,
+  } = useProposalState();
+  
   const { selection: selectedIds, setSelection } = useSelection();
   
   // Rectangle default attributes (persisted)
   const { defaults: rectDefaults, update: updateRectDefaults } = usePersistentRectDefaults({ fill: '#ffffff', stroke: '#334155', strokeWidth: 1, radius: 0, opacity: 1, strokeDash: undefined });
-  // Remember last non-undefined colors so toggling off/on restores previous value
-  const [lastFillById, setLastFillById] = useState<Record<string,string>>({});
-  const [lastStrokeById, setLastStrokeById] = useState<Record<string,string>>({});
-  // (Removed lastDefaultFill/Stroke state – now encapsulated in DefaultsPanel)
   // Recent colors via hook
   const { recentColors, beginSession: beginRecentSession, previewColor: previewRecent, commitColor: commitRecent } = useRecentColors();
-  // Raw dash pattern input (for both selected rect and defaults) to preserve user typing
-  const [rawDashInput, setRawDashInput] = useState<string>('');
-  const [canvasRef, canvasSize] = useElementSize<HTMLDivElement>(); // State for default last colors moved into DefaultsPanel component
-  const [helpOpen, setHelpOpen] = useState(false);
-  const [fileOpen, setFileOpen] = useState(false);
-  const [aboutOpen, setAboutOpen] = useState(false);
-  const [cheatOpen, setCheatOpen] = useState(false);
-  const [iconLibraryOpen, setIconLibraryOpen] = useState(false);
-  const [componentLibraryOpen, setComponentLibraryOpen] = useState(false);
-  const [selectedIconId, setSelectedIconId] = useState(ICON_LIBRARY[0]?.id || "star");
-  const [selectedComponentId, setSelectedComponentId] = useState(COMPONENT_LIBRARY[0]?.id || "button");
-  const [iconSearch, setIconSearch] = useState('');
+  const [canvasRef, canvasSize] = useElementSize<HTMLDivElement>();
   const [activeFlowId, setActiveFlowId] = useState<string | null>(null);
   const [focusNodeId, setFocusNodeId] = useState<string | null>(null);
-  const [attributeTab, setAttributeTab] = useState<'element' | 'flow'>('element');
   const [draggingGroupIndex, setDraggingGroupIndex] = useState<number | null>(null);
   const [dragOverGroupIndex, setDragOverGroupIndex] = useState<number | null>(null);
   const [viewportTransition, setViewportTransition] = useState<null | { targetId: string; durationMs?: number; easing?: FlowTransition["easing"]; _key: string }>(null);
-  const [newDialogOpen, setNewDialogOpen] = useState(false); // New design template dialog
-  const [openDialogOpen, setOpenDialogOpen] = useState(false); // Open design dialog
   const [currentDesignName, setCurrentDesignNameState] = useState<string | null>(getCurrentDesignName);
-  const [panelMode, setPanelMode] = useState<'attributes' | 'agent'>('attributes');
   const [fitToContentKey, setFitToContentKey] = useState(0); // Increment to trigger fit-to-content in CanvasStage
-  // Curve control point selection
-  const [selectedCurvePointIndex, setSelectedCurvePointIndex] = useState<number | null>(null);
   const [sidebarVisible, setSidebarVisible] = useState(true);
-  const [editingCurveId, setEditingCurveId] = useState<string | null>(null);
   const blockCanvasClicksRef = useRef(false);
   const skipNormalizationRef = useRef(false);
   const appVersion = import.meta.env.VITE_APP_VERSION ?? '0.0.0';
@@ -385,8 +413,6 @@ export default function CanvasApp() {
       setCurrentCanvasIdRaw(localStorage.getItem(canvasIdStorageKey));
     } catch { setCurrentCanvasIdRaw(null); }
   }, [canvasIdStorageKey]);
-  const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
-  const [viewingProposedSpec, setViewingProposedSpec] = useState(false);
   const [creatingCanvasId, setCreatingCanvasId] = useState(false);
   
   const proposals = useProposals({
@@ -395,7 +421,8 @@ export default function CanvasApp() {
     refreshInterval: currentCanvasId ? 30000 : 0, // Poll every 30s when shared
   });
 
-  const pushRecent = useCallback((col: string) => { commitRecent(col); }, [commitRecent]);
+  const pushRecent = useCallback((col?: string) => { if (col) commitRecent(col); }, [commitRecent]);
+  const wrappedPreviewRecent = useCallback((col?: string) => { if (col) previewRecent(col); }, [previewRecent]);
 
   const updateFlows = useCallback((nextFlows: Flow[]) => {
     setSpec(prev => ({ ...prev, flows: nextFlows }));
@@ -545,6 +572,27 @@ export default function CanvasApp() {
     setNewDialogOpen(false);
   }, [setSpec, setSelection, isCollaborative]);
 
+  // Dialog action callbacks
+  const handleStartCollaborativeSession = useCallback(() => {
+    const newRoomId = generateRoomId();
+    const url = new URL(window.location.href);
+    url.searchParams.set('room', newRoomId);
+    window.history.pushState({}, '', url.toString());
+    setRoomId(newRoomId);
+  }, []);
+
+  const handleLeaveCollaborativeSession = useCallback(() => {
+    // Leave collaborative mode
+    const url = new URL(window.location.href);
+    url.searchParams.delete('room');
+    window.history.pushState({}, '', url.toString());
+    setRoomId(null);
+    setShareDialogOpen(false);
+  }, []);
+
+  const handleCopyShareLink = useCallback(() => {
+    navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}?room=${roomId}`);
+  }, [roomId]);
 
   // Derive stage width/height from container size (padding adjustments if needed)
   const stageWidth = Math.max(0, canvasSize.width);
@@ -594,445 +642,65 @@ export default function CanvasApp() {
   return (
     <div className="h-screen w-screen overflow-hidden bg-gray-100 text-gray-900 flex flex-col">
       {/* Header */}
-      <header ref={headerRef} className="flex items-center justify-between border-b border-blue-900/30 bg-gradient-to-r from-blue-950 via-blue-900 to-cyan-700 shadow-lg select-none" style={{ padding: '20px' }}>
-        <div className="flex items-center gap-8">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-white/15 backdrop-blur flex items-center justify-center shadow-sm overflow-hidden">
-                <img src="/vizail-mark.svg" alt="Vizail" className="w-7 h-7" />
-              </div>
-              <h1 className="tracking-wide text-white" style={{ fontFamily: '"Cal Sans", "Cal Sans Semibold", sans-serif', fontWeight: 600, fontSize: '2em' }}>Viz<span className="text-cyan-300">ai</span>l</h1>
-            </div>
-            {/* File menu */}
-            <div className="relative">
-              <button
-                onClick={() => setFileOpen(o => !o)}
-                className={`text-sm px-3 py-1.5 rounded-md transition-colors duration-150 text-white/90 hover:bg-white/10 ${fileOpen ? 'bg-white/10' : ''}`}
-                aria-haspopup="true"
-                aria-expanded={fileOpen}
-              >
-                <i className="fa-regular fa-folder mr-1.5 text-cyan-300" />
-                File
-                <i className="fa-solid fa-chevron-down ml-1.5 text-[10px] text-white/50" />
-              </button>
-              {fileOpen && (
-                <div className="absolute left-0 mt-1.5 w-48 rounded-lg border border-gray-200 bg-white shadow-xl z-30 p-1.5 flex flex-col overflow-hidden">
-                  {[
-                    ["fa-regular fa-file", "New", "new", "⌘N"],
-                    ["fa-regular fa-folder-open", "Open…", "open", "⌘O"],
-                    ["fa-regular fa-floppy-disk", "Save", "save", "⌘S"],
-                    ["fa-solid fa-file-export", "Save As…", "saveAs", "⇧⌘S"],
-                  ].map(([icon, label, act, shortcut]) => (
-                    <button
-                      key={act}
-                      onClick={() => { fileAction(act); setFileOpen(false); }}
-                      className="w-full flex items-center justify-between px-3 py-2 text-sm rounded-md hover:bg-gray-100 transition-colors duration-100"
-                    >
-                      <span className="flex items-center gap-2.5">
-                        <i className={`${icon} text-gray-500 w-4`} />
-                        {label}
-                      </span>
-                      <span className="text-[10px] text-gray-400 font-mono">{shortcut}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            {/* Help menu */}
-            <div className="relative">
-              <button
-                onClick={() => setHelpOpen(o => !o)}
-                className={`text-sm px-3 py-1.5 rounded-md transition-colors duration-150 text-white/90 hover:bg-white/10 ${helpOpen ? 'bg-white/10' : ''}`}
-                aria-haspopup="true"
-                aria-expanded={helpOpen}
-              >
-                <i className="fa-regular fa-circle-question mr-1.5 text-cyan-300" />
-                Help
-                <i className="fa-solid fa-chevron-down ml-1.5 text-[10px] text-white/50" />
-              </button>
-              {helpOpen && (
-                <div className="absolute left-0 mt-1.5 w-52 rounded-lg border border-gray-200 bg-white shadow-xl z-30 p-1.5 flex flex-col overflow-hidden">
-                  <button
-                    onClick={() => { setAboutOpen(true); setHelpOpen(false); }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm rounded-md hover:bg-gray-100 transition-colors duration-100"
-                  >
-                    <i className="fa-solid fa-info-circle text-gray-500 w-4" />
-                    About
-                  </button>
-                  <button
-                    onClick={() => { setCheatOpen(true); setHelpOpen(false); }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm rounded-md hover:bg-gray-100 transition-colors duration-100"
-                  >
-                    <i className="fa-regular fa-keyboard text-gray-500 w-4" />
-                    Keyboard Shortcuts
-                  </button>
-                </div>
-              )}
-            </div>
-        </div>
-        <div className="flex items-center gap-4">
-          {/* Collaboration status (when in collaborative mode) */}
-          {isCollaborative && (
-            <div className="flex items-center gap-3">
-              <ConnectionStatusIndicator
-                status={status}
-                collaboratorCount={collaborators.size}
-                isSyncing={isSyncing}
-                lastError={lastError}
-                onReconnect={reconnect}
-              />
-              <ActiveUsersList collaborators={collaborators} maxVisible={4} />
-            </div>
-          )}
-          {/* Share button */}
-          <button
-            onClick={() => setShareDialogOpen(true)}
-            className="flex items-center gap-2 text-sm font-medium text-white bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 px-4 py-2 rounded-lg shadow-md transition-all duration-150"
-          >
-            <i className="fa-solid fa-share-nodes" />
-            Share
-          </button>
-          
-          {/* Tool indicator */}
-          <div className="flex items-center gap-2 text-xs font-medium text-white/90 bg-white/15 backdrop-blur px-4 py-2 rounded-full border border-white/10">
-            <i className="fa-solid fa-wand-magic-sparkles text-cyan-300" />
-            <span className="capitalize">{tool}</span>
-          </div>
-        </div>
-      </header>
-      {/* Modals */}
-      {/* Share / Collaboration Dialog */}
-      <Modal open={shareDialogOpen} onClose={() => setShareDialogOpen(false)} title="Share & Collaborate" size="md" variant="light">
-        <div className="space-y-4">
-          {isCollaborative ? (
-            <>
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <div className="flex items-center gap-2 text-green-700 font-medium mb-2">
-                  <i className="fa-solid fa-check-circle" />
-                  You're in a collaborative session
-                </div>
-                <p className="text-sm text-green-600">
-                  Share this link with others to collaborate in real-time:
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  readOnly
-                  value={`${window.location.origin}${window.location.pathname}?room=${roomId}`}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-sm font-mono"
-                  onClick={(e) => (e.target as HTMLInputElement).select()}
-                />
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}?room=${roomId}`);
-                  }}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
-                >
-                  <i className="fa-regular fa-copy mr-1.5" />
-                  Copy
-                </button>
-              </div>
-              <div className="border-t border-gray-200 pt-4">
-                <button
-                  onClick={() => {
-                    // Leave collaborative mode
-                    const url = new URL(window.location.href);
-                    url.searchParams.delete('room');
-                    window.history.pushState({}, '', url.toString());
-                    setRoomId(null);
-                    setShareDialogOpen(false);
-                  }}
-                  className="text-sm text-red-600 hover:text-red-700"
-                >
-                  <i className="fa-solid fa-arrow-right-from-bracket mr-1.5" />
-                  Leave collaborative session
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <p className="text-sm text-gray-600">
-                Start a collaborative session to work with others in real-time. 
-                Everyone with the link can see and edit the design together.
-              </p>
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div className="flex items-center gap-2 text-blue-700 font-medium mb-2">
-                  <i className="fa-solid fa-users" />
-                  Real-time collaboration features:
-                </div>
-                <ul className="text-sm text-blue-600 space-y-1 ml-6 list-disc">
-                  <li>See other users' cursors in real-time</li>
-                  <li>View who has what selected</li>
-                  <li>Changes sync instantly across all users</li>
-                  <li>Works with humans and AI agents</li>
-                </ul>
-              </div>
-              <button
-                onClick={() => {
-                  const newRoomId = generateRoomId();
-                  const url = new URL(window.location.href);
-                  url.searchParams.set('room', newRoomId);
-                  window.history.pushState({}, '', url.toString());
-                  setRoomId(newRoomId);
-                }}
-                className="w-full px-4 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-lg hover:from-cyan-400 hover:to-blue-400 transition-all text-sm font-medium shadow-md"
-              >
-                <i className="fa-solid fa-play mr-2" />
-                Start Collaborative Session
-              </button>
-            </>
-          )}
-        </div>
-      </Modal>
-      <Modal open={aboutOpen} onClose={() => setAboutOpen(false)} title="About Vizail" size="sm" variant="light">
-        <p><strong>Vizail</strong> version <code>{appVersion}</code></p>
-        <p className="mt-2">Experimental canvas + layout editor. Transforms are baked to schema on release.</p>
-        <p className="mt-4 opacity-70 text-[10px]">© {new Date().getFullYear()} Vizail</p>
-      </Modal>
-      <Modal open={cheatOpen} onClose={() => setCheatOpen(false)} title="Interaction Cheatsheet" size="sm" variant="light">
-        <ul className="space-y-1 list-disc pl-4 pr-1 max-h-72 overflow-auto text-xs">
-          <li>Select: Click; Shift/Ctrl multi; marquee drag empty space.</li>
-          <li>Pan: Space+Drag / Middle / Alt+Drag.</li>
-          <li>Zoom: Wheel (cursor focus).</li>
-          <li>Resize: Drag handles; Shift=aspect; Alt=center; Shift+Alt=center+aspect.</li>
-          <li>Rotate: Handle (snaps 0/90/180/270).</li>
-          <li>Images: Non-uniform stretch disables aspect; context menu to restore.</li>
-          <li><strong>Tool Shortcuts:</strong> V=Select, R=Rectangle, O=Ellipse, L=Line, P=Curve, T=Text, I=Image.</li>
-          <li>Rectangle/Ellipse: Drag to draw; Shift=circle/square; Alt=center-out.</li>
-          <li>Line: Click and drag to draw a straight line.</li>
-          <li>Curve: Click to add points, Enter or double-click to finish.</li>
-          <li>Text/Image: Click to place at cursor position.</li>
-          <li>Group: Ctrl/Cmd+G; Ungroup: Ctrl/Cmd+Shift+G.</li>
-          <li>Duplicate: Ctrl/Cmd+D. Delete: Del/Backspace.</li>
-          <li>Nudge: Arrows (1px) / Shift+Arrows (10px).</li>
-        </ul>
-      </Modal>
-      <Modal open={iconLibraryOpen} onClose={() => setIconLibraryOpen(false)} title="Icons" size="md" variant="light">
-        <p className="text-xs text-gray-600 mb-3">Choose an icon to place on the canvas.</p>
-        <div className="relative mb-3">
-          <i className="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-[10px]" />
-          <input
-            value={iconSearch}
-            onChange={(e) => setIconSearch(e.target.value)}
-            placeholder="Search icons..."
-            className="w-full border border-gray-200 rounded-md pl-7 pr-2 py-2 text-[11px] bg-white focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition-colors"
-          />
-        </div>
-        {(() => {
-          const q = iconSearch.trim().toLowerCase();
-          const filteredIcons = q
-            ? ICON_LIBRARY.filter((icon) => icon.label.toLowerCase().includes(q) || icon.id.toLowerCase().includes(q))
-            : ICON_LIBRARY;
-
-          return (
-            <>
-              <div className="grid grid-cols-4 gap-2 max-h-[50vh] overflow-y-auto pr-1">
-                {filteredIcons.map((icon) => {
-                  const [w, h, , , d] = icon.icon.icon;
-                  const path = Array.isArray(d) ? d.join(' ') : d;
-                  return (
-                    <button
-                      key={icon.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedIconId(icon.id);
-                        setIconLibraryOpen(false);
-                      }}
-                      className={`flex flex-col items-center justify-center gap-1.5 px-2 py-2 rounded-lg border text-[10px] transition-colors ${
-                        selectedIconId === icon.id
-                          ? 'border-blue-500 bg-blue-50 text-blue-700'
-                          : 'border-gray-200 hover:bg-gray-50 text-gray-600'
-                      }`}
-                    >
-                      <svg viewBox={`0 0 ${w} ${h}`} className="w-4 h-4" fill="currentColor" aria-hidden="true">
-                        <path d={path} />
-                      </svg>
-                      <span className="truncate w-full text-center">{icon.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-              {filteredIcons.length === 0 && (
-                <div className="mt-3 text-[11px] text-gray-500">No icons match “{iconSearch}”.</div>
-              )}
-            </>
-          );
-        })()}
-      </Modal>
-      <Modal open={componentLibraryOpen} onClose={() => setComponentLibraryOpen(false)} title="Components" size="md" variant="light">
-        <p className="text-xs text-gray-600 mb-3">Choose a component to place on the canvas.</p>
-        <div className="grid grid-cols-1 gap-2 max-h-[50vh] overflow-y-auto pr-1">
-          {COMPONENT_LIBRARY.map((component) => (
-            <button
-              key={component.id}
-              type="button"
-              onClick={() => {
-                setSelectedComponentId(component.id);
-                setComponentLibraryOpen(false);
-              }}
-              className={`flex items-center gap-3 px-3 py-2 rounded-lg border text-left transition-colors ${
-                selectedComponentId === component.id
-                  ? 'border-blue-500 bg-blue-50'
-                  : 'border-gray-200 hover:bg-gray-50'
-              }`}
-            >
-              <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center text-gray-500">
-                <i className={`${component.iconClassName}`} />
-              </div>
-              <div>
-                <div className="text-sm font-medium text-gray-800">{component.name}</div>
-                <div className="text-[11px] text-gray-500">{component.description}</div>
-              </div>
-            </button>
-          ))}
-        </div>
-      </Modal>
-      {/* New Design Template Dialog */}
-      <Modal open={newDialogOpen} onClose={() => setNewDialogOpen(false)} title="Create New Design" size="lg" variant="light">
-        <p className="text-sm text-gray-600 mb-4">Choose a template to get started:</p>
-        <div className="grid grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto pr-1">
-          {TEMPLATES.map((template) => (
-            <button
-              key={template.id}
-              onClick={() => applyTemplate(template.id)}
-              className="flex flex-col items-start p-4 rounded-lg border border-gray-200 bg-white hover:border-blue-400 hover:bg-blue-50 transition-all duration-150 text-left group"
-            >
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white shadow-sm group-hover:scale-105 transition-transform">
-                  <i className={`${template.icon} text-lg`} />
-                </div>
-                <span className="font-medium text-gray-900">{template.name}</span>
-              </div>
-              <p className="text-xs text-gray-500 leading-relaxed">{template.description}</p>
-            </button>
-          ))}
-        </div>
-      </Modal>
-      {/* Open Design Dialog */}
-      <Modal open={openDialogOpen} onClose={() => setOpenDialogOpen(false)} title="Open Design" size="lg" variant="light">
-        <p className="text-sm text-gray-600 mb-4">Select a saved design to open:</p>
-        {(() => {
-          const designs = getSavedDesigns();
-          if (designs.length === 0) {
-            return (
-              <div className="text-center py-8 text-gray-500">
-                <i className="fa-regular fa-folder-open text-4xl mb-3 text-gray-300" />
-                <p>No saved designs yet.</p>
-                <p className="text-sm mt-1">Use "Save" or "Save As" to save your work.</p>
-              </div>
-            );
-          }
-          return (
-            <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
-              {designs
-                .sort((a, b) => b.savedAt - a.savedAt)
-                .map((design) => (
-                  <button
-                    key={design.name}
-                    onClick={() => loadDesign(design)}
-                    className="w-full flex items-center justify-between p-4 rounded-lg border border-gray-200 bg-white hover:border-blue-400 hover:bg-blue-50 transition-all duration-150 text-left group"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white shadow-sm group-hover:scale-105 transition-transform">
-                        <i className="fa-regular fa-file text-lg" />
-                      </div>
-                      <div>
-                        <span className="font-medium text-gray-900 block">{design.name}</span>
-                        <span className="text-xs text-gray-500">
-                          {new Date(design.savedAt).toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
-                    <i className="fa-solid fa-arrow-right text-gray-400 group-hover:text-blue-500 transition-colors" />
-                  </button>
-                ))}
-            </div>
-          );
-        })()}
-      </Modal>
+      <HeaderToolbar
+        headerRef={headerRef}
+        fileOpen={fileOpen}
+        setFileOpen={setFileOpen}
+        fileAction={fileAction}
+        helpOpen={helpOpen}
+        setHelpOpen={setHelpOpen}
+        setAboutOpen={setAboutOpen}
+        setCheatOpen={setCheatOpen}
+        isCollaborative={isCollaborative}
+        status={status}
+        collaborators={collaborators}
+        isSyncing={isSyncing}
+        lastError={lastError}
+        reconnect={reconnect}
+        setShareDialogOpen={setShareDialogOpen}
+        tool={tool}
+      />
+      {/* Dialogs */}
+      <DialogManager
+        shareDialogOpen={shareDialogOpen}
+        setShareDialogOpen={setShareDialogOpen}
+        aboutOpen={aboutOpen}
+        setAboutOpen={setAboutOpen}
+        cheatOpen={cheatOpen}
+        setCheatOpen={setCheatOpen}
+        iconLibraryOpen={iconLibraryOpen}
+        setIconLibraryOpen={setIconLibraryOpen}
+        componentLibraryOpen={componentLibraryOpen}
+        setComponentLibraryOpen={setComponentLibraryOpen}
+        newDialogOpen={newDialogOpen}
+        setNewDialogOpen={setNewDialogOpen}
+        openDialogOpen={openDialogOpen}
+        setOpenDialogOpen={setOpenDialogOpen}
+        isCollaborative={isCollaborative}
+        roomId={roomId}
+        selectedIconId={selectedIconId}
+        setSelectedIconId={setSelectedIconId}
+        iconSearch={iconSearch}
+        setIconSearch={setIconSearch}
+        selectedComponentId={selectedComponentId}
+        setSelectedComponentId={setSelectedComponentId}
+        appVersion={appVersion}
+        onApplyTemplate={applyTemplate}
+        onLoadDesign={loadDesign}
+        onStartCollaborativeSession={handleStartCollaborativeSession}
+        onLeaveCollaborativeSession={handleLeaveCollaborativeSession}
+        onCopyShareLink={handleCopyShareLink}
+        templates={TEMPLATES}
+      />
       {/* Body layout */}
       <div className="flex flex-1 min-h-0">
         {/* Left toolbar */}
-        <aside className="w-14 border-r border-gray-200 bg-gradient-to-b from-white to-gray-50 flex flex-col items-center py-3 gap-1 shadow-sm">
-          {[
-            { icon: "fa-solid fa-arrow-pointer", val: "select", tooltip: "Select (V)" },
-            { icon: "fa-regular fa-square", val: "rect", tooltip: "Rectangle (R)" },
-            { icon: "fa-regular fa-circle", val: "ellipse", tooltip: "Ellipse (O)" },
-            { icon: "fa-solid fa-minus", val: "line", tooltip: "Line (L)" },
-            { icon: "fa-solid fa-bezier-curve", val: "curve", tooltip: "Curve (P)" },
-            { icon: "fa-solid fa-font", val: "text", tooltip: "Text (T)" },
-            { icon: "fa-regular fa-image", val: "image", tooltip: "Image (I)" },
-            { icon: "fa-solid fa-icons", val: "icon", tooltip: "Icon Library" },
-            { icon: "fa-solid fa-layer-group", val: "component", tooltip: "Components" },
-          ].map(({ icon, val, tooltip }) => (
-            <button
-              key={val}
-              onClick={() => {
-                if (val === 'icon') {
-                  setTool('icon');
-                  setIconLibraryOpen(true);
-                  return;
-                }
-                if (val === 'component') {
-                  setTool('component');
-                  setComponentLibraryOpen(true);
-                  return;
-                }
-                setTool(val);
-              }}
-              title={tooltip}
-              className={`relative w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-150 ${
-                tool === val 
-                  ? "text-white" 
-                  : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-              }`}
-            >
-              {tool === val && (
-                <span className="absolute inset-0 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow-md" />
-              )}
-              <i className={`${icon} text-base relative z-10`} />
-            </button>
-          ))}
-          <div className="flex-1" />
-          <div className="flex flex-col gap-1 mb-2">
-            <button
-              onClick={() => setTool('zoom')}
-              title="Zoom tool (click to zoom in, Alt-click to zoom out)"
-              className={`relative w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-150 ${
-                tool === 'zoom'
-                  ? "text-white"
-                  : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-              }`}
-            >
-              {tool === 'zoom' && (
-                <span className="absolute inset-0 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow-md" />
-              )}
-              <i className="fa-solid fa-magnifying-glass text-base relative z-10" />
-            </button>
-            <button
-              onClick={() => setTool('pan')}
-              title="Pan tool (drag to pan)"
-              className={`relative w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-150 ${
-                tool === 'pan'
-                  ? "text-white"
-                  : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-              }`}
-            >
-              {tool === 'pan' && (
-                <span className="absolute inset-0 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow-md" />
-              )}
-              <i className="fa-regular fa-hand text-base relative z-10" />
-            </button>
-          </div>
-          <div className="w-8 h-px bg-gray-200 my-2" />
-          <button
-            onClick={() => setCheatOpen(true)}
-            title="Keyboard shortcuts"
-            className="w-10 h-10 rounded-lg flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-all duration-150"
-          >
-            <i className="fa-regular fa-keyboard text-base" />
-          </button>
-        </aside>
+        <LeftToolbar
+          tool={tool}
+          setTool={setTool}
+          setIconLibraryOpen={setIconLibraryOpen}
+          setComponentLibraryOpen={setComponentLibraryOpen}
+        />
         {/* Canvas center */}
         <main 
           className="flex-1 relative min-w-0"
@@ -1303,758 +971,63 @@ export default function CanvasApp() {
             </div>
             <div className="p-4 text-xs text-gray-600 space-y-4 overflow-auto flex-1">
               {panelMode === 'attributes' && (
-                <>
-              {/* Show CV panel when editing a curve */}
-              {editingCurveId && (() => {
-                const curveNode = findNode(spec.root, editingCurveId) as CurveNode | null;
-                if (!curveNode || curveNode.type !== 'curve') return null;
-                
-                const points = curveNode.points as number[];
-                const cvPoints: Array<{x: number, y: number, index: number}> = [];
-                for (let i = 0; i < points.length; i += 2) {
-                  cvPoints.push({ x: points[i], y: points[i + 1], index: i / 2 });
-                }
-                
-                return (
-                  <div className="space-y-4">
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <h3 className="text-sm font-semibold text-blue-900">Curve Editing Mode</h3>
-                        <button
-                          onClick={() => setEditingCurveId(null)}
-                          className="text-xs px-2 py-1 bg-white border border-blue-300 rounded hover:bg-blue-50 transition-colors"
-                        >
-                          Exit
-                        </button>
-                      </div>
-                      <p className="text-[11px] text-blue-700">Press Enter or Escape to exit</p>
-                    </div>
-                    
-                    <div>
-                      <h4 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Control Points ({cvPoints.length})</h4>
-                      <div className="space-y-2">
-                        {cvPoints.map((cv) => (
-                          <div
-                            key={cv.index}
-                            className={`p-2 rounded border ${
-                              selectedCurvePointIndex === cv.index
-                                ? 'bg-blue-50 border-blue-300'
-                                : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
-                            } transition-colors cursor-pointer`}
-                            onClick={() => setSelectedCurvePointIndex(cv.index)}
-                          >
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-[11px] font-medium">Point {cv.index + 1}</span>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  // Delete this CV point
-                                  const newPoints = [...points];
-                                  newPoints.splice(cv.index * 2, 2);
-                                  setSpec(prev => ({
-                                    ...prev,
-                                    root: updateNode(prev.root, editingCurveId, { points: newPoints })
-                                  }));
-                                  if (selectedCurvePointIndex === cv.index) {
-                                    setSelectedCurvePointIndex(null);
-                                  }
-                                }}
-                                className="text-[10px] px-2 py-0.5 text-red-600 hover:bg-red-50 rounded border border-red-200 transition-colors"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                            <div className="text-[10px] text-gray-500">
-                              x: {Math.round(cv.x)}, y: {Math.round(cv.y)}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <h4 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Curve Properties</h4>
-                      <CurveAttributesPanel
-                        curve={curveNode}
-                        updateNode={(patch) => {
-                          setSpec(prev => ({
-                            ...prev,
-                            root: updateNode(prev.root, editingCurveId, patch)
-                          }));
-                        }}
-                        selectedPointIndex={selectedCurvePointIndex}
-                        setSelectedPointIndex={setSelectedCurvePointIndex}
-                        beginRecentSession={beginRecentSession}
-                        previewRecent={previewRecent}
-                        commitRecent={commitRecent}
-                        pushRecent={pushRecent}
-                        recentColors={recentColors}
-                      />
-                    </div>
-                  </div>
-                );
-              })()}
-              
-              {/* Regular attribute panels when not editing curve */}
-              {!editingCurveId && (
-                <>
-            <div className="bg-gray-100/70 rounded-lg p-3 space-y-2">
-              <p className="text-[10px] uppercase tracking-wider font-semibold text-gray-500 flex items-center gap-1.5">
-                <i className="fa-solid fa-circle-info text-blue-400" />
-                Context
-              </p>
-              <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11px]">
-                <span className="text-gray-400">Tool</span><span className="font-medium capitalize">{tool}</span>
-                <span className="text-gray-400">Nodes</span><span className="font-medium">{spec.root.children.length}</span>
-                <span className="text-gray-400">Selected</span><span className="font-medium">{selectedIds.length}</span>
-              </div>
-            </div>
-            {selectedIds.length === 1 && (() => {
-              // Find node
-              const node = findNode(spec.root, selectedIds[0]) as LayoutNode | null;
-              if (!node) return <div className="text-[11px] text-gray-400">Node not found.</div>;
-              
-              const createUpdateFn = (nodeId: string) => (patch: SpecPatch) => {
-                setSpec(prev => ({
-                  ...prev,
-                  root: updateNode(prev.root, nodeId, patch)
-                }));
-              };
-
-              // All nodes can be marked as screens for flow
-              const isScreenEligible = true;
-              const screenMeta = node.screen;
-              const flows = spec.flows ?? [];
-
-              const removeScreenFromFlows = (screenId: string) => {
-                const nextFlows = flows
-                  .map(f => ({
-                    ...f,
-                    screenIds: f.screenIds.filter(id => id !== screenId),
-                    transitions: f.transitions.filter(t => t.from !== screenId && t.to !== screenId),
-                  }))
-                  .filter(f => f.screenIds.length > 0);
-                updateFlows(nextFlows);
-              };
-
-              const screenPanel = isScreenEligible ? (
-                <div className="space-y-2">
-                  <div className="text-[11px] font-semibold text-gray-600 flex items-center gap-2">
-                    <i className="fa-solid fa-rectangle-list text-gray-400 text-[10px]" />
-                    Screen
-                  </div>
-                  <label className="flex items-center gap-2 text-[11px]">
-                    <input
-                      type="checkbox"
-                      checked={!!screenMeta}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          const name = (node.name || `Screen ${selectedIds[0].slice(0, 4)}`) as string;
-                          createUpdateFn(node.id)({ screen: { id: node.id, name } });
-                          if (!flows.some(f => f.screenIds.includes(node.id))) {
-                            const id = `flow_${Date.now().toString(36)}`;
-                            updateFlows([...flows, { id, name: `Flow ${flows.length + 1}`, screenIds: [node.id], transitions: [] }]);
-                            setActiveFlowId(id);
-                          }
-                        } else {
-                          createUpdateFn(node.id)({ screen: undefined });
-                          removeScreenFromFlows(node.id);
-                        }
-                      }}
-                    />
-                    Mark as Screen
-                  </label>
-                  {screenMeta && (
-                    <input
-                      value={screenMeta.name}
-                      onChange={(e) => createUpdateFn(node.id)({ screen: { id: node.id, name: e.target.value } })}
-                      className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-[11px]"
-                      placeholder="Screen name"
-                    />
-                  )}
-                </div>
-              ) : null;
-
-              const flowPanel = screenMeta ? (
-                <FlowAttributesPanel
-                  flows={flows}
+                <AttributesSidebar
+                  spec={spec}
+                  setSpec={setSpec}
+                  selectedIds={selectedIds}
+                  tool={tool}
+                  editingCurveId={editingCurveId}
+                  setEditingCurveId={setEditingCurveId}
+                  selectedCurvePointIndex={selectedCurvePointIndex}
+                  setSelectedCurvePointIndex={setSelectedCurvePointIndex}
+                  attributeTab={attributeTab}
+                  setAttributeTab={setAttributeTab}
+                  draggingGroupIndex={draggingGroupIndex}
+                  setDraggingGroupIndex={setDraggingGroupIndex}
+                  dragOverGroupIndex={dragOverGroupIndex}
+                  setDragOverGroupIndex={setDragOverGroupIndex}
+                  lastFillById={lastFillById}
+                  setLastFillById={setLastFillById}
+                  lastStrokeById={lastStrokeById}
+                  setLastStrokeById={setLastStrokeById}
+                  rawDashInput={rawDashInput}
+                  setRawDashInput={setRawDashInput}
+                  beginRecentSession={beginRecentSession}
+                  previewRecent={wrappedPreviewRecent}
+                  commitRecent={commitRecent}
+                  pushRecent={pushRecent}
+                  recentColors={recentColors}
+                  rectDefaults={rectDefaults}
+                  updateRectDefaults={updateRectDefaults}
                   activeFlowId={activeFlowId}
                   setActiveFlowId={setActiveFlowId}
-                  screenId={screenMeta.id}
-                  screenName={screenMeta.name}
-                  onUpdateFlows={updateFlows}
-                  onFocusScreen={focusScreen}
-                  onSelectScreen={focusScreen}
-                  onTriggerTransition={(toId, transition) => {
-                    focusScreen(toId);
-                    playTransitionPreview(toId, transition);
-                  }}
+                  updateFlows={updateFlows}
+                  focusScreen={focusScreen}
+                  playTransitionPreview={playTransitionPreview}
+                  setSelection={setSelection}
+                  isCollaborative={isCollaborative}
+                  updateSelection={updateSelection}
+                  blockCanvasClicksRef={blockCanvasClicksRef}
+                  skipNormalizationRef={skipNormalizationRef}
                 />
-              ) : null;
-
-              const screenFlowPanel = isScreenEligible ? (
-                <>
-                  {screenPanel}
-                  {flowPanel}
-                </>
-              ) : (
-                <div className="text-[11px] text-gray-400">Screen/flow attributes are available for groups, frames, stacks, grids, and boxes.</div>
-              );
-
-              const renderElementPanelFor = (targetNode: LayoutNode): JSX.Element => {
-                if (targetNode.type === 'rect') {
-                  const rect = targetNode as RectNode;
-                  const updateRect = createUpdateFn(rect.id);
-                  return (
-                    <RectAttributesPanel
-                      rect={rect}
-                      lastFillById={lastFillById}
-                      lastStrokeById={lastStrokeById}
-                      setLastFillById={setLastFillById}
-                      setLastStrokeById={setLastStrokeById}
-                      updateRect={updateRect}
-                      rawDashInput={rawDashInput}
-                      setRawDashInput={setRawDashInput}
-                      beginRecentSession={beginRecentSession}
-                      previewRecent={previewRecent}
-                      commitRecent={commitRecent}
-                      pushRecent={pushRecent}
-                      recentColors={recentColors}
-                    />
-                  );
-                }
-
-                if (targetNode.type === 'ellipse') {
-                  const ellipse = targetNode as EllipseNode;
-                  const updateEllipse = createUpdateFn(ellipse.id);
-                  return (
-                    <EllipseAttributesPanel
-                      ellipse={ellipse}
-                      lastFillById={lastFillById}
-                      lastStrokeById={lastStrokeById}
-                      setLastFillById={setLastFillById}
-                      setLastStrokeById={setLastStrokeById}
-                      updateNode={updateEllipse}
-                      beginRecentSession={beginRecentSession}
-                      previewRecent={previewRecent}
-                      commitRecent={commitRecent}
-                      pushRecent={pushRecent}
-                      recentColors={recentColors}
-                    />
-                  );
-                }
-
-                if (targetNode.type === 'line') {
-                  const line = targetNode as LineNode;
-                  const updateLine = createUpdateFn(line.id);
-                  return (
-                    <LineAttributesPanel
-                      line={line}
-                      updateNode={updateLine}
-                      beginRecentSession={beginRecentSession}
-                      previewRecent={previewRecent}
-                      commitRecent={commitRecent}
-                      pushRecent={pushRecent}
-                      recentColors={recentColors}
-                    />
-                  );
-                }
-
-                if (targetNode.type === 'curve') {
-                  const curve = targetNode as CurveNode;
-                  const updateCurve = createUpdateFn(curve.id);
-                  return (
-                    <CurveAttributesPanel
-                      curve={curve}
-                      updateNode={updateCurve}
-                      selectedPointIndex={selectedCurvePointIndex}
-                      setSelectedPointIndex={setSelectedCurvePointIndex}
-                      beginRecentSession={beginRecentSession}
-                      previewRecent={previewRecent}
-                      commitRecent={commitRecent}
-                      pushRecent={pushRecent}
-                      recentColors={recentColors}
-                    />
-                  );
-                }
-
-                if (targetNode.type === 'text') {
-                  const textNode = targetNode as TextNode;
-                  const updateText = createUpdateFn(textNode.id);
-                  return (
-                    <TextAttributesPanel
-                      textNode={textNode}
-                      updateNode={updateText}
-                      beginRecentSession={beginRecentSession}
-                      previewRecent={previewRecent}
-                      commitRecent={commitRecent}
-                      pushRecent={pushRecent}
-                      recentColors={recentColors}
-                    />
-                  );
-                }
-
-                if (targetNode.type === 'image') {
-                  const imageNode = targetNode as ImageNode;
-                  const updateImage = createUpdateFn(imageNode.id);
-                  return (
-                    <ImageAttributesPanel
-                      imageNode={imageNode}
-                      updateNode={updateImage}
-                    />
-                  );
-                }
-
-                return <div className="text-[11px] text-gray-400">No editable attributes for type: {targetNode.type}</div>;
-              };
-
-              const elementPanel = renderElementPanelFor(node);
-              const groupChildren = node.children;
-              const hasChildren = Array.isArray(groupChildren) && groupChildren.length > 0;
-              
-              // Always show Screen/Flow option for all elements
-              const showScreenFlowTab = isScreenEligible;
-              
-              const moveChild = (fromIndex: number, toIndex: number) => {
-                if (!groupChildren) return;
-                if (toIndex < 0 || toIndex >= groupChildren.length) return;
-                const nextChildren = [...groupChildren];
-                const [moved] = nextChildren.splice(fromIndex, 1);
-                nextChildren.splice(toIndex, 0, moved);
-                createUpdateFn(node.id)({ children: nextChildren });
-              };
-
-              const orderedChildren = groupChildren
-                ? groupChildren.map((child, index) => ({ child, index })).reverse()
-                : [];
-
-              const moveChildByDisplayIndex = (fromDisplayIndex: number, toDisplayIndex: number) => {
-                if (!groupChildren) return;
-                if (toDisplayIndex < 0 || toDisplayIndex >= orderedChildren.length) return;
-                const fromOriginal = orderedChildren[fromDisplayIndex].index;
-                const toOriginal = orderedChildren[toDisplayIndex].index;
-                if (fromOriginal === toOriginal) return;
-                moveChild(fromOriginal, toOriginal);
-              };
-
-              const groupPanel = hasChildren ? (
-                <div className="space-y-2">
-                  <div className="text-[11px] font-semibold text-gray-600 flex items-center gap-2">
-                    <i className="fa-solid fa-layer-group text-gray-400 text-[10px]" />
-                    Elements
-                  </div>
-                  <div className="space-y-2">
-                    {orderedChildren.map(({ child }, displayIndex) => (
-                      <details
-                        key={child.id}
-                        className={`rounded-md border ${dragOverGroupIndex === displayIndex ? 'border-blue-400' : 'border-gray-200'} bg-white/70`}
-                        onDragOver={(e) => {
-                          e.preventDefault();
-                          setDragOverGroupIndex(displayIndex);
-                        }}
-                        onDragEnter={(e) => {
-                          e.preventDefault();
-                          setDragOverGroupIndex(displayIndex);
-                        }}
-                        onDragLeave={() => {
-                          if (dragOverGroupIndex === displayIndex) setDragOverGroupIndex(null);
-                        }}
-                        onDrop={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          if (draggingGroupIndex === null) return;
-                          moveChildByDisplayIndex(draggingGroupIndex, displayIndex);
-                          setDraggingGroupIndex(null);
-                          setDragOverGroupIndex(null);
-                        }}
-                      >
-                        <summary
-                          className="cursor-pointer select-none px-2 py-1.5 text-[11px] text-gray-600 flex items-center justify-between gap-2"
-                          draggable
-                          onDragStart={(e) => {
-                            e.dataTransfer.effectAllowed = 'move';
-                            e.dataTransfer.setData('text/plain', child.id);
-                            setDraggingGroupIndex(displayIndex);
-                            setDragOverGroupIndex(displayIndex);
-                          }}
-                          onDragEnd={() => {
-                            setDraggingGroupIndex(null);
-                            setDragOverGroupIndex(null);
-                          }}
-                        >
-                          <span
-                            className="mr-1 inline-flex h-5 w-5 items-center justify-center rounded border border-gray-200 text-gray-400 hover:text-gray-600 cursor-grab"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                            }}
-                            aria-label="Reorder layer"
-                          >
-                            <i className="fa-solid fa-grip-vertical text-[10px]" />
-                          </span>
-                          <span className="font-medium truncate">
-                            {child.name ?? (child.type === 'text' ? child.text : undefined) ?? `Untitled ${child.type}`}
-                          </span>
-                          <span className="ml-auto text-[10px] uppercase tracking-wide text-gray-400">{child.type}</span>
-                        </summary>
-                        <div className="px-2 py-2 space-y-2">
-                          <div className="space-y-1">
-                            <div className="text-[10px] uppercase tracking-wider text-gray-400">Name</div>
-                            <input
-                              value={(child.name as string) ?? ''}
-                              onChange={(e) => createUpdateFn(child.id)({ name: e.target.value })}
-                              className="w-full border border-gray-200 rounded-md px-2 py-1 text-[11px]"
-                              placeholder="Layer name"
-                            />
-                          </div>
-                          {/* Navigate into nested groups */}
-                          {(['group', 'frame', 'stack', 'grid'].includes(child.type) && 'children' in child && (child.children as any[]).length > 0) && (
-                            <button
-                              type="button"
-                              onMouseDown={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                // Set flags IMMEDIATELY on mousedown, before canvas events
-                                blockCanvasClicksRef.current = true;
-                                skipNormalizationRef.current = true;
-                              }}
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                e.nativeEvent.stopImmediatePropagation();
-                                
-                                const targetId = child.id;
-                                // Skip normalization for nested group selection
-                                skipNormalizationRef.current = true;
-                                setSelection([targetId]);
-                                // Also sync to collaboration if enabled
-                                if (isCollaborative) {
-                                  updateSelection([targetId]);
-                                }
-                                // Reset flags after a short delay
-                                setTimeout(() => {
-                                  blockCanvasClicksRef.current = false;
-                                  skipNormalizationRef.current = false;
-                                }, 100);
-                              }}
-                              onMouseUp={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                              }}
-                              className="w-full px-2 py-1.5 text-[11px] bg-blue-50 text-blue-600 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors flex items-center justify-center gap-1.5"
-                            >
-                              <i className="fa-solid fa-arrow-right-to-bracket" />
-                              Edit Nested Group ({(child.children as any[]).length} children)
-                            </button>
-                          )}
-                          {renderElementPanelFor(child)}
-                        </div>
-                      </details>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="text-[11px] text-gray-400">No child elements to edit.</div>
-              );
-
-              // Check if this node has a parent that's a group/frame/stack/grid (but not the root)
-              const parentNode = findParentNode(spec.root, node.id);
-              const hasGroupParent = parentNode && parentNode.id !== spec.root.id && ['group', 'frame', 'stack', 'grid'].includes(parentNode.type);
-
-              // Show element panel alone if no children and no Screen/Flow support
-              if (!hasChildren && !showScreenFlowTab) {
-                return (
-                  <>
-                    {hasGroupParent && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          
-                          // Skip normalization for parent group selection
-                          skipNormalizationRef.current = true;
-                          setSelection([parentNode.id]);
-                          if (isCollaborative) {
-                            updateSelection([parentNode.id]);
-                          }
-                          // Reset flag after a short delay
-                          setTimeout(() => {
-                            skipNormalizationRef.current = false;
-                          }, 100);
-                        }}
-                        className="w-full px-2 py-1.5 mb-2 text-[11px] bg-gray-50 text-gray-600 border border-gray-200 rounded-md hover:bg-gray-100 transition-colors flex items-center justify-center gap-1.5"
-                      >
-                        <i className="fa-solid fa-arrow-left" />
-                        Back to Parent Group
-                      </button>
-                    )}
-                    {elementPanel}
-                  </>
-                );
-              }
-              
-              // Show tabs if has children OR supports Screen/Flow
-              if (hasChildren || showScreenFlowTab) {
-                return (
-                  <>
-                    {hasGroupParent && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          
-                          // Skip normalization for parent group selection
-                          skipNormalizationRef.current = true;
-                          setSelection([parentNode.id]);
-                          if (isCollaborative) {
-                            updateSelection([parentNode.id]);
-                          }
-                          // Reset flag after a short delay
-                          setTimeout(() => {
-                            skipNormalizationRef.current = false;
-                          }, 100);
-                        }}
-                        className="w-full px-2 py-1.5 mb-2 text-[11px] bg-gray-50 text-gray-600 border border-gray-200 rounded-md hover:bg-gray-100 transition-colors flex items-center justify-center gap-1.5"
-                      >
-                        <i className="fa-solid fa-arrow-left" />
-                        Back to Parent Group
-                      </button>
-                    )}
-                    <div className="flex items-center gap-1 rounded-md bg-gray-100 p-1 text-[11px]">
-                      <button
-                        className={`flex-1 rounded-md px-2 py-1 transition ${attributeTab === 'element' ? 'bg-white shadow-sm text-gray-700' : 'text-gray-500 hover:text-gray-700'}`}
-                        onClick={() => setAttributeTab('element')}
-                      >
-                        {hasChildren ? 'Group' : 'Element'}
-                      </button>
-                      {showScreenFlowTab && (
-                        <button
-                          className={`flex-1 rounded-md px-2 py-1 transition ${attributeTab === 'flow' ? 'bg-white shadow-sm text-gray-700' : 'text-gray-500 hover:text-gray-700'}`}
-                          onClick={() => setAttributeTab('flow')}
-                        >
-                          Screen/Flow
-                        </button>
-                      )}
-                    </div>
-                    {attributeTab === 'element' && hasChildren ? groupPanel : (attributeTab === 'flow' ? screenFlowPanel : elementPanel)}
-                  </>
-                );
-              }
-
-              return elementPanel;
-            })()}
-            {selectedIds.length !== 1 && tool==='rect' && selectedIds.length===0 && (
-              <DefaultsPanel
-                defaults={rectDefaults}
-                updateDefaults={updateRectDefaults}
-                beginRecentSession={beginRecentSession}
-                previewRecent={previewRecent}
-                commitRecent={commitRecent}
-                recentColors={recentColors}
-              />
-            )}
-            {selectedIds.length !== 1 && !(tool==='rect' && selectedIds.length===0) && (
-              <div className="text-[11px] text-gray-400">{selectedIds.length === 0 ? 'No selection' : 'Multiple selection (attributes coming soon).'}</div>
-            )}
-                </>
-              )}
-                </>
               )}
 
               {/* Agent Panel Content */}
               {panelMode === 'agent' && (
-                <>
-                  {/* Canvas ID Section */}
-                  <div className="space-y-2">
-                    <div className="text-xs font-semibold text-gray-700">Canvas ID</div>
-                    {currentCanvasId ? (
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="text"
-                            value={currentCanvasId}
-                            readOnly
-                            className="flex-1 px-2 py-1 text-xs font-mono bg-gray-50 border border-gray-200 rounded"
-                          />
-                          <button
-                            onClick={() => navigator.clipboard.writeText(currentCanvasId)}
-                            className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition"
-                            title="Copy to clipboard"
-                          >
-                            <i className="fa-solid fa-copy text-gray-600" />
-                          </button>
-                        </div>
-                        <div className="text-xs text-gray-500">Share this ID with agents to allow proposals</div>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={async () => {
-                          setCreatingCanvasId(true);
-                          try {
-                            const { apiClient } = await import('./api/client');
-                            const result = await apiClient.createCanvas(currentDesignName || 'Untitled Canvas', spec);
-                            if (result.data) {
-                              setCurrentCanvasId(result.data.id);
-                            } else {
-                              console.error('Failed to create canvas:', result.error);
-                            }
-                          } catch (err) {
-                            console.error('Error creating canvas:', err);
-                          } finally {
-                            setCreatingCanvasId(false);
-                          }
-                        }}
-                        disabled={creatingCanvasId}
-                        className="w-full px-3 py-2 bg-teal-600 text-white text-xs font-medium rounded hover:bg-teal-700 transition disabled:opacity-50"
-                      >
-                        {creatingCanvasId ? 'Creating...' : 'Share with Agent'}
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Proposals Section */}
-                  {currentCanvasId && (
-                    <>
-                      <div className="border-t pt-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="text-xs font-semibold text-gray-700">
-                        Proposals ({proposals.proposals.length})
-                      </div>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          proposals.refetch();
-                        }}
-                        className="text-xs text-blue-600 hover:text-blue-700 transition"
-                        disabled={proposals.loading}
-                      >
-                        {proposals.loading ? '↻ Loading...' : '↻ Refresh'}
-                      </button>
-                    </div>
-
-                    {proposals.error && (
-                      <div className="text-xs text-red-500 bg-red-50 border border-red-200 rounded p-2 mb-2">
-                        {proposals.error}
-                      </div>
-                    )}
-
-                    {proposals.loading && proposals.proposals.length === 0 && (
-                      <div className="text-xs text-gray-500 text-center py-4">Loading proposals...</div>
-                    )}
-
-                    {!proposals.loading && !proposals.error && proposals.proposals.filter(p => p.status === 'pending').length === 0 && (
-                      <div className="text-xs text-gray-500 text-center py-4">No pending proposals</div>
-                    )}
-
-                    {proposals.proposals.filter(p => p.status === 'pending').map((proposal) => (
-                      <div
-                        key={proposal.id}
-                        className={`border rounded-lg p-3 cursor-pointer transition mb-2 ${
-                          selectedProposalId === proposal.id
-                            ? 'border-blue-500 bg-blue-50'
-                            : 'border-gray-200 hover:border-blue-300'
-                        }`}
-                        onClick={() => {
-                          setSelectedProposalId(proposal.id);
-                          setViewingProposedSpec(false);
-                        }}
-                      >
-                        <div className="font-medium text-gray-900 mb-1 text-sm">{proposal.title}</div>
-                        <div className="text-xs text-gray-600 mb-2">{proposal.description}</div>
-                        <div className="flex items-center gap-2 text-xs text-gray-500">
-                          <span>{proposal.operations.length} change{proposal.operations.length !== 1 ? 's' : ''}</span>
-                          <span>•</span>
-                          <span>{Math.round(proposal.confidence * 100)}% confidence</span>
-                        </div>
-                      </div>
-                    ))}
-
-                    {/* Selected Proposal Details */}
-                    {selectedProposalId && (() => {
-                      const selectedProposal = proposals.proposals.find(p => p.id === selectedProposalId);
-                      if (!selectedProposal) return null;
-
-                      return (
-                        <div className="border-t pt-3 mt-3 space-y-3">
-                          <div className="text-xs font-semibold text-gray-700">Preview</div>
-                          
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => setViewingProposedSpec(false)}
-                              className={`flex-1 px-3 py-2 rounded text-xs font-medium transition ${
-                                !viewingProposedSpec
-                                  ? 'bg-gray-900 text-white'
-                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                              }`}
-                            >
-                              Current
-                            </button>
-                            <button
-                              onClick={() => setViewingProposedSpec(true)}
-                              className={`flex-1 px-3 py-2 rounded text-xs font-medium transition ${
-                                viewingProposedSpec
-                                  ? 'bg-green-600 text-white'
-                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                              }`}
-                            >
-                              Proposed
-                            </button>
-                          </div>
-                          
-                          <div className="bg-blue-50 border border-blue-200 rounded p-2 text-xs">
-                            <div className="font-semibold text-blue-900 mb-1">Rationale</div>
-                            <div className="text-blue-800">{selectedProposal.rationale}</div>
-                          </div>
-                          
-                          {selectedProposal.assumptions && selectedProposal.assumptions.length > 0 && (
-                            <div className="bg-amber-50 border border-amber-200 rounded p-2 text-xs">
-                              <div className="font-semibold text-amber-900 mb-1">Assumptions</div>
-                              <ul className="text-amber-800 space-y-1">
-                                {selectedProposal.assumptions.map((assumption, i) => (
-                                  <li key={i}>• {assumption}</li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                          
-                          <div className="flex gap-2 pt-2">
-                            <button
-                              onClick={async () => {
-                                const success = await proposals.approveProposal(selectedProposal.id);
-                                if (success) {
-                                  // Apply the proposal operations to the local spec so changes persist
-                                  const mergedSpec = applyProposalOperations(spec, selectedProposal.operations);
-                                  setSpec(mergedSpec);
-                                }
-                                setSelectedProposalId(null);
-                                setViewingProposedSpec(false);
-                              }}
-                              className="flex-1 px-3 py-2 bg-green-600 text-white rounded font-medium hover:bg-green-700 transition text-xs"
-                            >
-                              ✓ Approve
-                            </button>
-                            <button
-                              onClick={async () => {
-                                await proposals.rejectProposal(selectedProposal.id, 'User rejected');
-                                setSelectedProposalId(null);
-                                setViewingProposedSpec(false);
-                              }}
-                              className="flex-1 px-3 py-2 bg-red-600 text-white rounded font-medium hover:bg-red-700 transition text-xs"
-                            >
-                              ✗ Reject
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })()}
-                      </div>
-                    </>
-                  )}
-                </>
+                <AgentPanel
+                  currentCanvasId={currentCanvasId}
+                  setCurrentCanvasId={setCurrentCanvasId}
+                  creatingCanvasId={creatingCanvasId}
+                  setCreatingCanvasId={setCreatingCanvasId}
+                  currentDesignName={currentDesignName}
+                  spec={spec}
+                  proposals={proposals}
+                  selectedProposalId={selectedProposalId}
+                  setSelectedProposalId={setSelectedProposalId}
+                  viewingProposedSpec={viewingProposedSpec}
+                  setViewingProposedSpec={setViewingProposedSpec}
+                  setSpec={setSpec}
+                />
               )}
             </div>
           </aside>
