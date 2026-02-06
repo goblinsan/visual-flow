@@ -261,7 +261,18 @@ export class ApiClient {
   }
 }
 
+/** Resolve the API base URL at runtime:
+ *  1. Explicit env var (VITE_API_URL) wins.
+ *  2. On vizail.com (production) → deployed Worker.
+ *  3. Otherwise → local dev server.
+ */
+function resolveApiUrl(): string {
+  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
+  if (typeof window !== 'undefined' && window.location.hostname === 'vizail.com') {
+    return 'https://vizail-api.coghlanjames.workers.dev/api';
+  }
+  return 'http://localhost:62587/api';
+}
+
 // Singleton instance
-export const apiClient = new ApiClient(
-  import.meta.env.VITE_API_URL || 'http://localhost:62587/api'
-);
+export const apiClient = new ApiClient(resolveApiUrl());

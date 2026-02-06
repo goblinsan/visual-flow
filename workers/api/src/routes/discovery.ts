@@ -38,6 +38,7 @@ Each operation targets a node by ID:
 **Important**: Operations apply to \`root.children\` only (top-level nodes). To modify nodes inside a group, update the group itself.`,
     },
     servers: [
+      { url: 'https://vizail-api.coghlanjames.workers.dev/api', description: 'Production' },
       { url: 'http://localhost:62587/api', description: 'Local development' },
     ],
     security: [{ agentToken: [] }],

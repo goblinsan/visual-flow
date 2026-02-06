@@ -66,6 +66,10 @@ export default {
     }
 
     // Public routes (no auth required)
+    if (url.pathname === '/health' || url.pathname === '/api/health') {
+      return jsonResponse({ status: 'ok', timestamp: Date.now() });
+    }
+
     if ((url.pathname === '/api/agent/discover' || url.pathname === '/api/openapi.json') && request.method === 'GET') {
       return agentDiscoveryResponse();
     }
@@ -220,11 +224,6 @@ export default {
         if (method === 'POST') {
           return await rejectProposal(user, env, proposalId, request);
         }
-      }
-
-      // Health check
-      if (path === '/health' || path === '/api/health') {
-        return jsonResponse({ status: 'ok', timestamp: Date.now() });
       }
 
       return errorResponse('Not found', 404);

@@ -2,6 +2,9 @@ name = "vizail-websocket"
 main = "src/index.ts"
 compatibility_date = "2024-01-01"
 
+# Disable preview URLs (not supported with Durable Objects)
+preview_urls = false
+
 # Durable Objects
 [durable_objects]
 bindings = [
@@ -10,4 +13,4 @@ bindings = [
 
 [[migrations]]
 tag = "v1"
-new_classes = ["CanvasRoom"]
+new_sqlite_classes = ["CanvasRoom"]

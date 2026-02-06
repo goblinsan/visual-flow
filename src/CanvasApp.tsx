@@ -80,6 +80,10 @@ function getWebSocketUrl(): string {
   // Check for environment variable first
   const envUrl = import.meta.env.VITE_WEBSOCKET_URL;
   if (envUrl) return envUrl;
+  // Auto-detect production
+  if (typeof window !== 'undefined' && window.location.hostname === 'vizail.com') {
+    return 'wss://vizail-websocket.coghlanjames.workers.dev';
+  }
   // Default to localhost for development
   return 'ws://localhost:8787';
 }
