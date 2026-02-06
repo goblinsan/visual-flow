@@ -1,8 +1,28 @@
 import { useCallback, useState, useRef, useEffect } from 'react';
 import type Konva from 'konva';
-import type { LayoutSpec, LayoutNode, FrameNode, TextNode, Size } from '../../layout-schema';
+import type { LayoutSpec, LayoutNode, FrameNode, TextNode, PolygonNode, Size } from '../../layout-schema';
 import { mapNode } from '../../commands/types';
 import { applyPosition, applyPositionAndSize } from '../stage-internal';
+
+// Helper function to generate regular polygon points
+function generateRegularPolygonPoints(width: number, height: number, sides: number): number[] {
+  const points: number[] = [];
+  const radiusX = width / 2;
+  const radiusY = height / 2;
+  const centerX = radiusX;
+  const centerY = radiusY;
+  
+  const angleOffset = -Math.PI / 2;
+  
+  for (let i = 0; i < sides; i++) {
+    const angle = angleOffset + (i * 2 * Math.PI) / sides;
+    const x = centerX + radiusX * Math.cos(angle);
+    const y = centerY + radiusY * Math.sin(angle);
+    points.push(x, y);
+  }
+  
+  return points;
+}
 
 interface TransformSession {
   nodes: Record<string, { topLeft: {x:number;y:number}; size:{width:number;height:number}; center:{x:number;y:number} }>;
@@ -132,7 +152,26 @@ export function useTransformManager(
                 })
               }));
             } else {
-              setSpec(prev => applyPositionAndSize(prev, nodeId, newPos, newSize));
+              // Special handling for polygon - regenerate points when size changes
+              if (currentNode.type === 'polygon') {
+                const polygonNode = currentNode as PolygonNode;
+                const sides = polygonNode.sides ?? 5;
+                const newPoints = generateRegularPolygonPoints(newSize.width, newSize.height, sides);
+                setSpec(prev => ({
+                  ...prev,
+                  root: mapNode<FrameNode>(prev.root, nodeId, (n) => {
+                    if (n.type !== 'polygon') return n;
+                    return {
+                      ...n,
+                      position: { x: newPos.x, y: newPos.y },
+                      size: newSize,
+                      points: newPoints,
+                    };
+                  })
+                }));
+              } else {
+                setSpec(prev => applyPositionAndSize(prev, nodeId, newPos, newSize));
+              }
             }
           }
         }
@@ -252,7 +291,26 @@ export function useTransformManager(
                 })
               }));
             } else {
-              setSpec(prev => applyPositionAndSize(prev, nodeId, newPos, newSize));
+              // Special handling for polygon - regenerate points when size changes
+              if (currentNode.type === 'polygon') {
+                const polygonNode = currentNode as PolygonNode;
+                const sides = polygonNode.sides ?? 5;
+                const newPoints = generateRegularPolygonPoints(newSize.width, newSize.height, sides);
+                setSpec(prev => ({
+                  ...prev,
+                  root: mapNode<FrameNode>(prev.root, nodeId, (n) => {
+                    if (n.type !== 'polygon') return n;
+                    return {
+                      ...n,
+                      position: newPos,
+                      size: newSize,
+                      points: newPoints,
+                    };
+                  })
+                }));
+              } else {
+                setSpec(prev => applyPositionAndSize(prev, nodeId, newPos, newSize));
+              }
             }
           }
         }
