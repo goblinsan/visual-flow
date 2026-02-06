@@ -1,17 +1,28 @@
 # Vizail (Interactive Canvas Editor)
 
-An experimental visual canvas editor built with **React**, **TypeScript**, **Vite**, and **Konva**. It focuses on incremental, test‑driven refactors toward a clean interaction model and future undo/redo support.
+A visual canvas editor built with **React**, **TypeScript**, **Vite**, and **Konva**. Features a modular architecture with comprehensive test coverage and real-time collaboration support.
 
-Current capabilities include:
- - Multi‑selection (click, shift / ctrl, marquee, toggle marquee)
- - Group / ungroup, duplicate, delete, layer z‑ordering
- - Rectangle tool with centered + square creation modifiers
- - Image aspect mode with stretch + restore flow
- - Text glyph scaling (with reset)
- - Attribute editing panels (color, stroke, dash, opacity, defaults, recent colors)
- - Pure derivation seams: paint normalization, rectangle visual props, measurement heuristics, selection logic
+## Features
 
-Baseline Tag: `refactor-baseline-v1` (post extraction of paint, measurement, rectVisual, interaction helpers)
+### Core Editing
+- Multi-selection (click, shift/ctrl, marquee)
+- Shape tools (rectangle, ellipse, line, curve)
+- Text editing with rich formatting
+- Image placement with aspect ratio control
+- Group/ungroup, duplicate, delete
+- Layer z-ordering and organization
+- Transform tools (resize, rotate, scale)
+
+### Collaboration
+- Real-time collaborative editing (Yjs CRDT)
+- Cursor and selection awareness
+- Soft locks for conflict prevention
+- Cloud synchronization
+
+### AI Integration
+- Agent-based design proposals
+- Branch-based workflow
+- Proposal review and approval
 
 ---
 ## Quick Start
@@ -25,173 +36,202 @@ pnpm build     # production bundle (if required later)
 Open the app, create rectangles (`R`), experiment with grouping, resizing, and context menu actions.
 
 ---
-## Project Management
-
-This repository uses an automated **Epic/Milestone/Issue** hierarchy for project management:
-- **Milestones** represent release goals or project phases
-- **Epics** (labeled PRs) represent major features tied to Milestones  
-- **Issues** represent individual tasks tied to Epics
-- When an Epic is merged, all linked Issues are **automatically closed**
-
-📖 See [Epic Management Guide](docs/EPIC_MANAGEMENT.md) for details  
-⚡ See [Quick Reference](docs/EPIC_QUICK_REFERENCE.md) for commands
-
----
 ## Architecture Overview
 
-| Layer | Purpose | Key Files |
-|-------|---------|-----------|
-| Spec Model | Declarative layout tree (root + children) | `layout-schema.ts` |
-| Rendering | Convert spec nodes → Konva shapes | `canvas/CanvasRenderer.tsx`, `renderer/rectVisual.ts` |
-| Interaction | Stage pointer + selection handling | `canvas/CanvasStage.tsx`, `renderer/interaction.ts` |
-| Measurement | Text + stack size heuristics | `renderer/measurement.ts` |
-| Paint / Style | Normalize fill/stroke/dash semantics | `utils/paint.ts` |
-| Persistence | Local storage for defaults + recent colors | `hooks/useDesignPersistence.ts`, `hooks/useRecentColors.ts` |
-| Attribute Panels | Editing UI (rect, colors, defaults) | `components/*Panel.tsx` |
+Vizail follows a modular architecture with clear separation of concerns:
 
-### Pure Seams (Tested)
-1. `computeRectVisual` – Consolidated rectangle visual derivation (fallback stroke, dash inclusion rules).
-2. `normalizePaint` / `deriveStrokeVisual` – Paint enable/disable + fallback semantics.
-3. `measurement` – Approximate height + font scaling heuristics separated from rendering.
-4. `interaction` – Selection state transitions (click + marquee) extracted for deterministic tests.
+| Layer | Purpose | Key Modules |
+|-------|---------|-------------|
+| **Specification** | Declarative layout tree | `layout-schema.ts` |
+| **Rendering** | Spec nodes → Konva shapes | `canvas/CanvasRenderer.tsx`, `renderer/` |
+| **Interaction** | Mouse/keyboard handling | `canvas/hooks/useMouseEventHandlers.ts` |
+| **Application** | Top-level orchestration | `CanvasApp.tsx`, `components/canvas/` |
+| **Commands** | Atomic operations (undo/redo) | `commands/*.ts` |
+| **Persistence** | Save/load/sync | `hooks/useDesignPersistence.ts` |
+| **Collaboration** | Real-time editing | `collaboration/useRealtimeCanvas.ts` |
 
-### Planned (Roadmap)
-See `docs/ROADMAP.md` for staged work: drag extraction, command layer, undo/redo, composite batching.
+### Modular Design (Post-Refactor)
+
+The codebase has been refactored from monolithic components into focused modules:
+
+**Canvas Layer** (~1,000 lines total):
+- `CanvasStage.tsx` (968 lines) - Main canvas orchestrator
+- 4 UI components (ContextMenu, CurveControlPointsLayer, etc.)
+- 7 custom hooks (useMouseEventHandlers, useTextEditing, etc.)
+- 3 utility modules (canvasUtils, iconComponentUtils, draftUtils)
+
+**Application Layer** (~1,000 lines total):
+- `CanvasApp.tsx` (1,037 lines) - App orchestrator
+- 4 UI components (HeaderToolbar, LeftToolbar, etc.)
+- 5 domain hooks (useToolState, useDialogState, etc.)
+
+See `docs/ARCHITECTURE.md` for detailed architecture documentation.
 
 ---
-## Directory Highlights
+## Directory Structure
+
 ```
 src/
-  canvas/            # Stage + Konva wiring
-  components/        # Attribute & control panels
-  hooks/             # Persistence, sizing, selection, defaults
-  renderer/          # Pure derivations (visuals, measurement, interaction)
-  utils/             # Paint, color editing, dash parsing, spec utilities
-  samples/           # Example spec compositions
-  editor/            # (Emerging) higher-level editor constructs
+├── CanvasApp.tsx              # Main app orchestrator (1,037 lines)
+├── canvas/
+│   ├── CanvasStage.tsx        # Canvas orchestrator (968 lines)
+│   ├── CanvasRenderer.tsx     # Spec → Konva rendering
+│   ├── components/            # Canvas UI components
+│   │   ├── ContextMenu.tsx
+│   │   ├── CurveControlPointsLayer.tsx
+│   │   ├── DraftPreviewLayer.tsx
+│   │   └── TextEditingOverlay.tsx
+│   ├── hooks/                 # Canvas interaction hooks
+│   │   ├── useMouseEventHandlers.ts
+│   │   ├── useTextEditing.ts
+│   │   ├── useShapeTools.ts
+│   │   ├── useTransformManager.ts
+│   │   ├── useKeyboardShortcuts.ts
+│   │   ├── useViewportManager.ts
+│   │   └── useSelectionManager.ts
+│   └── utils/                 # Canvas utilities
+│       ├── canvasUtils.ts
+│       ├── iconComponentUtils.ts
+│       └── draftUtils.ts
+├── components/
+│   ├── canvas/                # App-level UI components
+│   │   ├── HeaderToolbar.tsx
+│   │   ├── LeftToolbar.tsx
+│   │   ├── AttributesSidebar.tsx
+│   │   └── AgentPanel.tsx
+│   ├── dialogs/
+│   │   └── DialogManager.tsx
+│   └── *Panel.tsx             # Attribute panels
+├── hooks/
+│   ├── canvas/                # App-level state hooks
+│   │   ├── useToolState.ts
+│   │   ├── useDialogState.ts
+│   │   ├── useAttributeState.ts
+│   │   ├── useLibraryState.ts
+│   │   └── useProposalState.ts
+│   └── use*.ts                # Feature hooks
+├── commands/                  # Atomic operations (undo/redo)
+├── collaboration/             # Real-time collaboration
+├── renderer/                  # Pure rendering derivations
+├── utils/                     # Shared utilities
+└── samples/                   # Example specs
 ```
 
 ---
 ## Development Workflow
-Small, behavior‑parity refactors only:
-1. Add / extend tests first.
-2. Extract pure helper or hook.
-3. Replace inline logic with helper call.
-4. Run full test suite (must stay green & count non‑decreasing).
-5. Document extraction (append to `refactor_plan.md`).
 
-Recommended scripts:
+### Setup
 ```bash
-pnpm test              # unit tests
-pnpm test --watch      # focused iterative loop
-pnpm lint              # lint (strict: many any->TODO items remain)
-pnpm storybook         # (if enabled) interactive component/dev env
+npm install        # Install dependencies
+npm run dev        # Start dev server
+npm test           # Run test suite
+npm run lint       # Run linter
+npm run build      # Production build
 ```
+
+### Development Principles
+1. **Test-Driven**: Write tests before implementation
+2. **Incremental**: Small, focused changes
+3. **Type-Safe**: Full TypeScript coverage
+4. **Modular**: Extract logic into hooks/utilities
+5. **Tested**: All modules have comprehensive tests
+
+### Code Organization
+- Keep components under 500 lines
+- Extract hooks for reusable logic
+- Create utilities for pure functions
+- Write tests for all new modules
+- Maintain clear boundaries
 
 ---
 ## Testing Strategy
-| Area | Coverage |
-|------|----------|
-| Visual derivation | `rectVisual.test.ts` validates style + fallback combinations |
-| Paint logic | `paint.test.ts` (dash conversion, disabling semantics) |
-| Measurement | `measurement.test.ts` ensures font + height heuristics stable |
-| Interaction | `interaction.test.ts` click + toggle + marquee behaviors |
-| Persistence | Round‑trip, recent colors, defaults |
-| Spec invariants | Node uniqueness / structure guards |
-| Panels | Rect attribute + color picker session interactions |
 
-Emerging TODO: drag delta math, command inversion, undo stack invariants.
+Comprehensive test coverage with 498+ tests:
 
----
-## Refactor Protocol (Condensed)
-Adapted from `.github/workflows/refactor_plan.md`:
+| Category | Coverage |
+|----------|----------|
+| **Unit Tests** | Hooks, utilities, commands |
+| **Component Tests** | UI components, interactions |
+| **Integration Tests** | Component composition |
+| **Visual Tests** | Rendering derivations |
 
-1. One conceptual change per commit (e.g. "extract measurement heuristics").
-2. No silent behavior changes – if behavior changes, label commit clearly & add tests.
-3. Every new module accompanied by a test file (or added cases).
-4. Test count never decreases; all must pass before merge.
-5. Avoid broad renames / formatting churn in refactor commits.
-6. Prefer small pure seams before architectural leaps (undo/redo, command bus).
+### Test Organization
+- Co-located with source files (e.g., `useMouseEventHandlers.test.ts`)
+- Comprehensive coverage of all modules
+- Fast execution (sub-second for most tests)
 
----
-## Roadmap Snapshot
-Milestones:
-1. Drag & Marquee Extraction (drag threshold, displacement calc, pure marquee hit-testing)
-2. Command Dispatch Layer (atomic + invertible commands)
-3. Undo / Redo Foundation (`useHistory`, command log, inversion tests)
-4. Batched Interaction Commits (drag grouped into single history entry)
-5. Optional: History persistence (session resilience)
-
-Details: see `docs/ROADMAP.md`.
+### Running Tests
+```bash
+npm test              # Run all tests
+npm test -- --watch   # Watch mode
+npm test -- --coverage # Coverage report
+```
 
 ---
-## Interaction Cheatsheet
+## Keyboard Shortcuts
 
-Core selection & navigation:
-- Click: Select a single node.
-- Shift / Ctrl + Click: Add/remove nodes from selection.
-- Drag on empty space: Marquee select (hold Shift/Ctrl to toggle in/out).
-- Right‑Click: Open context menu (Group / Ungroup / Re-enable Aspect when applicable).
-- Middle Mouse / Alt+Left Drag / Space+Drag: Pan (Spacebar enables temporary panning mode).
-- Mouse Wheel: Zoom to cursor.
+### Tools
+- `V` - Select tool
+- `R` - Rectangle tool
+- `O` - Ellipse tool
+- `L` - Line tool
+- `P` - Curve/Path tool
+- `T` - Text tool
+- `I` - Image tool
 
-Transform & geometry:
-- Drag corner/edge handles: Resize freely (non-uniform allowed).
-- Shift + Drag handle: Constrain resize to original aspect ratio.
-- Alt/Option + Drag handle: Centered scaling (expands/shrinks symmetrically about center).
-- Shift + Alt + Drag: Centered uniform scaling.
-- Rotate handle: Free rotation (snaps at 0/90/180/270°).
+### Actions
+- `Delete`/`Backspace` - Delete selected
+- `Ctrl/Cmd + D` - Duplicate
+- `Ctrl/Cmd + G` - Group
+- `Ctrl/Cmd + Shift + G` - Ungroup
+- `Ctrl/Cmd + Z` - Undo (local mode)
+- `Ctrl/Cmd + Shift + Z` - Redo (local mode)
+- `Arrow Keys` - Nudge 1px
+- `Shift + Arrow Keys` - Nudge 10px
+- `Space + Drag` - Pan canvas
 
-Rectangle tool:
-- Activate: toolbar button or press `R` (toggle).
-- Draw: Click-drag on empty canvas to create rectangle.
-- Shift while dragging: Constrain to square.
-- Alt while dragging: Center-out creation (start point becomes center). Shift+Alt: centered square.
-- Release mouse to finalize; tool auto-switches back to Select; new rect is selected.
+### Selection
+- `Click` - Select single
+- `Shift/Ctrl + Click` - Add/remove from selection
+- `Drag` - Marquee select
+- `Shift/Ctrl + Drag` - Toggle marquee
 
-Text glyph scaling:
-- Text nodes distort (squash/stretch) their glyphs when resized; the box itself does not reflow text.
-- Shift during text resize: Uniform glyph scale (maintain original distortion ratio).
-- Alt: Centered glyph scaling; Shift+Alt combines both behaviors.
-- Context Menu → Reset Text Scale: Restore glyph scale to 1× (removes distortion).
-
-Images:
-- Non-uniform resize of an aspect-preserving image: Switches to stretched mode (aspect disabled).
-- Context Menu → Re-enable Aspect: Restores aspect mode (uses existing or fallback `contain` fit).
-- Shift constraint still works after restoring aspect.
-
-Grouping:
-- Ctrl/Cmd + G: Group selected nodes.
-- Ctrl/Cmd + Shift + G: Ungroup (when a single group is selected).
-
-Editing:
-- Delete / Backspace: Remove selected nodes.
-- Ctrl/Cmd + D: Duplicate selection.
-- Arrow Keys: Nudge 1px.
-- Shift + Arrow Keys: Nudge 10px.
-
-Layer ordering (z-order within same parent):
-- Context Menu → Move Forward: Move each selected node one step closer to front (cannot pass another selected node).
-- Context Menu → Move Lower: Move each selected node one step toward back.
-- Context Menu → Move To Top: Bring selected nodes to front (relative order preserved among them).
-- Context Menu → Move To Bottom: Send selected nodes to back (relative order preserved).
-
-Rotation & Baking:
-- Transform changes are baked on mouse release: live Konva transform is reset while persisted spec stores final position, size, rotation.
-
-Notes:
-- Aspect behavior for images is controlled by `preserveAspect` + `objectFit` (`cover`/`contain`). Stretched images set `preserveAspect=false`.
-- Any subsequent non-uniform scale of a restored aspect image disables aspect again.
-- Text scaling persists as `textScaleX` / `textScaleY`; reset sets both to 1.
+### Transform
+- `Shift + Drag Handle` - Constrain aspect ratio
+- `Alt + Drag Handle` - Scale from center
+- `Shift + Alt + Drag` - Both constraints
 
 ---
-## Contributing (Internal)
-This project currently iterates via tightly scoped refactors. Follow the Refactor Protocol, update roadmap / refactor plan as you land seams, and keep commits reviewable (< ~400 touched LOC ideally).
+## Project Management
 
-Planned external contribution guidelines (CODE_OF_CONDUCT, PR template) pending stabilization of interaction & history layers.
+This repository uses an **Epic/Milestone/Issue** hierarchy:
+- **Milestones**: Release goals or project phases
+- **Epics**: Major features (labeled PRs)
+- **Issues**: Individual tasks tied to Epics
+
+See `docs/GITHUB_ISSUE_HIERARCHY.md` for details.
+
+---
+## Contributing
+
+Contributions are welcome! Please follow these guidelines:
+
+1. **Code Quality**: Maintain TypeScript types and test coverage
+2. **Modularity**: Keep components focused and under 500 lines
+3. **Testing**: Write tests for all new functionality
+4. **Documentation**: Update relevant docs with changes
+
+See `docs/ARCHITECTURE.md` for architecture details and patterns.
+
+---
+## Roadmap
+
+See `docs/ROADMAP.md` for:
+- Planned features and improvements
+- Milestone tracking
+- Technical debt items
 
 ---
 ## License
+
 TBD (not yet specified). Add a LICENSE file before public distribution.
-
-
