@@ -42,6 +42,6 @@ export async function authenticateWebSocket(request: Request): Promise<string | 
  */
 export async function checkCanvasAccess(userId: string, canvasId: string): Promise<boolean> {
   // TODO: Implement database check for canvas membership
-  // For now, allow access if user is authenticated
-  return userId !== null;
+  // For now, allow access if user is authenticated (non-empty userId)
+  return userId.length > 0;
 }

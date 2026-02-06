@@ -53,12 +53,21 @@ export function isOriginAllowed(origin: string | null, env: Env): boolean {
 
 /**
  * Get CORS headers based on request origin and environment
+ * Returns headers with proper origin or rejects with error
  */
 export function getCorsHeaders(origin: string | null, env: Env): Record<string, string> {
-  const allowedOrigin = isOriginAllowed(origin, env) ? origin : 'null';
+  const allowedOrigin = isOriginAllowed(origin, env) ? origin! : '';
+  
+  // If origin is not allowed, return minimal headers (don't set Access-Control-Allow-Origin)
+  if (!allowedOrigin) {
+    return {
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    };
+  }
   
   return {
-    'Access-Control-Allow-Origin': allowedOrigin!,
+    'Access-Control-Allow-Origin': allowedOrigin,
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Max-Age': '86400', // 24 hours

@@ -54,7 +54,10 @@ export async function generateAgentToken(
     const tokenId = generateId();
     const token = generateSecureToken(); // Generate secure token
     const tokenHash = await hashToken(token); // Hash before storing
-    const expiresAt = now + (365 * 24 * 60 * 60 * 1000); // 365 days
+    // Token expires in 365 days - long expiration suitable for agent automation
+    // Agents typically run continuously and token rotation can be disruptive
+    // Tokens can be manually revoked if compromised
+    const expiresAt = now + (365 * 24 * 60 * 60 * 1000);
 
     await env.DB
       .prepare(`
