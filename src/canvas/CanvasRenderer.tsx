@@ -459,8 +459,8 @@ function renderLine(n: LineNode) {
         strokeWidth={n.strokeWidth ?? 2}
         dash={n.strokeDash}
         lineCap={n.lineCap ?? "round"}
-        pointerAtBeginning={n.startArrow}
-        pointerAtEnding={n.endArrow}
+        pointerAtBeginning={n.startArrow === true}
+        pointerAtEnding={n.endArrow === true}
         pointerLength={pointerLength}
         pointerWidth={pointerWidth}
       />
