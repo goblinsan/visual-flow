@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import type { LayoutSpec, LayoutNode, EllipseNode, LineNode, CurveNode } from '../../layout-schema';
+import type { LayoutSpec, LayoutNode, EllipseNode, LineNode, CurveNode, PolygonNode } from '../../layout-schema';
 
 interface DraftState {
   start: { x: number; y: number };
@@ -38,11 +38,20 @@ interface CurveDefaults {
   tension: number;
 }
 
+interface PolygonDefaults {
+  fill?: string;
+  stroke?: string;
+  strokeWidth: number;
+  opacity: number;
+  closed: boolean;
+}
+
 // Default styling values for shapes (module-level constants to avoid re-creation)
 const DEFAULT_RECT_STYLE: RectDefaults = { fill: '#ffffff', stroke: '#334155', strokeWidth: 1, radius: 0, opacity: 1, strokeDash: undefined };
 const DEFAULT_ELLIPSE_STYLE: EllipseDefaults = { fill: '#ffffff', stroke: '#334155', strokeWidth: 1, opacity: 1 };
 const DEFAULT_LINE_STYLE: LineDefaults = { stroke: '#334155', strokeWidth: 2 };
 const DEFAULT_CURVE_STYLE: CurveDefaults = { stroke: '#334155', strokeWidth: 2, tension: 0.5 };
+const DEFAULT_POLYGON_STYLE: PolygonDefaults = { fill: '#ffffff', stroke: '#334155', strokeWidth: 1, opacity: 1, closed: true };
 
 const updateRootChildren = (spec: LayoutSpec, updater: (children: LayoutNode[]) => LayoutNode[]): LayoutSpec => {
   const root = spec.root;
@@ -67,7 +76,8 @@ export function useShapeTools(
   rectDefaults?: RectDefaults,
   ellipseDefaults?: EllipseDefaults,
   lineDefaults?: LineDefaults,
-  curveDefaults?: CurveDefaults
+  curveDefaults?: CurveDefaults,
+  polygonDefaults?: PolygonDefaults
 ) {
   const finalizeRect = useCallback((
     rectDraft: DraftState | null,
@@ -265,10 +275,40 @@ export function useShapeTools(
     onToolChange?.('select');
   }, [setSpec, onToolChange, curveDefaults, setSelection]);
 
+  const finalizePolygon = useCallback((
+    polygonDraft: CurveDraftState | null
+  ) => {
+    if (!polygonDraft || polygonDraft.points.length < 3) return;
+    
+    const points = polygonDraft.points;
+    const origin = points[0];
+    
+    // Convert points to relative coordinates
+    const relativePoints = points.flatMap(p => [p.x - origin.x, p.y - origin.y]);
+    
+    const defaults = polygonDefaults || DEFAULT_POLYGON_STYLE;
+    const id = 'polygon_' + Math.random().toString(36).slice(2, 9);
+    const polygonNode: PolygonNode = {
+      id,
+      type: 'polygon',
+      position: { x: origin.x, y: origin.y },
+      points: relativePoints,
+      fill: defaults.fill,
+      stroke: defaults.stroke,
+      strokeWidth: defaults.strokeWidth,
+      opacity: defaults.opacity,
+      closed: defaults.closed,
+    };
+    setSpec(prev => appendNodesToRoot(prev, [polygonNode]));
+    setSelection([id]);
+    onToolChange?.('select');
+  }, [setSpec, onToolChange, polygonDefaults, setSelection]);
+
   return {
     finalizeRect,
     finalizeEllipse,
     finalizeLine,
     finalizeCurve,
+    finalizePolygon,
   };
 }

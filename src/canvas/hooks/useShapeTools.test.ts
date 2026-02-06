@@ -164,3 +164,54 @@ describe('useShapeTools', () => {
     expect(setSelection).not.toHaveBeenCalled();
   });
 });
+
+  it('finalizePolygon creates a polygon node', () => {
+    const spec = mkSpec();
+    let updatedSpec = spec;
+    const setSpec = vi.fn((updater: any) => {
+      updatedSpec = typeof updater === 'function' ? updater(updatedSpec) : updater;
+    });
+    const setSelection = vi.fn();
+    const onToolChange = vi.fn();
+
+    const { result } = renderHook(() => useShapeTools(setSpec, setSelection, onToolChange));
+
+    const polygonDraft = {
+      points: [
+        { x: 10, y: 10 },
+        { x: 50, y: 30 },
+        { x: 30, y: 60 },
+      ],
+      current: { x: 30, y: 60 }
+    };
+    result.current.finalizePolygon(polygonDraft);
+
+    expect(setSpec).toHaveBeenCalled();
+    expect(setSelection).toHaveBeenCalled();
+    expect(onToolChange).toHaveBeenCalledWith('select');
+    expect(updatedSpec.root.children.length).toBe(1);
+    expect(updatedSpec.root.children[0].type).toBe('polygon');
+  });
+
+  it('finalizePolygon handles too few points', () => {
+    const spec = mkSpec();
+    let updatedSpec = spec;
+    const setSpec = vi.fn((updater: any) => {
+      updatedSpec = typeof updater === 'function' ? updater(updatedSpec) : updater;
+    });
+    const setSelection = vi.fn();
+
+    const { result } = renderHook(() => useShapeTools(setSpec, setSelection));
+
+    const polygonDraft = {
+      points: [
+        { x: 10, y: 10 },
+        { x: 50, y: 30 },
+      ],
+      current: { x: 50, y: 30 }
+    };
+    result.current.finalizePolygon(polygonDraft);
+
+    // Should not create polygon with only 2 points
+    expect(updatedSpec.root.children.length).toBe(0);
+  });

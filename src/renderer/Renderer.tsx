@@ -1,5 +1,6 @@
 import type { JSX } from "react";
-import { type GridNode, type NodeSpec, type RootSpec, type StackNode, type TextNode, type BoxNode, type IconNode, type ImageNode, type BadgeNode, type ProgressNode, cx } from "../dsl";
+import { type GridNode, type NodeSpec, type RootSpec, type StackNode, type TextNode, type BoxNode, type IconNode, type ImageNode, type BadgeNode, type ProgressNode, type AccordionNode, type CarouselNode, cx } from "../dsl";
+import { useState } from "react";
 
 type EditProps = { editing?: boolean; path?: string; onSelectNode?: (path: string, node: NodeSpec) => void; selectedPath?: string; wrapChild?: (path: string, element: JSX.Element) => JSX.Element };
 
@@ -99,6 +100,10 @@ export function NodeView({ node, editing, path, onSelectNode, selectedPath, wrap
       return <Badge node={node} editing={editing} path={path} onSelectNode={onSelectNode} selectedPath={selectedPath} />;
     case "progress":
       return <Progress node={node} editing={editing} path={path} onSelectNode={onSelectNode} selectedPath={selectedPath} />;
+    case "accordion":
+      return <Accordion node={node} editing={editing} path={path} onSelectNode={onSelectNode} selectedPath={selectedPath} />;
+    case "carousel":
+      return <Carousel node={node} editing={editing} path={path} onSelectNode={onSelectNode} selectedPath={selectedPath} />;
     default:
       return null;
   }
@@ -202,6 +207,115 @@ function Progress({ node, editing, path, onSelectNode, selectedPath }: { node: P
           style={{ width: `${value}%` }}
         />
       </div>
+    </div>
+  );
+}
+
+function Accordion({ node, editing, path, onSelectNode, selectedPath }: { node: AccordionNode } & EditProps) {
+  const [expandedIndexes, setExpandedIndexes] = useState<Set<number>>(() => {
+    const initial = new Set<number>();
+    node.items.forEach((item, idx) => {
+      if (item.defaultExpanded) initial.add(idx);
+    });
+    return initial;
+  });
+
+  const toggleItem = (index: number) => {
+    setExpandedIndexes(prev => {
+      const next = new Set(prev);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        if (!node.allowMultiple) {
+          next.clear();
+        }
+        next.add(index);
+      }
+      return next;
+    });
+  };
+
+  const sel = editing ? (selectedPath === path ? "outline outline-2 outline-[--color-brand]" : "outline outline-1 outline-transparent hover:outline-[--color-brand]/60") : undefined;
+
+  return (
+    <div className={cx("border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden", sel, node.className)} onClick={editing && onSelectNode && path != null ? (e) => { e.stopPropagation(); onSelectNode(path, node); } : undefined}>
+      {node.items.map((item, idx) => {
+        const isExpanded = expandedIndexes.has(idx);
+        return (
+          <div key={idx} className="border-b border-slate-200 dark:border-slate-700 last:border-b-0">
+            <button
+              className="w-full px-4 py-3 text-left font-medium bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 flex justify-between items-center transition-colors"
+              onClick={(e) => { e.stopPropagation(); toggleItem(idx); }}
+            >
+              <span>{item.title}</span>
+              <span className={cx("transition-transform", isExpanded ? "rotate-180" : "")}>▼</span>
+            </button>
+            {isExpanded && (
+              <div className="px-4 py-3 bg-white dark:bg-slate-900">
+                <NodeView node={item.content} editing={editing} path={path ? `${path}.${idx}` : `${idx}`} onSelectNode={onSelectNode} selectedPath={selectedPath} />
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function Carousel({ node, editing, path, onSelectNode, selectedPath }: { node: CarouselNode } & EditProps) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  const next = () => setCurrentIndex((prev) => (prev + 1) % node.items.length);
+  const prev = () => setCurrentIndex((p) => (p - 1 + node.items.length) % node.items.length);
+  const goTo = (index: number) => setCurrentIndex(index);
+
+  const sel = editing ? (selectedPath === path ? "outline outline-2 outline-[--color-brand]" : "outline outline-1 outline-transparent hover:outline-[--color-brand]/60") : undefined;
+
+  return (
+    <div className={cx("relative", sel, node.className)} onClick={editing && onSelectNode && path != null ? (e) => { e.stopPropagation(); onSelectNode(path, node); } : undefined}>
+      <div className="relative overflow-hidden rounded-lg">
+        <div className="flex transition-transform duration-300" style={{ transform: `translateX(-${currentIndex * 100}%)` }}>
+          {node.items.map((item, idx) => (
+            <div key={idx} className="min-w-full">
+              <NodeView node={item} editing={editing} path={path ? `${path}.${idx}` : `${idx}`} onSelectNode={onSelectNode} selectedPath={selectedPath} />
+            </div>
+          ))}
+        </div>
+      </div>
+      
+      {node.showArrows !== false && node.items.length > 1 && (
+        <>
+          <button
+            onClick={(e) => { e.stopPropagation(); prev(); }}
+            className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 dark:bg-slate-800/80 p-2 rounded-full shadow-md hover:bg-white dark:hover:bg-slate-700"
+          >
+            ◀
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); next(); }}
+            className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 dark:bg-slate-800/80 p-2 rounded-full shadow-md hover:bg-white dark:hover:bg-slate-700"
+          >
+            ▶
+          </button>
+        </>
+      )}
+      
+      {node.showDots !== false && node.items.length > 1 && (
+        <div className="flex justify-center gap-2 mt-3">
+          {node.items.map((_, idx) => (
+            <button
+              key={idx}
+              onClick={(e) => { e.stopPropagation(); goTo(idx); }}
+              className={cx(
+                "w-2 h-2 rounded-full transition-all",
+                idx === currentIndex
+                  ? "bg-blue-500 w-6"
+                  : "bg-slate-300 dark:bg-slate-600 hover:bg-slate-400 dark:hover:bg-slate-500"
+              )}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

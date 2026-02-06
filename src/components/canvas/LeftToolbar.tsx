@@ -15,6 +15,7 @@ export function LeftToolbar({
     { icon: "fa-solid fa-arrow-pointer", val: "select", tooltip: "Select (V)" },
     { icon: "fa-regular fa-square", val: "rect", tooltip: "Rectangle (R)" },
     { icon: "fa-regular fa-circle", val: "ellipse", tooltip: "Ellipse (O)" },
+    { icon: "fa-solid fa-draw-polygon", val: "polygon", tooltip: "Polygon (G)" },
     { icon: "fa-solid fa-minus", val: "line", tooltip: "Line (L)" },
     { icon: "fa-solid fa-bezier-curve", val: "curve", tooltip: "Curve (P)" },
     { icon: "fa-solid fa-font", val: "text", tooltip: "Text (T)" },

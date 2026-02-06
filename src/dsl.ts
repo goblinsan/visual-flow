@@ -62,6 +62,31 @@ export type ProgressNode = {
   barClassName?: string; // inner bar classes (color)
 };
 
+export type AccordionItemNode = {
+  title: string;
+  content: NodeSpec;
+  defaultExpanded?: boolean;
+};
+
+export type AccordionNode = {
+  type: "accordion";
+  id?: string;
+  items: AccordionItemNode[];
+  allowMultiple?: boolean; // allow multiple items expanded at once
+  className?: string;
+};
+
+export type CarouselNode = {
+  type: "carousel";
+  id?: string;
+  items: NodeSpec[];
+  autoPlay?: boolean;
+  interval?: number; // milliseconds between auto-transitions
+  showDots?: boolean; // show navigation dots
+  showArrows?: boolean; // show prev/next arrows
+  className?: string;
+};
+
 export type BoxNode = {
   type: "box";
   id?: string; // strongly recommended when selectable
@@ -74,7 +99,7 @@ export type BoxNode = {
   children: NodeSpec[];
 };
 
-export type NodeSpec = TextNode | StackNode | GridNode | IconNode | ImageNode | BadgeNode | ProgressNode | BoxNode;
+export type NodeSpec = TextNode | StackNode | GridNode | IconNode | ImageNode | BadgeNode | ProgressNode | AccordionNode | CarouselNode | BoxNode;
 
 export type RootSpec = {
   id?: string;

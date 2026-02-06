@@ -11,7 +11,8 @@ export type NodeType =
   | "group"
   | "ellipse"
   | "line"
-  | "curve";
+  | "curve"
+  | "polygon";
 
 export interface BaseNode {
   id: string;
@@ -170,6 +171,9 @@ export interface LineNode extends BaseNode {
   strokeWidth?: number;  // px
   strokeDash?: number[]; // dash pattern
   lineCap?: "butt" | "round" | "square";
+  startArrow?: boolean;  // arrow at start point
+  endArrow?: boolean;    // arrow at end point
+  arrowSize?: number;    // arrow size multiplier (default 1)
 }
 
 /** Curve/bezier shape node (quadratic or cubic bezier). */
@@ -182,6 +186,20 @@ export interface CurveNode extends BaseNode {
   strokeDash?: number[]; // dash pattern
   lineCap?: "butt" | "round" | "square";
   tension?: number;      // spline tension (0-1)
+  handleType?: "smooth" | "sharp"; // bezier handle constraint type (default "smooth")
+}
+
+/** Polygon shape node (closed multi-point shape). */
+export interface PolygonNode extends BaseNode {
+  type: "polygon";
+  points: number[];      // [x1, y1, x2, y2, ..., xn, yn] array of vertices
+  position?: Pos;        // offset for the polygon group
+  fill?: string;         // CSS fill color (solid)
+  fillGradient?: GradientFill; // gradient fill (overrides fill if set)
+  stroke?: string;       // CSS stroke color
+  strokeWidth?: number;  // px
+  strokeDash?: number[]; // dash pattern
+  closed?: boolean;      // whether the polygon is closed (default true)
 }
 
 export type LayoutNode =
@@ -195,7 +213,8 @@ export type LayoutNode =
   | RectNode
   | EllipseNode
   | LineNode
-  | CurveNode;
+  | CurveNode
+  | PolygonNode;
 
 export interface LayoutSpec {
   version?: string; // schema version (e.g., "1.0.0"); undefined = legacy/pre-versioning

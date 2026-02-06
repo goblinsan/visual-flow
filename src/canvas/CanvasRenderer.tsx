@@ -2,7 +2,7 @@ import { Group, Rect, Text, Ellipse, Line } from "react-konva";
 import { type ReactNode, useEffect, useState } from "react";
 import { computeRectVisual } from "../renderer/rectVisual";
 import { estimateNodeHeight } from "../renderer/measurement";
-import type { LayoutNode, FrameNode, StackNode, TextNode, BoxNode, GridNode, GroupNode, ImageNode, RectNode, EllipseNode, LineNode, CurveNode } from "../layout-schema.ts";
+import type { LayoutNode, FrameNode, StackNode, TextNode, BoxNode, GridNode, GroupNode, ImageNode, RectNode, EllipseNode, LineNode, CurveNode, PolygonNode } from "../layout-schema.ts";
 import { CanvasImage } from "./components/CanvasImage";
 import { debugOnce, logger } from "../utils/logger";
 
@@ -445,6 +445,11 @@ function renderEllipse(n: EllipseNode) {
 function renderLine(n: LineNode) {
   const x = n.position?.x ?? 0;
   const y = n.position?.y ?? 0;
+  
+  // Calculate arrow points if arrows are enabled
+  const pointerLength = (n.arrowSize ?? 1) * 10;
+  const pointerWidth = (n.arrowSize ?? 1) * 8;
+  
   return (
     <Group key={n.id} id={n.id} name={`node ${n.type}`} x={x} y={y} rotation={n.rotation ?? 0} opacity={n.opacity ?? 1}>
       <Line
@@ -453,6 +458,10 @@ function renderLine(n: LineNode) {
         strokeWidth={n.strokeWidth ?? 2}
         dash={n.strokeDash}
         lineCap={n.lineCap ?? "round"}
+        pointerAtBeginning={n.startArrow}
+        pointerAtEnding={n.endArrow}
+        pointerLength={pointerLength}
+        pointerWidth={pointerWidth}
       />
     </Group>
   );
@@ -479,6 +488,79 @@ function renderCurve(n: CurveNode) {
   );
 }
 
+// Polygon shape (multi-point closed/open shape)
+function renderPolygon(n: PolygonNode) {
+  const x = n.position?.x ?? 0;
+  const y = n.position?.y ?? 0;
+  const closed = n.closed ?? true;
+  
+  // Determine fill and stroke status
+  const hasFill = n.fill !== undefined || n.fillGradient !== undefined;
+  const hasStroke = n.stroke !== undefined;
+  
+  // Handle gradient fills
+  let gradientProps: any = {};
+  if (n.fillGradient) {
+    const colorStops: number[] = [];
+    n.fillGradient.colors.forEach((color, index) => {
+      const position = index / (n.fillGradient!.colors.length - 1);
+      colorStops.push(position, ...hexToRgb(color).map(c => c / 255));
+    });
+    
+    if (n.fillGradient.type === 'linear') {
+      // Calculate bounding box for gradient positioning
+      const xs = n.points.filter((_, i) => i % 2 === 0);
+      const ys = n.points.filter((_, i) => i % 2 === 1);
+      const minX = Math.min(...xs);
+      const maxX = Math.max(...xs);
+      const minY = Math.min(...ys);
+      const maxY = Math.max(...ys);
+      const centerX = (minX + maxX) / 2;
+      const centerY = (minY + maxY) / 2;
+      
+      const angle = n.fillGradient.angle ?? 0;
+      const rad = (angle * Math.PI) / 180;
+      const len = Math.max(maxX - minX, maxY - minY);
+      
+      gradientProps = {
+        fillLinearGradientStartPoint: {
+          x: centerX - Math.cos(rad) * len / 2,
+          y: centerY - Math.sin(rad) * len / 2,
+        },
+        fillLinearGradientEndPoint: {
+          x: centerX + Math.cos(rad) * len / 2,
+          y: centerY + Math.sin(rad) * len / 2,
+        },
+        fillLinearGradientColorStops: colorStops,
+      };
+    }
+  }
+  
+  return (
+    <Group key={n.id} id={n.id} name={`node ${n.type}`} x={x} y={y} rotation={n.rotation ?? 0} opacity={n.opacity ?? 1}>
+      <Line
+        points={n.points}
+        closed={closed}
+        fill={n.fillGradient ? undefined : (n.fill ?? "#ffffff")}
+        fillEnabled={hasFill}
+        stroke={n.stroke ?? "#334155"}
+        strokeEnabled={hasStroke || !hasFill}
+        strokeWidth={n.strokeWidth ?? 1}
+        dash={n.strokeDash}
+        {...gradientProps}
+      />
+    </Group>
+  );
+}
+
+// Helper function to convert hex color to RGB
+function hexToRgb(hex: string): [number, number, number] {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result
+    ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)]
+    : [255, 255, 255];
+}
+
 export function renderNode(n: LayoutNode): ReactNode {
   debugOnce('renderNode:'+n.id, n.id, n.type);
   switch (n.type) {
@@ -493,6 +575,7 @@ export function renderNode(n: LayoutNode): ReactNode {
     case "ellipse": return renderEllipse(n);
     case "line": return renderLine(n);
     case "curve": return renderCurve(n);
+    case "polygon": return renderPolygon(n);
     default:
       logger.warn('Unknown node type', n);
       return null;
