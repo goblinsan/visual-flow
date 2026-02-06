@@ -1,17 +1,15 @@
-import { Stage, Layer, Transformer, Rect, Group, Line, Circle } from "react-konva";
+import { Stage, Layer, Transformer, Rect, Group, Circle } from "react-konva";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { JSX } from "react";
 import type Konva from "konva";
-import type { LayoutNode, LayoutSpec, TextNode, TextSpan, Pos, EllipseNode, LineNode, CurveNode, ImageNode, FrameNode, Size } from "../layout-schema.ts";
+import type { LayoutNode, LayoutSpec, TextNode, Pos, ImageNode } from "../layout-schema.ts";
 import { renderNode, useFontLoading } from "./CanvasRenderer.tsx";
 import { computeClickSelection, computeMarqueeSelection } from "../renderer/interaction";
 import { beginDrag, updateDrag, finalizeDrag } from "../interaction/drag";
 import type { DragSession } from "../interaction/types";
 import { beginMarquee, updateMarquee, finalizeMarquee, type MarqueeSession } from "../interaction/marquee";
-import { deleteNodes, duplicateNodes, nudgeNodes } from "./editing";
-import { applyPosition, applyPositionAndSize, groupNodes, ungroupNodes } from "./stage-internal";
-import { mapNode, nodeHasChildren } from "../commands/types";
-import type { RichTextEditorHandle } from "../components/RichTextEditor";
+import { applyPosition, groupNodes, ungroupNodes } from "./stage-internal";
+import { nodeHasChildren } from "../commands/types";
 import { ImagePickerModal } from "../components/ImagePickerModal";
 import { COMPONENT_LIBRARY, ICON_LIBRARY } from "../library";
 import { DraftPreviewLayer } from "./DraftPreviewLayer";
@@ -21,6 +19,7 @@ import { useViewportManager } from "./hooks/useViewportManager";
 import { useSelectionManager } from "./hooks/useSelectionManager";
 import { useTransformManager } from "./hooks/useTransformManager";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
+import { useTextEditing } from "./hooks/useTextEditing";
 import { ContextMenu } from "./components/ContextMenu";
 import { CurveControlPointsLayer } from "./components/CurveControlPointsLayer";
 
@@ -46,9 +45,6 @@ const appendNodesToRoot = (spec: LayoutSpec, nodes: LayoutNode[]): LayoutSpec =>
   if (!nodes.length) return spec;
   return updateRootChildren(spec, (children) => [...children, ...nodes]);
 };
-
-const nodeHasSize = (node: LayoutNode): node is LayoutNode & { size: Size } =>
-  'size' in node && Boolean((node as { size?: Size }).size);
 
 // Props
 interface CanvasStageProps {
@@ -147,8 +143,6 @@ function CanvasStage({
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const [panning, setPanning] = useState(false);
   const panLastPosRef = useRef<{ x: number; y: number } | null>(null);
-  const posRef = useRef(pos);
-  const transitionRafRef = useRef<number | null>(null);
   const selected = selection;
   const [menu, setMenu] = useState<null | { x: number; y: number }>(null);
   
@@ -169,8 +163,7 @@ function CanvasStage({
   // Marquee session (pure helper based)
   const [marqueeSession, setMarqueeSession] = useState<MarqueeSession | null>(null);
 
-  // Inline text editing state
-  const [editingTextId, setEditingTextId] = useState<string | null>(null);
+  // justStartedTextEditRef tracks if text editing just started to prevent immediate commit
   const justStartedTextEditRef = useRef(false);
   
   // Curve editing mode - use external state if provided, otherwise use internal
@@ -302,11 +295,6 @@ function CanvasStage({
       }
       return null;
     }, []);
-
-  const [editingTextValue, setEditingTextValue] = useState<string>('');
-  const [editingTextSpans, setEditingTextSpans] = useState<TextSpan[]>([]);
-  const richTextEditorRef = useRef<RichTextEditorHandle>(null);
-  const [textSelection, setTextSelection] = useState<{ start: number; end: number } | null>(null);
 
   // Image picker state
   const [imagePickerOpen, setImagePickerOpen] = useState(false);
@@ -448,7 +436,35 @@ function CanvasStage({
 
   // Use transform manager hook
   const transformManager = useTransformManager(trRef, spec, setSpec, selected, findNode);
-  const { transformSession, onTransform, onTransformEnd } = transformManager;
+  const { onTransform, onTransformEnd } = transformManager;
+
+  // Use text editing hook
+  const textEditingHook = useTextEditing({
+    spec,
+    setSpec,
+    onToolChange,
+    setSelection,
+    findNode,
+    getNodeWorldPosition,
+    stageRef,
+    wrapperRef,
+    scale,
+    pos,
+  });
+  const {
+    editingTextId,
+    editingTextValue,
+    editingTextSpans,
+    textSelection,
+    richTextEditorRef,
+    startTextEdit,
+    commitTextEdit,
+    cancelTextEdit,
+    handleTextChange,
+    applyFormat,
+    setTextSelection,
+    getTextEditStyle,
+  } = textEditingHook;
 
   // Wrap shape finalization functions to handle draft state
   const finalizeRect = useCallback(() => {
@@ -641,9 +657,7 @@ function CanvasStage({
       // We do NOT clear selection here because we just set it.
       // But we must ensure onToolChange doesn't cause a remount or state reset.
       justStartedTextEditRef.current = true;
-      setEditingTextId(id);
-      setEditingTextValue(' ');
-      setEditingTextSpans([]);
+      startTextEdit(id, placeholderText);
 
       e.cancelBubble = true;
       e.evt.preventDefault();
@@ -1141,143 +1155,11 @@ function CanvasStage({
         
         if (textNode && textNode.type === 'text') {
           justStartedTextEditRef.current = true;
-          setEditingTextId(nodeId);
-          setEditingTextValue(textNode.text || '');
-          // Initialize spans - either from existing spans or create one from plain text
-          if (textNode.spans && textNode.spans.length > 0) {
-            setEditingTextSpans(textNode.spans);
-          } else {
-            setEditingTextSpans([{ text: textNode.text || '' }]);
-          }
-          // Focus the editor on next tick
-          setTimeout(() => {
-            richTextEditorRef.current?.focus();
-            richTextEditorRef.current?.selectAll();
-          }, 0);
+          startTextEdit(nodeId, textNode);
         }
       }
     }
-  }, [isCurveMode, curveDraft, finalizeCurve, isSelectMode, spec.root, findNode]);
-
-  // Commit text edit and close editor
-  const commitTextEdit = useCallback(() => {
-    if (!editingTextId) return;
-    
-    const newRoot = mapNode<FrameNode>(spec.root, editingTextId, (n) => ({
-      ...n,
-      text: editingTextValue,
-      spans: editingTextSpans.length > 0 ? editingTextSpans : undefined,
-    }));
-    
-    setSpec({ ...spec, root: newRoot });
-    onToolChange?.('select');
-    setSelection([editingTextId]);
-    setEditingTextId(null);
-    setEditingTextValue('');
-    setEditingTextSpans([]);
-    setTextSelection(null);
-  }, [editingTextId, editingTextValue, editingTextSpans, spec, setSpec, onToolChange, setSelection]);
-
-  // Cancel text edit without saving
-    const cancelTextEdit = useCallback(() => {
-      setEditingTextId(null);
-      setEditingTextValue('');
-      setEditingTextSpans([]);
-      setTextSelection(null);
-      onToolChange?.('select');
-    }, [onToolChange]);
-
-  // Handle text/spans change from rich text editor
-  const handleTextChange = useCallback((text: string, spans: TextSpan[]) => {
-    setEditingTextValue(text);
-    setEditingTextSpans(spans);
-  }, []);
-
-  // Apply formatting to selected text
-  const applyFormat = useCallback((format: Partial<TextSpan>) => {
-    if (!richTextEditorRef.current) return;
-    richTextEditorRef.current.applyFormatToSelection(format);
-  }, []);
-
-  // Hide Konva text node while editing (so textarea appears to replace it)
-  useEffect(() => {
-    const stage = stageRef.current;
-    if (!stage || !editingTextId) return;
-    
-    const konvaNode = stage.findOne(`#${CSS.escape(editingTextId)}`);
-    if (konvaNode) {
-      konvaNode.visible(false);
-      stage.batchDraw();
-    }
-    
-    return () => {
-      if (konvaNode) {
-        konvaNode.visible(true);
-        stage.batchDraw();
-      }
-    };
-  }, [editingTextId]);
-
-  // Calculate textarea position and style based on the text node's position on canvas
-  const getTextEditStyle = useCallback((): React.CSSProperties | null => {
-    if (!editingTextId || !stageRef.current) return null;
-    
-    const textNode = findNode(spec.root, editingTextId) as TextNode | null;
-    if (!textNode) return null;
-    
-    const worldPos = getNodeWorldPosition(editingTextId) ?? { x: 0, y: 0 };
-    const x = worldPos.x;
-    const y = worldPos.y;
-    
-    // Convert world coordinates to screen coordinates
-    const stageX = x * scale + pos.x;
-    const stageY = y * scale + pos.y;
-    
-    // Get the wrapper's position
-    const wrapper = wrapperRef.current;
-    if (!wrapper) return null;
-    
-    // Get font properties
-    const fontSize = textNode.fontSize ?? 14;
-    const fontFamily = textNode.fontFamily || 'Arial';
-    const fontWeight = textNode.fontWeight || '400';
-    
-    // Calculate text alignment offset if needed
-    const align = textNode.align ?? 'left';
-
-    const PADDING = 6;
-    const MIN_WIDTH = 15;
-    const MIN_HEIGHT = 30;
-    
-    return {
-      position: 'absolute',
-      left: stageX - PADDING,
-      top: stageY - PADDING,
-      fontSize: fontSize * scale,
-      fontFamily,
-      fontWeight: fontWeight === 'bold' ? 700 : (fontWeight === 'normal' ? 400 : Number(fontWeight)),
-      fontStyle: textNode.fontStyle === 'italic' ? 'italic' : 'normal',
-      color: textNode.color ?? '#0f172a',
-      background: 'transparent',
-      border: 'none',
-      outline: 'none',
-      padding: `${PADDING}px`,
-      margin: 0,
-      display: 'inline-block',
-      width: 'auto',
-      minWidth: `${MIN_WIDTH}px`,
-      minHeight: `${MIN_HEIGHT}px`,
-      resize: 'none',
-      overflow: 'visible',
-      transformOrigin: 'top left',
-      transform: `rotate(${textNode.rotation ?? 0}deg) scale(${textNode.textScaleX ?? 1}, ${textNode.textScaleY ?? 1})`,
-      zIndex: 1000,
-      lineHeight: 1.2,
-      textAlign: align,
-      caretColor: '#3b82f6',
-      whiteSpace: 'pre',
-    };
-  }, [editingTextId, spec.root, scale, pos, getNodeWorldPosition, findNode]);
+  }, [isCurveMode, curveDraft, finalizeCurve, isSelectMode, spec.root, findNode, startTextEdit]);
 
   // Single click handler for empty canvas
   const onClick = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {

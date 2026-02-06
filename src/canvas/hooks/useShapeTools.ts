@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import type { LayoutSpec, LayoutNode, EllipseNode, LineNode, CurveNode, Size } from '../../layout-schema';
+import type { LayoutSpec, LayoutNode, EllipseNode, LineNode, CurveNode } from '../../layout-schema';
 
 interface DraftState {
   start: { x: number; y: number };
