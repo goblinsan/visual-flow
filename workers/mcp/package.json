@@ -1,8 +1,6 @@
 {
   "name": "vizail-mcp-server",
-  "version": "1.0.0",
-  "private": true,
-  "type": "module",
+  "version": "0.1.0",
   "description": "MCP server for Vizail Canvas — allows any AI agent to interact with canvas designs",
   "bin": {
     "vizail-mcp": "./dist/index.js"
@@ -10,8 +8,24 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/index.ts",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "prepublishOnly": "npm run build"
   },
+  "keywords": [
+    "mcp",
+    "vizail",
+    "canvas",
+    "design",
+    "ai-agent",
+    "model-context-protocol"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/goblinsan/visual-flow.git",
+    "directory": "workers/mcp"
+  },
+  "author": "Vizail Contributors",
+  "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0"
   },
@@ -19,5 +33,12 @@
     "@types/node": "^20.0.0",
     "tsx": "^4.0.0",
     "typescript": "^5.5.0"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

@@ -1,6 +1,8 @@
+import { useState, useEffect, useCallback } from 'react';
 import type { LayoutSpec } from "../../layout-schema";
 import { applyProposalOperations } from '../../utils/proposalHelpers';
 import type { UseProposalsResult } from '../../hooks/useProposals';
+import type { AgentToken, AgentBranch } from '../../types/agent';
 
 interface AgentPanelProps {
   currentCanvasId: string | null;
@@ -31,6 +33,74 @@ export function AgentPanel({
   setViewingProposedSpec,
   setSpec,
 }: AgentPanelProps) {
+  const [generatedToken, setGeneratedToken] = useState<AgentToken | null>(null);
+  const [generatingToken, setGeneratingToken] = useState(false);
+  const [tokenError, setTokenError] = useState<string | null>(null);
+  const [showChatGPTGuide, setShowChatGPTGuide] = useState(false);
+  const [branches, setBranches] = useState<AgentBranch[]>([]);
+  const [loadingBranches, setLoadingBranches] = useState(false);
+
+  const fetchBranches = useCallback(async () => {
+    if (!currentCanvasId) return;
+    setLoadingBranches(true);
+    try {
+      const { apiClient } = await import('../../api/client');
+      const result = await apiClient.listBranches(currentCanvasId);
+      if (result.data) {
+        setBranches(result.data);
+      }
+    } catch (err) {
+      console.error('Error fetching branches:', err);
+    } finally {
+      setLoadingBranches(false);
+    }
+  }, [currentCanvasId]);
+
+  // Auto-fetch branches when canvas ID changes
+  useEffect(() => {
+    if (currentCanvasId) {
+      fetchBranches();
+      // Only auto-refresh every 10 seconds to reduce API load
+      const interval = setInterval(fetchBranches, 10000);
+      return () => clearInterval(interval);
+    }
+  }, [currentCanvasId, fetchBranches]);
+
+  const handleGenerateToken = async () => {
+    if (!currentCanvasId) return;
+    
+    setGeneratingToken(true);
+    setTokenError(null);
+    
+    try {
+      const { apiClient } = await import('../../api/client');
+      const result = await apiClient.generateAgentToken(
+        currentCanvasId,
+        'chatgpt-agent',
+        'propose'
+      );
+      
+      if (result.data) {
+        setGeneratedToken(result.data);
+        setShowChatGPTGuide(true);
+      } else {
+        setTokenError(result.error || 'Failed to generate token');
+      }
+    } catch (err) {
+      setTokenError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setGeneratingToken(false);
+    }
+  };
+
+  const getApiUrl = () => {
+    if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
+    if (typeof window !== 'undefined' && window.location.hostname === 'vizail.com') {
+      return 'https://vizail-api.coghlanjames.workers.dev/api';
+    }
+    return 'http://localhost:62587/api';
+  };
+
   return (
     <>
       {/* Canvas ID Section */}
@@ -80,6 +150,140 @@ export function AgentPanel({
           </button>
         )}
       </div>
+
+      {/* Connect to ChatGPT Section - Issue 5.1 */}
+      {currentCanvasId && (
+        <div className="border-t pt-4 space-y-3">
+          <div className="text-xs font-semibold text-gray-700">Connect to ChatGPT</div>
+          
+          {!generatedToken ? (
+            <button
+              onClick={handleGenerateToken}
+              disabled={generatingToken}
+              className="w-full px-3 py-2 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700 transition disabled:opacity-50"
+            >
+              {generatingToken ? 'Generating Token...' : '🤖 Generate Token for ChatGPT'}
+            </button>
+          ) : (
+            <div className="space-y-3">
+              <div className="bg-green-50 border border-green-200 rounded p-3">
+                <div className="text-xs font-semibold text-green-900 mb-2">✓ Token Generated!</div>
+                <div className="flex items-center gap-2 mb-2">
+                  <code className="flex-1 p-2 bg-white border border-gray-300 rounded text-xs break-all font-mono">
+                    {generatedToken.token}
+                  </code>
+                  <button
+                    onClick={() => navigator.clipboard.writeText(generatedToken.token)}
+                    className="px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-xs whitespace-nowrap"
+                  >
+                    Copy
+                  </button>
+                </div>
+                <div className="text-xs text-green-800">
+                  Expires: {new Date(generatedToken.expiresAt).toLocaleDateString()}
+                </div>
+              </div>
+
+              {showChatGPTGuide && (
+                <div className="bg-blue-50 border border-blue-200 rounded p-3 space-y-2">
+                  <div className="text-xs font-semibold text-blue-900">Setup Instructions:</div>
+                  <ol className="text-xs text-blue-800 space-y-1 list-decimal list-inside">
+                    <li>Go to ChatGPT and create a new GPT</li>
+                    <li>In "Configure" tab, add these instructions:</li>
+                  </ol>
+                  <div className="bg-white border border-blue-300 rounded p-2 mt-1">
+                    <code className="text-xs block whitespace-pre-wrap break-all">
+{`You are a design assistant for Vizail Canvas.
+API URL: ${getApiUrl()}
+Canvas ID: ${currentCanvasId}
+Token: ${generatedToken.token}
+
+Use the API to read the canvas and submit design proposals.`}
+                    </code>
+                    <button
+                      onClick={() => {
+                        const instructions = `You are a design assistant for Vizail Canvas.\nAPI URL: ${getApiUrl()}\nCanvas ID: ${currentCanvasId}\nToken: ${generatedToken.token}\n\nUse the API to read the canvas and submit design proposals.`;
+                        navigator.clipboard.writeText(instructions);
+                      }}
+                      className="mt-2 px-2 py-1 bg-blue-100 hover:bg-blue-200 rounded text-xs"
+                    >
+                      Copy Instructions
+                    </button>
+                  </div>
+                  <div className="text-xs text-blue-700 mt-2">
+                    ⏱️ Setup time: Under 2 minutes
+                  </div>
+                </div>
+              )}
+
+              <button
+                onClick={() => {
+                  setGeneratedToken(null);
+                  setShowChatGPTGuide(false);
+                }}
+                className="text-xs text-blue-600 hover:text-blue-700"
+              >
+                Generate New Token
+              </button>
+            </div>
+          )}
+
+          {tokenError && (
+            <div className="text-xs text-red-500 bg-red-50 border border-red-200 rounded p-2">
+              {tokenError}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Multi-Agent Activity Feed - Issues 5.4 & 5.5 */}
+      {currentCanvasId && branches.length > 0 && (
+        <div className="border-t pt-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-xs font-semibold text-gray-700">
+              Active Agents ({branches.filter(b => b.status === 'active').length})
+            </div>
+            <button
+              onClick={fetchBranches}
+              disabled={loadingBranches}
+              className="text-xs text-blue-600 hover:text-blue-700 transition"
+            >
+              {loadingBranches ? '↻ Loading...' : '↻ Refresh'}
+            </button>
+          </div>
+
+          <div className="space-y-2">
+            {branches
+              .filter(b => b.status === 'active')
+              .map((branch) => {
+                const agentProposals = proposals.proposals.filter(
+                  p => p.branchId === branch.id
+                );
+                return (
+                  <div
+                    key={branch.id}
+                    className="border border-gray-200 rounded p-2 bg-gray-50"
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <span className="text-xs font-medium text-gray-900">
+                          {branch.agentId}
+                        </span>
+                      </div>
+                      <span className="text-xs text-gray-500">
+                        {agentProposals.length} proposal{agentProposals.length !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-600">
+                      Last updated: {new Date(branch.updatedAt).toLocaleString()}
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        </div>
+      )}
 
       {/* Proposals Section */}
       {currentCanvasId && (

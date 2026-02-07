@@ -8,6 +8,8 @@ import type { UseProposalsResult } from '../../hooks/useProposals';
 vi.mock('../../api/client', () => ({
   apiClient: {
     createCanvas: vi.fn(),
+    listBranches: vi.fn().mockResolvedValue({ data: [] }),
+    generateAgentToken: vi.fn(),
   },
 }));
 
