@@ -60,6 +60,8 @@ export interface RichTextEditorHandle {
   selectAll: () => void;
   applyFormatToSelection: (format: Partial<TextSpan>) => void;
   getSelection: () => { start: number; end: number } | null;
+  /** Re-render the editor content from spans (e.g. when formatting changes externally) */
+  reinitializeContent: (spans: TextSpan[], baseStyles: RichTextEditorProps['baseStyles']) => void;
 }
 
 // Convert spans to HTML with data attributes for tracking
@@ -353,6 +355,50 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
     },
     applyFormatToSelection,
     getSelection,
+    reinitializeContent: (spans: TextSpan[], newBaseStyles: RichTextEditorProps['baseStyles']) => {
+      if (!editorRef.current) return;
+      // Save current selection
+      const sel = window.getSelection();
+      let savedOffset: number | null = null;
+      if (sel && sel.rangeCount > 0) {
+        const range = sel.getRangeAt(0);
+        if (editorRef.current.contains(range.commonAncestorContainer)) {
+          const preRange = range.cloneRange();
+          preRange.selectNodeContents(editorRef.current);
+          preRange.setEnd(range.startContainer, range.startOffset);
+          savedOffset = preRange.toString().length;
+        }
+      }
+      // Re-render HTML from new spans
+      editorRef.current.innerHTML = spansToHtml(spans, newBaseStyles);
+      // Restore caret position
+      if (savedOffset !== null) {
+        try {
+          const walker = document.createTreeWalker(editorRef.current, NodeFilter.SHOW_TEXT);
+          let offset = 0;
+          let node: Text | null = null;
+          while (walker.nextNode()) {
+            const textNode = walker.currentNode as Text;
+            const len = textNode.textContent?.length ?? 0;
+            if (offset + len >= savedOffset) {
+              node = textNode;
+              break;
+            }
+            offset += len;
+          }
+          if (node) {
+            const newRange = document.createRange();
+            newRange.setStart(node, Math.min(savedOffset - offset, node.textContent?.length ?? 0));
+            newRange.collapse(true);
+            sel?.removeAllRanges();
+            sel?.addRange(newRange);
+          }
+        } catch {
+          // If caret restoration fails, just place at end
+          editorRef.current.focus();
+        }
+      }
+    },
   }), [applyFormatToSelection, getSelection]);
   
   // Handle selection change

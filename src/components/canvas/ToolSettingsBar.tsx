@@ -1,4 +1,4 @@
-import React from 'react';
+// ToolSettingsBar — persistent settings bar at top of canvas area
 
 interface ToolSettingsBarProps {
   tool: string;
@@ -23,6 +23,15 @@ interface ToolSettingsBarProps {
     arrowSize: number;
   };
   updateLineDefaults: (patch: Record<string, unknown>) => void;
+  /** Text defaults */
+  textDefaults: {
+    fontFamily: string;
+    fontSize: number;
+    fontWeight: string;
+    fontStyle: string;
+    color: string;
+  };
+  updateTextDefaults: (patch: Record<string, unknown>) => void;
   /** Snapping toggles */
   snapToGrid: boolean;
   setSnapToGrid: (snap: boolean) => void;
@@ -62,6 +71,8 @@ export function ToolSettingsBar({
   updateRectDefaults,
   lineDefaults,
   updateLineDefaults,
+  textDefaults,
+  updateTextDefaults,
   snapToGrid,
   setSnapToGrid,
   snapToObjects,
@@ -77,6 +88,7 @@ export function ToolSettingsBar({
   const isDrawingTool = Boolean(DRAWING_TOOLS[tool]);
   const isShapeTool = tool === 'rect' || tool === 'ellipse' || tool === 'polygon';
   const isLineTool = tool === 'line' || tool === 'curve';
+  const isTextTool = tool === 'text';
 
   return (
     <div className="absolute top-0 left-0 right-0 z-40 flex items-center gap-3 px-4 py-1.5 bg-white/95 backdrop-blur-sm border-b border-gray-200 text-xs select-none shadow-sm">
@@ -193,6 +205,66 @@ export function ToolSettingsBar({
             />
             <span className="w-8 text-right tabular-nums">{Math.round(rectDefaults.opacity * 100)}%</span>
           </label>
+        </>
+      )}
+
+      {/* Text tool settings */}
+      {isTextTool && (
+        <>
+          {/* Font Family */}
+          <label className="flex items-center gap-1.5 text-gray-600">
+            <span>Font</span>
+            <input
+              type="text"
+              value={textDefaults.fontFamily}
+              onChange={(e) => updateTextDefaults({ fontFamily: e.target.value })}
+              className="w-24 px-1 py-0.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-400"
+              placeholder="Arial"
+            />
+          </label>
+
+          {/* Font size auto-adjusts to zoom — show hint instead of static input */}
+          <span className="text-[10px] text-gray-400 italic" title="Font size auto-scales to match canvas zoom">Size: auto</span>
+
+          {/* Color */}
+          <label className="flex items-center gap-1.5 text-gray-600">
+            <span>Color</span>
+            <span className="relative">
+              <input
+                type="color"
+                value={textDefaults.color}
+                onChange={(e) => updateTextDefaults({ color: e.target.value })}
+                className="w-5 h-5 border border-gray-300 rounded cursor-pointer appearance-none p-0"
+                style={{ backgroundColor: textDefaults.color }}
+              />
+            </span>
+          </label>
+
+          {/* Bold toggle */}
+          <button
+            onClick={() => updateTextDefaults({ fontWeight: textDefaults.fontWeight === '700' || textDefaults.fontWeight === 'bold' ? '400' : '700' })}
+            className={`w-7 h-7 rounded flex items-center justify-center text-xs font-bold transition-colors ${
+              textDefaults.fontWeight === '700' || textDefaults.fontWeight === 'bold'
+                ? 'bg-blue-100 text-blue-600 border border-blue-300'
+                : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50'
+            }`}
+            title="Bold"
+          >
+            B
+          </button>
+
+          {/* Italic toggle */}
+          <button
+            onClick={() => updateTextDefaults({ fontStyle: textDefaults.fontStyle === 'italic' ? 'normal' : 'italic' })}
+            className={`w-7 h-7 rounded flex items-center justify-center text-xs italic transition-colors ${
+              textDefaults.fontStyle === 'italic'
+                ? 'bg-blue-100 text-blue-600 border border-blue-300'
+                : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50'
+            }`}
+            title="Italic"
+          >
+            I
+          </button>
         </>
       )}
 

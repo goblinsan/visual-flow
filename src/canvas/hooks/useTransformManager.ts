@@ -90,6 +90,10 @@ export function useTransformManager(
             const baseFontSize = textNode.fontSize ?? (textNode.variant === 'h1' ? 28 : textNode.variant === 'h2' ? 22 : textNode.variant === 'h3' ? 18 : 14);
             const scaleFactor = Math.max(0.1, scaleY);
             const newFontSize = Math.round(Math.max(8, baseFontSize * scaleFactor));
+            // Compute horizontal stretch factor when scaleX differs from scaleY
+            const baseTextScaleX = textNode.textScaleX ?? 1;
+            const horizontalStretch = scaleY !== 0 ? (scaleX / scaleY) : 1;
+            const newTextScaleX = Math.abs(horizontalStretch - 1) < 0.001 ? baseTextScaleX : baseTextScaleX * horizontalStretch;
             
             setSpec(prev => ({
               ...prev,
@@ -100,6 +104,7 @@ export function useTransformManager(
                   ...textN,
                   fontSize: newFontSize,
                   position: { x: newPos.x, y: newPos.y },
+                  textScaleX: Math.round(newTextScaleX * 1000) / 1000,
                 };
                 if (textN.spans && textN.spans.length > 0) {
                   result.spans = textN.spans.map(span => {
@@ -229,6 +234,10 @@ export function useTransformManager(
           const baseFontSize = textNode.fontSize ?? (textNode.variant === 'h1' ? 28 : textNode.variant === 'h2' ? 22 : textNode.variant === 'h3' ? 18 : 14);
           const scaleFactor = Math.max(0.1, scaleY);
           const newFontSize = Math.round(Math.max(8, baseFontSize * scaleFactor));
+          // Compute horizontal stretch factor when scaleX differs from scaleY
+          const baseTextScaleX = textNode.textScaleX ?? 1;
+          const horizontalStretch = scaleY !== 0 ? (scaleX / scaleY) : 1;
+          const newTextScaleX = Math.abs(horizontalStretch - 1) < 0.001 ? baseTextScaleX : baseTextScaleX * horizontalStretch;
           
           setSpec(prev => ({
             ...prev,
@@ -238,6 +247,7 @@ export function useTransformManager(
               const result: TextNode = {
                 ...textN,
                 fontSize: newFontSize,
+                textScaleX: Math.round(newTextScaleX * 1000) / 1000,
               };
               if (textN.spans && textN.spans.length > 0) {
                 result.spans = textN.spans.map(span => {

@@ -65,6 +65,7 @@ interface CanvasStageProps {
   onUngroup?: (ids: string[]) => void;
   rectDefaults?: { fill?: string; stroke?: string; strokeWidth: number; radius: number; opacity: number; strokeDash?: number[] };
   lineDefaults?: { stroke?: string; strokeWidth: number; startArrow?: boolean; endArrow?: boolean; arrowSize?: number };
+  textDefaults?: { fontFamily: string; fontSize: number; fontWeight: string; fontStyle: string; color: string };
   polygonSides?: number;
   setPolygonSides?: (sides: number) => void;
   selection: string[];
@@ -145,7 +146,7 @@ function InfiniteGrid({ width, height, scale, offsetX, offsetY, gridSize }: Infi
 
 function CanvasStage({ 
   spec, setSpec, width = 800, height = 600, tool = "select", onToolChange, selectedIconId, selectedComponentId, 
-  onUndo, onRedo, focusNodeId, onUngroup, rectDefaults, lineDefaults, polygonSides: propPolygonSides, setPolygonSides: propSetPolygonSides,
+  onUndo, onRedo, focusNodeId, onUngroup, rectDefaults, lineDefaults, textDefaults, polygonSides: propPolygonSides, setPolygonSides: propSetPolygonSides,
   selection, setSelection, selectedCurvePointIndex, setSelectedCurvePointIndex, 
   editingCurveId: propsEditingCurveId, onEditingCurveIdChange,
   blockCanvasClicksRef, skipNormalizationRef,
@@ -338,6 +339,7 @@ function CanvasStage({
     editingTextSpans,
     textSelection,
     richTextEditorRef,
+    textEditContainerRef,
     startTextEdit,
     commitTextEdit,
     cancelTextEdit,
@@ -473,6 +475,7 @@ function CanvasStage({
     startTextEdit,
     justStartedTextEditRef,
     justCreatedShapeRef,
+    textDefaults,
     onToolChange,
     setMenu,
     snapToGrid: propSnapToGrid ?? false,
@@ -1089,21 +1092,23 @@ function CanvasStage({
         const toolbarAnchor = { x: textX + textWidth / 2, y: textY };
         
         return (
-          <TextEditingOverlay
-            visible={true}
-            editingTextValue={editingTextValue}
-            editingTextSpans={editingTextSpans}
-            baseStyles={baseStyles}
-            textEditStyle={getTextEditStyle()}
-            textSelection={textSelection}
-            toolbarAnchorPosition={toolbarAnchor}
-            richTextEditorRef={richTextEditorRef}
-            onChange={handleTextChange}
-            onCommit={commitTextEdit}
-            onCancel={cancelTextEdit}
-            onSelectionChange={setTextSelection}
-            onApplyFormat={applyFormat}
-          />
+          <div ref={textEditContainerRef}>
+            <TextEditingOverlay
+              visible={true}
+              editingTextValue={editingTextValue}
+              editingTextSpans={editingTextSpans}
+              baseStyles={baseStyles}
+              textEditStyle={getTextEditStyle()}
+              textSelection={textSelection}
+              toolbarAnchorPosition={toolbarAnchor}
+              richTextEditorRef={richTextEditorRef}
+              onChange={handleTextChange}
+              onCommit={commitTextEdit}
+              onCancel={cancelTextEdit}
+              onSelectionChange={setTextSelection}
+              onApplyFormat={applyFormat}
+            />
+          </div>
         );
       })()}
       

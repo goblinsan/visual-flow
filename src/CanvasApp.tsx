@@ -385,6 +385,11 @@ export default function CanvasApp() {
   const updateLineDefaults = useCallback((patch: Record<string, unknown>) => {
     setLineDefaults(prev => ({ ...prev, ...patch }));
   }, []);
+  // Text default attributes
+  const [textDefaults, setTextDefaults] = useState({ fontFamily: 'Arial', fontSize: 14, fontWeight: '400' as string, fontStyle: 'normal' as string, color: '#000000' });
+  const updateTextDefaults = useCallback((patch: Record<string, unknown>) => {
+    setTextDefaults(prev => ({ ...prev, ...patch }));
+  }, []);
   // Polygon sides (lifted from CanvasStage so ToolSettingsBar can control it)
   const [polygonSides, setPolygonSides] = useState(5);
   // Snapping toggles
@@ -736,6 +741,8 @@ export default function CanvasApp() {
             updateRectDefaults={updateRectDefaults}
             lineDefaults={lineDefaults}
             updateLineDefaults={updateLineDefaults}
+            textDefaults={textDefaults}
+            updateTextDefaults={updateTextDefaults}
             snapToGrid={snapToGrid}
             setSnapToGrid={setSnapToGrid}
             snapToObjects={snapToObjects}
@@ -819,6 +826,7 @@ export default function CanvasApp() {
                   strokeDash: rectDefaults.strokeDash,
                 }}
                 lineDefaults={lineDefaults}
+                textDefaults={textDefaults}
                 viewportTransition={viewportTransition}
                 onViewportChange={handleViewportChange}
                 snapToGrid={snapToGrid}

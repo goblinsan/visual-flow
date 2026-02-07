@@ -82,6 +82,7 @@ interface UseMouseEventHandlersProps {
   startTextEdit: (id: string, node: TextNode) => void;
   justStartedTextEditRef: React.MutableRefObject<boolean>;
   justCreatedShapeRef?: React.MutableRefObject<boolean>;
+  textDefaults?: { fontFamily: string; fontSize: number; fontWeight: string; fontStyle: string; color: string };
   
   // Callbacks
   onToolChange?: (tool: string) => void;
@@ -159,6 +160,7 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
     startTextEdit,
     justStartedTextEditRef,
     justCreatedShapeRef,
+    textDefaults,
     onToolChange,
     setMenu,
     snapToGrid,
@@ -254,16 +256,24 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
       const pointer = stage.getPointerPosition(); if (!pointer) return;
       const world = toWorld(stage, pointer);
       
+      // Compute font size so text appears ~30px tall on screen regardless of zoom
+      const zoomAdjustedFontSize = Math.round(Math.max(8, Math.min(200, 30 / scale)));
+      const initialFontSize = zoomAdjustedFontSize;
+      const initialHeight = Math.round(initialFontSize * 1.4);
+      const initialWidth = Math.round(Math.max(200, initialFontSize * 10));
+      
       const id = 'text_' + Math.random().toString(36).slice(2, 9);
       const placeholderText: TextNode = {
         id,
         type: 'text',
         position: world,
-        size: { width: 200, height: 24 },
+        size: { width: initialWidth, height: initialHeight },
         text: ' ',
-        fontSize: 14,
-        fontFamily: 'Arial',
-        color: '#000000',
+        fontSize: initialFontSize,
+        fontFamily: textDefaults?.fontFamily ?? 'Arial',
+        fontWeight: (textDefaults?.fontWeight ?? '400') as TextNode['fontWeight'],
+        fontStyle: (textDefaults?.fontStyle ?? 'normal') as TextNode['fontStyle'],
+        color: textDefaults?.color ?? '#000000',
         spans: [],
       };
       setSpec(prev => appendNodesToRoot(prev, [placeholderText]));
