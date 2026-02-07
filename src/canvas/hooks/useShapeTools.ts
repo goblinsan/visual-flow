@@ -37,8 +37,11 @@ interface LineDefaults {
 }
 
 interface CurveDefaults {
+  fill?: string;
   stroke?: string;
   strokeWidth: number;
+  opacity: number;
+  closed: boolean;
   tension: number;
 }
 
@@ -55,7 +58,7 @@ interface PolygonDefaults {
 const DEFAULT_RECT_STYLE: RectDefaults = { fill: '#ffffff', stroke: '#334155', strokeWidth: 1, radius: 0, opacity: 1, strokeDash: undefined };
 const DEFAULT_ELLIPSE_STYLE: EllipseDefaults = { fill: '#ffffff', stroke: '#334155', strokeWidth: 1, opacity: 1 };
 const DEFAULT_LINE_STYLE: LineDefaults = { stroke: '#334155', strokeWidth: 2 };
-const DEFAULT_CURVE_STYLE: CurveDefaults = { stroke: '#334155', strokeWidth: 2, tension: 0.5 };
+const DEFAULT_CURVE_STYLE: CurveDefaults = { stroke: '#334155', strokeWidth: 2, tension: 0.5, opacity: 1, closed: false };
 const DEFAULT_POLYGON_STYLE: PolygonDefaults = { fill: '#ffffff', stroke: '#334155', strokeWidth: 1, opacity: 1, closed: true, sides: 5 };
 
 const updateRootChildren = (spec: LayoutSpec, updater: (children: LayoutNode[]) => LayoutNode[]): LayoutSpec => {
@@ -279,6 +282,9 @@ export function useShapeTools(
       stroke: defaults.stroke,
       strokeWidth: defaults.strokeWidth,
       tension: defaults.tension,
+      ...(defaults.fill && { fill: defaults.fill }),
+      ...(defaults.opacity !== undefined && { opacity: defaults.opacity }),
+      ...(defaults.closed !== undefined && { closed: defaults.closed }),
     };
     setSpec(prev => appendNodesToRoot(prev, [curveNode]));
     setSelection([id]);

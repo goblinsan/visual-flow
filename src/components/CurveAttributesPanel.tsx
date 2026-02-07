@@ -1,12 +1,15 @@
 import React from 'react';
-import { parseColor } from '../utils/color';
-import { parseDashPattern } from '../utils/dashPattern';
 import { Select } from './Select';
+import ColorControls from './ColorControls';
+import type { GradientFill } from './gradientUtils';
 
 export interface CurveNode {
   id: string;
   type: 'curve';
   points: number[];
+  closed?: boolean;
+  fill?: string;
+  fillGradient?: GradientFill;
   stroke?: string;
   strokeWidth?: number;
   opacity?: number;
@@ -24,6 +27,10 @@ export interface ControlPoint {
 
 export interface CurveAttributesPanelProps {
   curve: CurveNode;
+  lastFillById: Record<string, string>;
+  lastStrokeById: Record<string, string>;
+  setLastFillById: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  setLastStrokeById: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   updateNode: (patch: Partial<CurveNode>) => void;
   selectedPointIndex: number | null;
   setSelectedPointIndex: (idx: number | null) => void;
@@ -36,6 +43,10 @@ export interface CurveAttributesPanelProps {
 
 export const CurveAttributesPanel: React.FC<CurveAttributesPanelProps> = ({
   curve,
+  lastFillById,
+  lastStrokeById,
+  setLastFillById,
+  setLastStrokeById,
   updateNode,
   selectedPointIndex,
   setSelectedPointIndex,
@@ -45,14 +56,7 @@ export const CurveAttributesPanel: React.FC<CurveAttributesPanelProps> = ({
   pushRecent,
   recentColors,
 }) => {
-  const [localDash, setLocalDash] = React.useState('');
-  
-  React.useEffect(() => {
-    const dashStr = curve.strokeDash?.join(' ') ?? '';
-    setLocalDash(dashStr);
-  }, [curve.strokeDash]);
-
-  const { stroke, strokeWidth, opacity, lineCap, tension, points } = curve;
+  const { fill, fillGradient, stroke, strokeWidth, opacity, lineCap, tension, points, closed } = curve;
 
   // Parse points into control points array
   const controlPoints: ControlPoint[] = [];
@@ -99,75 +103,44 @@ export const CurveAttributesPanel: React.FC<CurveAttributesPanelProps> = ({
         <span className="font-medium">{controlPoints.length}</span>
       </div>
 
-      {/* Stroke Color */}
-      <div className="flex items-center gap-2">
-        <span className="text-[10px] font-medium text-gray-500">Stroke</span>
-        <label className="relative" title="Stroke color">
-          <input
-            type="color"
-            value={stroke || '#334155'}
-            onPointerDown={() => beginRecentSession(stroke || '#334155')}
-            onInput={e => { const val = (e.target as HTMLInputElement).value; updateNode({ stroke: val }); previewRecent(val); }}
-            onChange={e => { const val = e.target.value; previewRecent(val); }}
-            onBlur={e => { const val = e.target.value; if (parseColor(val)) commitRecent(val); }}
-            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-          />
-          <div className="w-9 h-9 rounded-lg border border-gray-200 shadow-sm flex items-center justify-center cursor-pointer hover:border-gray-300 transition-colors">
-            <div className="w-7 h-7 rounded" style={{ background: stroke || '#334155' }} />
-          </div>
-        </label>
+      {/* Closed Shape Toggle */}
+      <label className="flex items-center gap-2 cursor-pointer">
         <input
-          type="text"
-          value={stroke || '#334155'}
-          onChange={e => updateNode({ stroke: e.target.value })}
-          onBlur={e => { if (parseColor(e.target.value)) pushRecent(e.target.value); }}
-          className="flex-1 border border-gray-200 rounded-md px-2 py-1.5 text-[11px] font-mono bg-white focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition-colors"
+          type="checkbox"
+          checked={closed ?? false}
+          onChange={e => updateNode({ closed: e.target.checked })}
+          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
         />
-      </div>
+        <span className="text-[11px] font-medium text-gray-600 flex items-center gap-1.5">
+          <i className="fa-solid fa-link text-gray-400 text-[9px]" />
+          Closed Shape
+        </span>
+      </label>
 
-      {/* Recent Colors */}
-      {recentColors.length > 0 && (
-        <div className="mt-2">
-          <div className="text-[10px] font-medium text-gray-500 mb-1.5 flex items-center gap-1">
-            <i className="fa-solid fa-clock-rotate-left text-gray-400 text-[9px]" />
-            Recent
-          </div>
-          <div className="flex flex-wrap gap-1">
-            {recentColors.map(col => {
-              const hasAlpha = /#[0-9a-fA-F]{8}$/.test(col);
-              return (
-                <button
-                  key={col}
-                  type="button"
-                  title={col}
-                  onClick={() => { updateNode({ stroke: col }); pushRecent(col); }}
-                  className="w-6 h-6 rounded border border-gray-300 flex items-center justify-center relative group p-0"
-                >
-                  <span className="w-5 h-5 rounded checkerboard overflow-hidden relative">
-                    <span className="absolute inset-0" style={{ background: col }} />
-                    {hasAlpha && <span className="absolute bottom-0 right-0 px-0.5 rounded-tl bg-black/40 text-[8px] text-white leading-none">α</span>}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      {/* Color Controls - Same as Rectangle/Polygon */}
+      <ColorControls
+        id={curve.id}
+        fill={fill}
+        fillGradient={fillGradient}
+        stroke={stroke}
+        strokeWidth={strokeWidth}
+        radius={0}
+        opacity={opacity}
+        strokeDash={curve.strokeDash}
+        lastFillById={lastFillById}
+        lastStrokeById={lastStrokeById}
+        setLastFillById={setLastFillById}
+        setLastStrokeById={setLastStrokeById}
+        updateRect={updateNode}
+        beginRecentSession={beginRecentSession}
+        previewRecent={previewRecent}
+        commitRecent={commitRecent}
+        recentColors={recentColors}
+        pushRecent={pushRecent}
+      />
 
+      {/* Line Cap and Tension - Curve-specific controls */}
       <div className="grid grid-cols-2 gap-3">
-        <label className="flex flex-col gap-1.5">
-          <span className="text-[11px] font-medium text-gray-600 flex items-center gap-1">
-            <i className="fa-solid fa-border-all text-gray-400 text-[9px]" />
-            Width
-          </span>
-          <input
-            type="number"
-            min={1}
-            value={strokeWidth ?? 2}
-            onChange={e => updateNode({ strokeWidth: Math.max(1, Number(e.target.value) || 1) })}
-            className="border border-gray-200 rounded-md px-2 py-1.5 text-[11px] bg-white focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition-colors"
-          />
-        </label>
         <label className="flex flex-col gap-1.5">
           <span className="text-[11px] font-medium text-gray-600 flex items-center gap-1">
             <i className="fa-solid fa-draw-polygon text-gray-400 text-[9px]" />
@@ -183,65 +156,22 @@ export const CurveAttributesPanel: React.FC<CurveAttributesPanelProps> = ({
             ]}
           />
         </label>
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[11px] font-medium text-gray-600 flex items-center gap-1">
+            <i className="fa-solid fa-wave-square text-gray-400 text-[9px]" />
+            Tension
+          </span>
+          <input
+            type="number"
+            min={0}
+            max={1}
+            step={0.05}
+            value={(tension ?? 0.5).toFixed(2)}
+            onChange={e => updateNode({ tension: Number(e.target.value) })}
+            className="border border-gray-200 rounded-md px-2 py-1.5 text-[11px] bg-white focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition-colors"
+          />
+        </label>
       </div>
-
-      <label className="flex flex-col gap-1.5">
-        <span className="text-[11px] font-medium text-gray-600 flex items-center gap-1">
-          <i className="fa-solid fa-wave-square text-gray-400 text-[9px]" />
-          Tension ({(tension ?? 0.5).toFixed(2)})
-        </span>
-        <input
-          type="range"
-          min={0}
-          max={1}
-          step={0.05}
-          value={tension ?? 0.5}
-          onChange={e => updateNode({ tension: Number(e.target.value) })}
-          className="accent-blue-500"
-        />
-        <span className="text-[10px] text-gray-400">0 = sharp corners, 1 = smooth</span>
-      </label>
-
-      <label className="flex flex-col gap-1.5">
-        <span className="text-[11px] font-medium text-gray-600 flex items-center gap-1">
-          <i className="fa-solid fa-eye text-gray-400 text-[9px]" />
-          Opacity ({(opacity ?? 1).toFixed(2)})
-        </span>
-        <input
-          type="range"
-          min={0}
-          max={1}
-          step={0.01}
-          value={opacity ?? 1}
-          onChange={e => updateNode({ opacity: Number(e.target.value) })}
-          className="accent-blue-500"
-        />
-      </label>
-
-      <label className="flex flex-col gap-1.5">
-        <span className="text-[11px] font-medium text-gray-600 flex items-center gap-1.5">
-          <i className="fa-solid fa-grip-lines text-gray-400 text-[10px]" />
-          Dash Pattern
-        </span>
-        <input
-          type="text"
-          placeholder="e.g. 4 4"
-          value={localDash}
-          onChange={e => setLocalDash(e.target.value)}
-          onBlur={e => {
-            const { pattern } = parseDashPattern(e.target.value);
-            updateNode({ strokeDash: pattern.length ? pattern : undefined });
-          }}
-          onKeyDown={e => {
-            if (e.key === 'Enter') {
-              const { pattern } = parseDashPattern((e.target as HTMLInputElement).value);
-              updateNode({ strokeDash: pattern.length ? pattern : undefined });
-              (e.target as HTMLInputElement).blur();
-            }
-          }}
-          className="border border-gray-200 rounded-md px-2 py-1.5 text-[11px] font-mono bg-white focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition-colors"
-        />
-      </label>
 
       {/* Control Points Editor */}
       <div className="border-t border-gray-200 pt-3 mt-3">

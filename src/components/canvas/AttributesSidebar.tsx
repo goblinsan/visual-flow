@@ -177,6 +177,10 @@ export function AttributesSidebar({
               <h4 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Curve Properties</h4>
               <CurveAttributesPanel
                 curve={curveNode}
+                lastFillById={lastFillById}
+                lastStrokeById={lastStrokeById}
+                setLastFillById={setLastFillById}
+                setLastStrokeById={setLastStrokeById}
                 updateNode={(patch) => {
                   setSpec(prev => ({
                     ...prev,
@@ -367,6 +371,10 @@ export function AttributesSidebar({
                 return (
                   <CurveAttributesPanel
                     curve={curve}
+                    lastFillById={lastFillById}
+                    lastStrokeById={lastStrokeById}
+                    setLastFillById={setLastFillById}
+                    setLastStrokeById={setLastStrokeById}
                     updateNode={updateCurve}
                     selectedPointIndex={selectedCurvePointIndex}
                     setSelectedPointIndex={setSelectedCurvePointIndex}

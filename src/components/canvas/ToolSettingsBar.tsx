@@ -155,6 +155,16 @@ interface ToolSettingsBarProps {
     arrowSize: number;
   };
   updateLineDefaults: (patch: Record<string, unknown>) => void;
+  /** Curve defaults */
+  curveDefaults: {
+    fill?: string;
+    stroke?: string;
+    strokeWidth: number;
+    opacity: number;
+    closed: boolean;
+    tension: number;
+  };
+  updateCurveDefaults: (patch: Record<string, unknown>) => void;
   /** Text defaults */
   textDefaults: {
     fontFamily: string;
@@ -203,6 +213,8 @@ export function ToolSettingsBar({
   updateRectDefaults,
   lineDefaults,
   updateLineDefaults,
+  curveDefaults,
+  updateCurveDefaults,
   textDefaults,
   updateTextDefaults,
   snapToGrid,
@@ -219,7 +231,7 @@ export function ToolSettingsBar({
 }: ToolSettingsBarProps) {
   const isDrawingTool = Boolean(DRAWING_TOOLS[tool]);
   const isShapeTool = tool === 'rect' || tool === 'ellipse' || tool === 'polygon';
-  const isLineTool = tool === 'line' || tool === 'curve';
+  const isLineTool = tool === 'line';
   const isTextTool = tool === 'text';
 
   return (
@@ -426,6 +438,97 @@ export function ToolSettingsBar({
               }}
               className="w-12 px-1 py-0.5 border border-gray-300 rounded text-center text-xs focus:outline-none focus:ring-1 focus:ring-blue-400"
             />
+          </label>
+        </>
+      )}
+
+      {/* Curve tool settings */}
+      {tool === 'curve' && (
+        <>
+          {/* Stroke color */}
+          <label className="flex items-center gap-1.5 text-gray-600">
+            <span>Stroke</span>
+            <span className="relative">
+              <input
+                type="color"
+                value={curveDefaults.stroke || '#334155'}
+                onChange={(e) => updateCurveDefaults({ stroke: e.target.value })}
+                className="w-5 h-5 border border-gray-300 rounded cursor-pointer appearance-none p-0"
+                style={{ backgroundColor: curveDefaults.stroke || '#334155' }}
+              />
+            </span>
+          </label>
+
+          {/* Stroke width */}
+          <label className="flex items-center gap-1.5 text-gray-600">
+            <span>Weight</span>
+            <input
+              type="number"
+              min={1}
+              max={20}
+              step={0.5}
+              value={curveDefaults.strokeWidth}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value);
+                if (!isNaN(v) && v >= 1) updateCurveDefaults({ strokeWidth: v });
+              }}
+              className="w-12 px-1 py-0.5 border border-gray-300 rounded text-center text-xs focus:outline-none focus:ring-1 focus:ring-blue-400"
+            />
+          </label>
+
+          <div className="w-px h-4 bg-gray-200" />
+
+          {/* Fill color */}
+          <label className="flex items-center gap-1.5 text-gray-600">
+            <span>Fill</span>
+            <span className="relative">
+              <input
+                type="color"
+                value={curveDefaults.fill || '#ffffff'}
+                onChange={(e) => updateCurveDefaults({ fill: e.target.value })}
+                className="w-5 h-5 border border-gray-300 rounded cursor-pointer appearance-none p-0"
+                style={{ backgroundColor: curveDefaults.fill || '#ffffff' }}
+              />
+            </span>
+          </label>
+
+          {/* Fill toggle */}
+          <label className="flex items-center gap-1 text-gray-600 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={!!curveDefaults.fill}
+              onChange={(e) => updateCurveDefaults({ fill: e.target.checked ? '#ffffff' : undefined })}
+              className="w-3.5 h-3.5 accent-blue-500 rounded"
+            />
+            <span>Fill</span>
+          </label>
+
+          {/* Opacity */}
+          <label className="flex items-center gap-1.5 text-gray-600">
+            <span>Opacity</span>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={curveDefaults.opacity}
+              onChange={(e) => updateCurveDefaults({ opacity: parseFloat(e.target.value) })}
+              className="w-16 h-3 accent-blue-500"
+            />
+            <span className="w-8 text-right tabular-nums">{Math.round(curveDefaults.opacity * 100)}%</span>
+          </label>
+
+          <div className="w-px h-4 bg-gray-200" />
+
+          {/* Closed shape toggle */}
+          <label className="flex items-center gap-1 text-gray-600 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={curveDefaults.closed}
+              onChange={(e) => updateCurveDefaults({ closed: e.target.checked })}
+              className="w-3.5 h-3.5 accent-blue-500 rounded"
+            />
+            <span>Closed</span>
           </label>
         </>
       )}

@@ -65,6 +65,7 @@ interface CanvasStageProps {
   onUngroup?: (ids: string[]) => void;
   rectDefaults?: { fill?: string; stroke?: string; strokeWidth: number; radius: number; opacity: number; strokeDash?: number[] };
   lineDefaults?: { stroke?: string; strokeWidth: number; startArrow?: boolean; endArrow?: boolean; arrowSize?: number };
+  curveDefaults?: { fill?: string; stroke?: string; strokeWidth: number; opacity: number; closed: boolean; tension: number };
   textDefaults?: { fontFamily: string; fontSize: number; fontWeight: string; fontStyle: string; color: string };
   polygonSides?: number;
   setPolygonSides?: (sides: number) => void;
@@ -146,7 +147,7 @@ function InfiniteGrid({ width, height, scale, offsetX, offsetY, gridSize }: Infi
 
 function CanvasStage({ 
   spec, setSpec, width = 800, height = 600, tool = "select", onToolChange, selectedIconId, selectedComponentId, 
-  onUndo, onRedo, focusNodeId, onUngroup, rectDefaults, lineDefaults, textDefaults, polygonSides: propPolygonSides, setPolygonSides: propSetPolygonSides,
+  onUndo, onRedo, focusNodeId, onUngroup, rectDefaults, lineDefaults, curveDefaults, textDefaults, polygonSides: propPolygonSides, setPolygonSides: propSetPolygonSides,
   selection, setSelection, selectedCurvePointIndex, setSelectedCurvePointIndex, 
   editingCurveId: propsEditingCurveId, onEditingCurveIdChange,
   blockCanvasClicksRef, skipNormalizationRef,
@@ -310,7 +311,7 @@ function CanvasStage({
   const setPolygonSides = propSetPolygonSides ?? setLocalPolygonSides;
 
   // Use shape tools hook
-  const shapeTools = useShapeTools(setSpec, setSelection, onToolChange, rectDefaults, undefined, lineDefaults, undefined);
+  const shapeTools = useShapeTools(setSpec, setSelection, onToolChange, rectDefaults, undefined, lineDefaults, curveDefaults);
 
   // Use selection manager hook
   const selectionManager = useSelectionManager(stageRef, spec.root.id, getTopContainerAncestorMemo);

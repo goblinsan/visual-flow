@@ -184,6 +184,9 @@ export interface CurveNode extends BaseNode {
                          // each segment: [outDx, outDy, inDx, inDy]
   anchorTypes?: ("smooth" | "sharp")[]; // per-anchor handle constraint type
   position?: Pos;        // offset for the curve group
+  closed?: boolean;      // whether the shape is closed (connects last point to first)
+  fill?: string;         // CSS fill color (can be applied to open or closed shapes)
+  fillGradient?: GradientFill; // gradient fill
   stroke?: string;       // CSS stroke color
   strokeWidth?: number;  // px
   strokeDash?: number[]; // dash pattern
