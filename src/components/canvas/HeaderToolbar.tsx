@@ -2,6 +2,7 @@ import type { RefObject } from "react";
 import type { ConnectionStatus, UserAwareness } from '../../collaboration/types';
 import { ConnectionStatusIndicator } from '../ConnectionStatusIndicator';
 import { ActiveUsersList } from '../ActiveUsersList';
+import SignIn from '../SignIn';
 
 export interface HeaderToolbarProps {
   headerRef: RefObject<HTMLDivElement | null>;
@@ -131,6 +132,10 @@ export function HeaderToolbar({
             <ActiveUsersList collaborators={collaborators} maxVisible={4} />
           </div>
         )}
+        {/* Sign-in (Cloudflare Access) */}
+        <div className="flex items-center">
+          <SignIn />
+        </div>
         {/* Share button */}
         <button
           onClick={() => setShareDialogOpen(true)}
