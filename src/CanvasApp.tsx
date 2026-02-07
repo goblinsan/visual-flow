@@ -31,6 +31,7 @@ import { HeaderToolbar } from './components/canvas/HeaderToolbar';
 import { LeftToolbar } from './components/canvas/LeftToolbar';
 import { AttributesSidebar } from './components/canvas/AttributesSidebar';
 import { AgentPanel } from './components/canvas/AgentPanel';
+import { ToolSettingsBar } from './components/canvas/ToolSettingsBar';
 
 /** Get room ID from URL query param ?room=xxx */
 function getRoomIdFromURL(): string | null {
@@ -379,6 +380,13 @@ export default function CanvasApp() {
   
   // Rectangle default attributes (persisted)
   const { defaults: rectDefaults, update: updateRectDefaults } = usePersistentRectDefaults({ fill: '#ffffff', stroke: '#334155', strokeWidth: 1, radius: 0, opacity: 1, strokeDash: undefined });
+  // Line default attributes
+  const [lineDefaults, setLineDefaults] = useState({ stroke: '#334155', strokeWidth: 2, startArrow: false, endArrow: false, arrowSize: 1 });
+  const updateLineDefaults = useCallback((patch: Record<string, unknown>) => {
+    setLineDefaults(prev => ({ ...prev, ...patch }));
+  }, []);
+  // Polygon sides (lifted from CanvasStage so ToolSettingsBar can control it)
+  const [polygonSides, setPolygonSides] = useState(5);
   // Recent colors via hook
   const { recentColors, beginSession: beginRecentSession, previewColor: previewRecent, commitColor: commitRecent } = useRecentColors();
   const [canvasRef, canvasSize] = useElementSize<HTMLDivElement>();
@@ -705,6 +713,22 @@ export default function CanvasApp() {
         <main 
           className="flex-1 relative min-w-0"
         >
+          {/* Tool settings bar overlays the top of the canvas */}
+          <ToolSettingsBar
+            tool={tool}
+            polygonSides={polygonSides}
+            setPolygonSides={setPolygonSides}
+            rectDefaults={{
+              fill: rectDefaults.fill,
+              stroke: rectDefaults.stroke,
+              strokeWidth: rectDefaults.strokeWidth ?? 1,
+              radius: rectDefaults.radius ?? 0,
+              opacity: rectDefaults.opacity ?? 1,
+            }}
+            updateRectDefaults={updateRectDefaults}
+            lineDefaults={lineDefaults}
+            updateLineDefaults={updateLineDefaults}
+          />
           <div 
             ref={canvasRef} 
             className="absolute inset-0 overflow-hidden"
@@ -765,6 +789,8 @@ export default function CanvasApp() {
                 blockCanvasClicksRef={blockCanvasClicksRef}
                 skipNormalizationRef={skipNormalizationRef}
                 fitToContentKey={fitToContentKey}
+                polygonSides={polygonSides}
+                setPolygonSides={setPolygonSides}
                 rectDefaults={{
                   fill: rectDefaults.fill,
                   stroke: rectDefaults.stroke,
@@ -773,6 +799,7 @@ export default function CanvasApp() {
                   opacity: rectDefaults.opacity ?? 1,
                   strokeDash: rectDefaults.strokeDash,
                 }}
+                lineDefaults={lineDefaults}
                 viewportTransition={viewportTransition}
                 onViewportChange={handleViewportChange}
                 />

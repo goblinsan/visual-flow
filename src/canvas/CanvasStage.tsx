@@ -63,6 +63,9 @@ interface CanvasStageProps {
   focusNodeId?: string | null;
   onUngroup?: (ids: string[]) => void;
   rectDefaults?: { fill?: string; stroke?: string; strokeWidth: number; radius: number; opacity: number; strokeDash?: number[] };
+  lineDefaults?: { stroke?: string; strokeWidth: number; startArrow?: boolean; endArrow?: boolean; arrowSize?: number };
+  polygonSides?: number;
+  setPolygonSides?: (sides: number) => void;
   selection: string[];
   setSelection: (ids: string[]) => void;
   selectedCurvePointIndex?: number | null;
@@ -135,7 +138,8 @@ function InfiniteGrid({ width, height, scale, offsetX, offsetY }: InfiniteGridPr
 
 function CanvasStage({ 
   spec, setSpec, width = 800, height = 600, tool = "select", onToolChange, selectedIconId, selectedComponentId, 
-  onUndo, onRedo, focusNodeId, onUngroup, rectDefaults, selection, setSelection, selectedCurvePointIndex, setSelectedCurvePointIndex, 
+  onUndo, onRedo, focusNodeId, onUngroup, rectDefaults, lineDefaults, polygonSides: propPolygonSides, setPolygonSides: propSetPolygonSides,
+  selection, setSelection, selectedCurvePointIndex, setSelectedCurvePointIndex, 
   editingCurveId: propsEditingCurveId, onEditingCurveIdChange,
   blockCanvasClicksRef, skipNormalizationRef,
   fitToContentKey, viewportTransition, onViewportChange 
@@ -217,10 +221,13 @@ function CanvasStage({
   const wrapperRef = useRef<HTMLDivElement>(null);
   const marqueeRectRef = useRef<Konva.Rect>(null);
 
+  // Track last-handled focusNodeId so we only pan once per focus request
+  const lastFocusedRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!focusNodeId) return;
+    if (!focusNodeId || focusNodeId === lastFocusedRef.current) return;
     const node = findNode(spec.root, focusNodeId);
     if (!node) return;
+    lastFocusedRef.current = focusNodeId;
     const pos = node.position ?? { x: 0, y: 0 };
     const size = node.size ?? { width: 300, height: 200 };
     const padding = 60;
@@ -276,10 +283,13 @@ function CanvasStage({
   }>(null);
   
   // Polygon sides (adjustable with mouse wheel during creation)
-  const [polygonSides, setPolygonSides] = useState(5);
+  // Use prop if provided, otherwise fall back to local state
+  const [localPolygonSides, setLocalPolygonSides] = useState(5);
+  const polygonSides = propPolygonSides ?? localPolygonSides;
+  const setPolygonSides = propSetPolygonSides ?? setLocalPolygonSides;
 
   // Use shape tools hook
-  const shapeTools = useShapeTools(setSpec, setSelection, onToolChange, rectDefaults, undefined, undefined, undefined);
+  const shapeTools = useShapeTools(setSpec, setSelection, onToolChange, rectDefaults, undefined, lineDefaults, undefined);
 
   // Use selection manager hook
   const selectionManager = useSelectionManager(stageRef, spec.root.id, getTopContainerAncestorMemo);
@@ -487,15 +497,17 @@ function CanvasStage({
     return () => window.removeEventListener('keydown', onKey, CAPTURE_OPTIONS);
   }, [isCurveMode, curveDraft, finalizeCurve]);
 
-  // Polygon: finalize on Enter, cancel on Escape
+  // Global listeners for polygon draft (supports dragging outside stage bounds)
   useEffect(() => {
-    if (!isPolygonMode) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { setPolygonDraft(null); }
-    };
-    window.addEventListener('keydown', onKey, CAPTURE_OPTIONS);
-    return () => window.removeEventListener('keydown', onKey, CAPTURE_OPTIONS);
-  }, [isPolygonMode]);
+    if (!isPolygonMode || !polygonDraft) return;
+    return setupGlobalDraftListeners(stageRef, setPolygonDraft, finalizePolygon);
+  }, [isPolygonMode, polygonDraft, finalizePolygon]);
+
+  // Cancel polygon draft with Escape
+  useEffect(() => {
+    if (!isPolygonMode || !polygonDraft) return;
+    return setupEscapeCancelListener(setPolygonDraft, CAPTURE_OPTIONS);
+  }, [isPolygonMode, polygonDraft]);
   
   // Polygon: adjust sides with mouse wheel during creation
   useEffect(() => {

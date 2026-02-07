@@ -30,6 +30,9 @@ interface EllipseDefaults {
 interface LineDefaults {
   stroke?: string;
   strokeWidth: number;
+  startArrow?: boolean;
+  endArrow?: boolean;
+  arrowSize?: number;
 }
 
 interface CurveDefaults {
@@ -234,6 +237,9 @@ export function useShapeTools(
       points,
       stroke: defaults.stroke,
       strokeWidth: defaults.strokeWidth,
+      startArrow: defaults.startArrow,
+      endArrow: defaults.endArrow,
+      arrowSize: defaults.arrowSize,
     };
     setSpec(prev => appendNodesToRoot(prev, [lineNode]));
     setSelection([id]);

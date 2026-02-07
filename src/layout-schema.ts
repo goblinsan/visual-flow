@@ -179,14 +179,17 @@ export interface LineNode extends BaseNode {
 /** Curve/bezier shape node (quadratic or cubic bezier). */
 export interface CurveNode extends BaseNode {
   type: "curve";
-  points: number[];      // [x1, y1, cx1, cy1, (cx2, cy2,) x2, y2] for quadratic/cubic
+  points: number[];      // anchor points [x1, y1, x2, y2, ...] (relative to position)
+  handles?: number[];    // per-segment bezier control handle offsets [(N-1)*4 numbers]
+                         // each segment: [outDx, outDy, inDx, inDy]
+  anchorTypes?: ("smooth" | "sharp")[]; // per-anchor handle constraint type
   position?: Pos;        // offset for the curve group
   stroke?: string;       // CSS stroke color
   strokeWidth?: number;  // px
   strokeDash?: number[]; // dash pattern
   lineCap?: "butt" | "round" | "square";
-  tension?: number;      // spline tension (0-1)
-  handleType?: "smooth" | "sharp"; // bezier handle constraint type (default "smooth")
+  tension?: number;      // spline tension (0-1), used when handles is absent
+  handleType?: "smooth" | "sharp"; // default handle constraint type
 }
 
 /** Polygon shape node (closed multi-point shape). */

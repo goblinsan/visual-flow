@@ -1,4 +1,4 @@
-import { Group, Rect, Text, Ellipse, Line } from "react-konva";
+import { Group, Rect, Text, Ellipse, Line, Arrow } from "react-konva";
 import { type ReactNode, useEffect, useState } from "react";
 import { computeRectVisual } from "../renderer/rectVisual";
 import { estimateNodeHeight } from "../renderer/measurement";
@@ -6,6 +6,7 @@ import type { LayoutNode, FrameNode, StackNode, TextNode, BoxNode, GridNode, Gro
 import { CanvasImage } from "./components/CanvasImage";
 import { debugOnce, logger } from "../utils/logger";
 import { parseColor } from "../utils/color";
+import { getAnchors, computeDefaultHandles, computeBezierPath } from "./utils/bezierUtils";
 
 // Font loading cache and callbacks
 const loadedFonts = new Set<string>();
@@ -442,28 +443,42 @@ function renderEllipse(n: EllipseNode) {
   );
 }
 
-// Line shape (straight line)
+// Line shape (straight line, or arrow if start/end arrows are enabled)
 function renderLine(n: LineNode) {
   const x = n.position?.x ?? 0;
   const y = n.position?.y ?? 0;
+  const hasArrow = n.startArrow === true || n.endArrow === true;
   
-  // Calculate arrow points if arrows are enabled
+  // Calculate arrow dimensions
   const pointerLength = (n.arrowSize ?? 1) * 10;
   const pointerWidth = (n.arrowSize ?? 1) * 8;
   
   return (
     <Group key={n.id} id={n.id} name={`node ${n.type}`} x={x} y={y} rotation={n.rotation ?? 0} opacity={n.opacity ?? 1}>
-      <Line
-        points={n.points}
-        stroke={n.stroke ?? "#334155"}
-        strokeWidth={n.strokeWidth ?? 2}
-        dash={n.strokeDash}
-        lineCap={n.lineCap ?? "round"}
-        pointerAtBeginning={n.startArrow === true}
-        pointerAtEnding={n.endArrow === true}
-        pointerLength={pointerLength}
-        pointerWidth={pointerWidth}
-      />
+      {hasArrow ? (
+        <Arrow
+          points={n.points}
+          stroke={n.stroke ?? "#334155"}
+          strokeWidth={n.strokeWidth ?? 2}
+          dash={n.strokeDash}
+          lineCap={n.lineCap ?? "round"}
+          fill={n.stroke ?? "#334155"}
+          pointerAtBeginning={n.startArrow === true}
+          pointerAtEnding={n.endArrow === true}
+          pointerLength={pointerLength}
+          pointerWidth={pointerWidth}
+          hitStrokeWidth={Math.max(20, (n.strokeWidth ?? 2) + 18)}
+        />
+      ) : (
+        <Line
+          points={n.points}
+          stroke={n.stroke ?? "#334155"}
+          strokeWidth={n.strokeWidth ?? 2}
+          dash={n.strokeDash}
+          lineCap={n.lineCap ?? "round"}
+          hitStrokeWidth={Math.max(20, (n.strokeWidth ?? 2) + 18)}
+        />
+      )}
     </Group>
   );
 }
@@ -472,16 +487,31 @@ function renderLine(n: LineNode) {
 function renderCurve(n: CurveNode) {
   const x = n.position?.x ?? 0;
   const y = n.position?.y ?? 0;
+
+  // If handles exist, render as cubic Bezier. Otherwise use tension-based spline.
+  const hasHandles = n.handles && n.handles.length > 0;
+  let renderPoints: number[];
+  let useBezier: boolean;
+
+  if (hasHandles) {
+    const anchors = getAnchors(n.points);
+    renderPoints = computeBezierPath(anchors, n.handles!);
+    useBezier = true;
+  } else {
+    renderPoints = n.points;
+    useBezier = false;
+  }
+
   return (
     <Group key={n.id} id={n.id} name={`node ${n.type}`} x={x} y={y} rotation={n.rotation ?? 0} opacity={n.opacity ?? 1}>
       <Line
-        points={n.points}
+        points={renderPoints}
         stroke={n.stroke ?? "#334155"}
         strokeWidth={n.strokeWidth ?? 2}
         dash={n.strokeDash}
         lineCap={n.lineCap ?? "round"}
-        tension={n.tension ?? 0.5}
-        bezier={n.tension === undefined || n.tension === 0}
+        tension={useBezier ? 0 : (n.tension ?? 0.5)}
+        bezier={useBezier}
         listening={true}
         hitStrokeWidth={20}
       />

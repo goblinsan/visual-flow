@@ -177,14 +177,10 @@ describe('useShapeTools', () => {
     const { result } = renderHook(() => useShapeTools(setSpec, setSelection, onToolChange));
 
     const polygonDraft = {
-      points: [
-        { x: 10, y: 10 },
-        { x: 50, y: 30 },
-        { x: 30, y: 60 },
-      ],
-      current: { x: 30, y: 60 }
+      start: { x: 10, y: 10 },
+      current: { x: 90, y: 90 }
     };
-    result.current.finalizePolygon(polygonDraft);
+    result.current.finalizePolygon(polygonDraft, false, false, 5);
 
     expect(setSpec).toHaveBeenCalled();
     expect(setSelection).toHaveBeenCalled();
@@ -193,7 +189,7 @@ describe('useShapeTools', () => {
     expect(updatedSpec.root.children[0].type).toBe('polygon');
   });
 
-  it('finalizePolygon handles too few points', () => {
+  it('finalizePolygon handles click (no drag) with default size', () => {
     const spec = mkSpec();
     let updatedSpec = spec;
     const setSpec = vi.fn((updater: any) => {
@@ -204,14 +200,13 @@ describe('useShapeTools', () => {
     const { result } = renderHook(() => useShapeTools(setSpec, setSelection));
 
     const polygonDraft = {
-      points: [
-        { x: 10, y: 10 },
-        { x: 50, y: 30 },
-      ],
-      current: { x: 50, y: 30 }
+      start: { x: 10, y: 10 },
+      current: { x: 11, y: 11 } // Almost no drag — click
     };
-    result.current.finalizePolygon(polygonDraft);
+    result.current.finalizePolygon(polygonDraft, false, false, 5);
 
-    // Should not create polygon with only 2 points
-    expect(updatedSpec.root.children.length).toBe(0);
+    // Should still create polygon with default size
+    expect(setSpec).toHaveBeenCalled();
+    expect(updatedSpec.root.children.length).toBe(1);
+    expect(updatedSpec.root.children[0].type).toBe('polygon');
   });
