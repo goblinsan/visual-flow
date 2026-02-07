@@ -38,10 +38,20 @@ function parseArgs() {
   
   for (const arg of args) {
     if (arg.startsWith('--')) {
-      const [key, value] = arg.slice(2).split('=');
-      if (key && value) {
-        result[key] = value;
+      const equalIndex = arg.indexOf('=');
+      if (equalIndex === -1) {
+        console.error(`⚠️  Warning: Argument '${arg}' is missing a value. Use format: --key=value`);
+        continue;
       }
+      const key = arg.slice(2, equalIndex);
+      const value = arg.slice(equalIndex + 1);
+      if (!key || !value) {
+        console.error(`⚠️  Warning: Invalid argument format '${arg}'. Use format: --key=value`);
+        continue;
+      }
+      result[key] = value;
+    } else {
+      console.error(`⚠️  Warning: Unknown argument '${arg}'. Arguments must start with --`);
     }
   }
   

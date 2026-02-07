@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { LayoutSpec } from "../../layout-schema";
 import { applyProposalOperations } from '../../utils/proposalHelpers';
 import type { UseProposalsResult } from '../../hooks/useProposals';
@@ -40,17 +40,7 @@ export function AgentPanel({
   const [branches, setBranches] = useState<AgentBranch[]>([]);
   const [loadingBranches, setLoadingBranches] = useState(false);
 
-  // Auto-fetch branches when canvas ID changes
-  useEffect(() => {
-    if (currentCanvasId) {
-      fetchBranches();
-      const interval = setInterval(fetchBranches, 5000); // Auto-refresh every 5 seconds
-      return () => clearInterval(interval);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentCanvasId]);
-
-  const fetchBranches = async () => {
+  const fetchBranches = useCallback(async () => {
     if (!currentCanvasId) return;
     setLoadingBranches(true);
     try {
@@ -64,7 +54,17 @@ export function AgentPanel({
     } finally {
       setLoadingBranches(false);
     }
-  };
+  }, [currentCanvasId]);
+
+  // Auto-fetch branches when canvas ID changes
+  useEffect(() => {
+    if (currentCanvasId) {
+      fetchBranches();
+      // Only auto-refresh every 10 seconds to reduce API load
+      const interval = setInterval(fetchBranches, 10000);
+      return () => clearInterval(interval);
+    }
+  }, [currentCanvasId, fetchBranches]);
 
   const handleGenerateToken = async () => {
     if (!currentCanvasId) return;

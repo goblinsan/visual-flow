@@ -1,6 +1,6 @@
 {
   "name": "vizail-mcp-server",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "MCP server for Vizail Canvas — allows any AI agent to interact with canvas designs",
   "bin": {
     "vizail-mcp": "./dist/index.js"
@@ -24,7 +24,7 @@
     "url": "https://github.com/goblinsan/visual-flow.git",
     "directory": "workers/mcp"
   },
-  "author": "",
+  "author": "Vizail Contributors",
   "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0"
