@@ -1,9 +1,20 @@
-import type { JSX } from "react";
+import { useState, type JSX } from "react";
 import { Modal } from "../Modal";
 import type { LayoutSpec } from "../../layout-schema";
 import type { SavedDesign } from "../../utils/persistence";
 import { getSavedDesigns } from "../../utils/persistence";
 import { COMPONENT_LIBRARY, ICON_LIBRARY } from "../../library";
+
+const COMPONENT_CATEGORIES = [
+  { key: "all", label: "All" },
+  { key: "buttons", label: "Buttons" },
+  { key: "inputs", label: "Inputs" },
+  { key: "navigation", label: "Navigation" },
+  { key: "surfaces", label: "Surfaces" },
+  { key: "feedback", label: "Feedback" },
+  { key: "data-display", label: "Data" },
+  { key: "layout", label: "Layout" },
+] as const;
 
 export interface DialogManagerProps {
   // Dialog state
@@ -54,6 +65,86 @@ export interface DialogManagerProps {
     description: string;
     build: () => LayoutSpec;
   }>;
+}
+
+function ComponentLibraryBrowser({
+  selectedComponentId,
+  onSelect,
+}: {
+  selectedComponentId: string;
+  onSelect: (id: string) => void;
+}) {
+  const [search, setSearch] = useState("");
+  const [activeCategory, setActiveCategory] = useState<string>("all");
+
+  const q = search.trim().toLowerCase();
+  const filtered = COMPONENT_LIBRARY.filter((c) => {
+    const matchesCategory = activeCategory === "all" || c.category === activeCategory;
+    const matchesSearch =
+      !q ||
+      c.name.toLowerCase().includes(q) ||
+      c.description.toLowerCase().includes(q) ||
+      c.category.toLowerCase().includes(q);
+    return matchesCategory && matchesSearch;
+  });
+
+  return (
+    <>
+      {/* Search */}
+      <div className="relative mb-3">
+        <i className="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-[10px]" />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search components..."
+          className="w-full border border-gray-200 rounded-md pl-7 pr-2 py-2 text-[11px] bg-white focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition-colors"
+        />
+      </div>
+      {/* Category tabs */}
+      <div className="flex gap-1 mb-3 flex-wrap">
+        {COMPONENT_CATEGORIES.map((cat) => (
+          <button
+            key={cat.key}
+            type="button"
+            onClick={() => setActiveCategory(cat.key)}
+            className={`px-2 py-1 rounded-full text-[10px] font-medium transition-colors ${
+              activeCategory === cat.key
+                ? "bg-blue-100 text-blue-700 border border-blue-300"
+                : "bg-gray-100 text-gray-600 border border-transparent hover:bg-gray-200"
+            }`}
+          >
+            {cat.label}
+          </button>
+        ))}
+      </div>
+      {/* Component grid */}
+      <div className="grid grid-cols-2 gap-2 max-h-[50vh] overflow-y-auto pr-1">
+        {filtered.map((component) => (
+          <button
+            key={component.id}
+            type="button"
+            onClick={() => onSelect(component.id)}
+            className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg border text-left transition-colors ${
+              selectedComponentId === component.id
+                ? "border-blue-500 bg-blue-50"
+                : "border-gray-200 hover:bg-gray-50"
+            }`}
+          >
+            <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-500 shrink-0">
+              <i className={component.iconClassName} />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[12px] font-medium text-gray-800 truncate">{component.name}</div>
+              <div className="text-[10px] text-gray-500 truncate">{component.description}</div>
+            </div>
+          </button>
+        ))}
+      </div>
+      {filtered.length === 0 && (
+        <div className="mt-3 text-[11px] text-gray-500">No components match your search.</div>
+      )}
+    </>
+  );
 }
 
 export function DialogManager({
@@ -243,31 +334,13 @@ export function DialogManager({
       {/* Component Library Modal */}
       <Modal open={componentLibraryOpen} onClose={() => setComponentLibraryOpen(false)} title="Components" size="md" variant="light">
         <p className="text-xs text-gray-600 mb-3">Choose a component to place on the canvas.</p>
-        <div className="grid grid-cols-1 gap-2 max-h-[50vh] overflow-y-auto pr-1">
-          {COMPONENT_LIBRARY.map((component) => (
-            <button
-              key={component.id}
-              type="button"
-              onClick={() => {
-                setSelectedComponentId(component.id);
-                setComponentLibraryOpen(false);
-              }}
-              className={`flex items-center gap-3 px-3 py-2 rounded-lg border text-left transition-colors ${
-                selectedComponentId === component.id
-                  ? 'border-blue-500 bg-blue-50'
-                  : 'border-gray-200 hover:bg-gray-50'
-              }`}
-            >
-              <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center text-gray-500">
-                <i className={`${component.iconClassName}`} />
-              </div>
-              <div>
-                <div className="text-sm font-medium text-gray-800">{component.name}</div>
-                <div className="text-[11px] text-gray-500">{component.description}</div>
-              </div>
-            </button>
-          ))}
-        </div>
+        <ComponentLibraryBrowser
+          selectedComponentId={selectedComponentId}
+          onSelect={(id) => {
+            setSelectedComponentId(id);
+            setComponentLibraryOpen(false);
+          }}
+        />
       </Modal>
 
       {/* New Design Template Dialog */}

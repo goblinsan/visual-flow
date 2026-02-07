@@ -1,4 +1,5 @@
 import { Rect, Ellipse, Line } from "react-konva";
+import { generateRegularPolygonPoints } from "../utils/polygonPoints";
 
 interface DraftState {
   start: { x: number; y: number };
@@ -15,10 +16,13 @@ interface DraftPreviewLayerProps {
   isEllipseMode: boolean;
   isLineMode: boolean;
   isCurveMode: boolean;
+  isPolygonMode: boolean;
   rectDraft: DraftState | null;
   ellipseDraft: DraftState | null;
   lineDraft: DraftState | null;
   curveDraft: CurveDraftState | null;
+  polygonDraft: DraftState | null;
+  polygonSides: number;
   altPressed: boolean;
   shiftPressed: boolean;
 }
@@ -28,10 +32,13 @@ export function DraftPreviewLayer({
   isEllipseMode,
   isLineMode,
   isCurveMode,
+  isPolygonMode,
   rectDraft,
   ellipseDraft,
   lineDraft,
   curveDraft,
+  polygonDraft,
+  polygonSides,
   altPressed,
   shiftPressed,
 }: DraftPreviewLayerProps) {
@@ -143,6 +150,50 @@ export function DraftPreviewLayer({
             dash={[6,4]}
             lineCap="round"
             tension={0.5}
+            listening={false}
+          />
+        );
+      })()}
+      
+      {/* Polygon draft preview */}
+      {isPolygonMode && polygonDraft && (() => {
+        const { start, current } = polygonDraft;
+        let x = start.x, y = start.y, w = current.x - start.x, h = current.y - start.y;
+        const alt = altPressed; const shift = shiftPressed;
+        if (alt) {
+          w = (current.x - start.x) * 2;
+          h = (current.y - start.y) * 2;
+        }
+        if (shift) {
+          const m = Math.max(Math.abs(w), Math.abs(h));
+          w = Math.sign(w || 1) * m;
+          h = Math.sign(h || 1) * m;
+        }
+        if (alt) {
+          x = start.x - Math.abs(w)/2;
+          y = start.y - Math.abs(h)/2;
+          w = Math.abs(w); h = Math.abs(h);
+        } else {
+          if (w < 0) { x = x + w; w = Math.abs(w);} 
+          if (h < 0) { y = y + h; h = Math.abs(h);} 
+        }
+        
+        // Generate regular polygon points (normalized to bounding box)
+        const localPoints = generateRegularPolygonPoints(Math.max(1, w), Math.max(1, h), polygonSides);
+        // Offset to absolute position
+        const points: number[] = [];
+        for (let i = 0; i < localPoints.length; i += 2) {
+          points.push(localPoints[i] + x, localPoints[i + 1] + y);
+        }
+        
+        return (
+          <Line
+            points={points}
+            closed={true}
+            fill={'rgba(255,255,255,0.35)'}
+            stroke={'#334155'}
+            strokeWidth={1}
+            dash={[6,4]}
             listening={false}
           />
         );

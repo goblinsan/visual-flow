@@ -1,8 +1,9 @@
 import { useCallback, useState, useRef, useEffect } from 'react';
 import type Konva from 'konva';
-import type { LayoutSpec, LayoutNode, FrameNode, TextNode, Size } from '../../layout-schema';
+import type { LayoutSpec, LayoutNode, FrameNode, TextNode, PolygonNode, Size } from '../../layout-schema';
 import { mapNode } from '../../commands/types';
 import { applyPosition, applyPositionAndSize } from '../stage-internal';
+import { generateRegularPolygonPoints } from '../../utils/polygonPoints';
 
 interface TransformSession {
   nodes: Record<string, { topLeft: {x:number;y:number}; size:{width:number;height:number}; center:{x:number;y:number} }>;
@@ -89,6 +90,10 @@ export function useTransformManager(
             const baseFontSize = textNode.fontSize ?? (textNode.variant === 'h1' ? 28 : textNode.variant === 'h2' ? 22 : textNode.variant === 'h3' ? 18 : 14);
             const scaleFactor = Math.max(0.1, scaleY);
             const newFontSize = Math.round(Math.max(8, baseFontSize * scaleFactor));
+            // Compute horizontal stretch factor when scaleX differs from scaleY
+            const baseTextScaleX = textNode.textScaleX ?? 1;
+            const horizontalStretch = scaleY !== 0 ? (scaleX / scaleY) : 1;
+            const newTextScaleX = Math.abs(horizontalStretch - 1) < 0.001 ? baseTextScaleX : baseTextScaleX * horizontalStretch;
             
             setSpec(prev => ({
               ...prev,
@@ -99,6 +104,7 @@ export function useTransformManager(
                   ...textN,
                   fontSize: newFontSize,
                   position: { x: newPos.x, y: newPos.y },
+                  textScaleX: Math.round(newTextScaleX * 1000) / 1000,
                 };
                 if (textN.spans && textN.spans.length > 0) {
                   result.spans = textN.spans.map(span => {
@@ -132,7 +138,26 @@ export function useTransformManager(
                 })
               }));
             } else {
-              setSpec(prev => applyPositionAndSize(prev, nodeId, newPos, newSize));
+              // Special handling for polygon - regenerate points when size changes
+              if (currentNode.type === 'polygon') {
+                const polygonNode = currentNode as PolygonNode;
+                const sides = polygonNode.sides ?? 5;
+                const newPoints = generateRegularPolygonPoints(newSize.width, newSize.height, sides);
+                setSpec(prev => ({
+                  ...prev,
+                  root: mapNode<FrameNode>(prev.root, nodeId, (n) => {
+                    if (n.type !== 'polygon') return n;
+                    return {
+                      ...n,
+                      position: { x: newPos.x, y: newPos.y },
+                      size: newSize,
+                      points: newPoints,
+                    };
+                  })
+                }));
+              } else {
+                setSpec(prev => applyPositionAndSize(prev, nodeId, newPos, newSize));
+              }
             }
           }
         }
@@ -209,6 +234,10 @@ export function useTransformManager(
           const baseFontSize = textNode.fontSize ?? (textNode.variant === 'h1' ? 28 : textNode.variant === 'h2' ? 22 : textNode.variant === 'h3' ? 18 : 14);
           const scaleFactor = Math.max(0.1, scaleY);
           const newFontSize = Math.round(Math.max(8, baseFontSize * scaleFactor));
+          // Compute horizontal stretch factor when scaleX differs from scaleY
+          const baseTextScaleX = textNode.textScaleX ?? 1;
+          const horizontalStretch = scaleY !== 0 ? (scaleX / scaleY) : 1;
+          const newTextScaleX = Math.abs(horizontalStretch - 1) < 0.001 ? baseTextScaleX : baseTextScaleX * horizontalStretch;
           
           setSpec(prev => ({
             ...prev,
@@ -218,6 +247,7 @@ export function useTransformManager(
               const result: TextNode = {
                 ...textN,
                 fontSize: newFontSize,
+                textScaleX: Math.round(newTextScaleX * 1000) / 1000,
               };
               if (textN.spans && textN.spans.length > 0) {
                 result.spans = textN.spans.map(span => {
@@ -252,7 +282,26 @@ export function useTransformManager(
                 })
               }));
             } else {
-              setSpec(prev => applyPositionAndSize(prev, nodeId, newPos, newSize));
+              // Special handling for polygon - regenerate points when size changes
+              if (currentNode.type === 'polygon') {
+                const polygonNode = currentNode as PolygonNode;
+                const sides = polygonNode.sides ?? 5;
+                const newPoints = generateRegularPolygonPoints(newSize.width, newSize.height, sides);
+                setSpec(prev => ({
+                  ...prev,
+                  root: mapNode<FrameNode>(prev.root, nodeId, (n) => {
+                    if (n.type !== 'polygon') return n;
+                    return {
+                      ...n,
+                      position: newPos,
+                      size: newSize,
+                      points: newPoints,
+                    };
+                  })
+                }));
+              } else {
+                setSpec(prev => applyPositionAndSize(prev, nodeId, newPos, newSize));
+              }
             }
           }
         }

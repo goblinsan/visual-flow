@@ -164,3 +164,49 @@ describe('useShapeTools', () => {
     expect(setSelection).not.toHaveBeenCalled();
   });
 });
+
+  it('finalizePolygon creates a polygon node', () => {
+    const spec = mkSpec();
+    let updatedSpec = spec;
+    const setSpec = vi.fn((updater: any) => {
+      updatedSpec = typeof updater === 'function' ? updater(updatedSpec) : updater;
+    });
+    const setSelection = vi.fn();
+    const onToolChange = vi.fn();
+
+    const { result } = renderHook(() => useShapeTools(setSpec, setSelection, onToolChange));
+
+    const polygonDraft = {
+      start: { x: 10, y: 10 },
+      current: { x: 90, y: 90 }
+    };
+    result.current.finalizePolygon(polygonDraft, false, false, 5);
+
+    expect(setSpec).toHaveBeenCalled();
+    expect(setSelection).toHaveBeenCalled();
+    expect(onToolChange).toHaveBeenCalledWith('select');
+    expect(updatedSpec.root.children.length).toBe(1);
+    expect(updatedSpec.root.children[0].type).toBe('polygon');
+  });
+
+  it('finalizePolygon handles click (no drag) with default size', () => {
+    const spec = mkSpec();
+    let updatedSpec = spec;
+    const setSpec = vi.fn((updater: any) => {
+      updatedSpec = typeof updater === 'function' ? updater(updatedSpec) : updater;
+    });
+    const setSelection = vi.fn();
+
+    const { result } = renderHook(() => useShapeTools(setSpec, setSelection));
+
+    const polygonDraft = {
+      start: { x: 10, y: 10 },
+      current: { x: 11, y: 11 } // Almost no drag — click
+    };
+    result.current.finalizePolygon(polygonDraft, false, false, 5);
+
+    // Should still create polygon with default size
+    expect(setSpec).toHaveBeenCalled();
+    expect(updatedSpec.root.children.length).toBe(1);
+    expect(updatedSpec.root.children[0].type).toBe('polygon');
+  });

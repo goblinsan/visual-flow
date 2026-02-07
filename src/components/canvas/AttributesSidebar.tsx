@@ -4,6 +4,7 @@ import RectAttributesPanel from '../RectAttributesPanel';
 import EllipseAttributesPanel from '../EllipseAttributesPanel';
 import LineAttributesPanel from '../LineAttributesPanel';
 import CurveAttributesPanel from '../CurveAttributesPanel';
+import PolygonAttributesPanel from '../PolygonAttributesPanel';
 import TextAttributesPanel from '../TextAttributesPanel';
 import ImageAttributesPanel from '../ImageAttributesPanel';
 import DefaultsPanel from '../DefaultsPanel';
@@ -16,6 +17,7 @@ import type {
   EllipseNode,
   LineNode,
   CurveNode,
+  PolygonNode,
   TextNode,
   ImageNode,
   FlowTransition,
@@ -175,6 +177,10 @@ export function AttributesSidebar({
               <h4 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Curve Properties</h4>
               <CurveAttributesPanel
                 curve={curveNode}
+                lastFillById={lastFillById}
+                lastStrokeById={lastStrokeById}
+                setLastFillById={setLastFillById}
+                setLastStrokeById={setLastStrokeById}
                 updateNode={(patch) => {
                   setSpec(prev => ({
                     ...prev,
@@ -365,9 +371,33 @@ export function AttributesSidebar({
                 return (
                   <CurveAttributesPanel
                     curve={curve}
+                    lastFillById={lastFillById}
+                    lastStrokeById={lastStrokeById}
+                    setLastFillById={setLastFillById}
+                    setLastStrokeById={setLastStrokeById}
                     updateNode={updateCurve}
                     selectedPointIndex={selectedCurvePointIndex}
                     setSelectedPointIndex={setSelectedCurvePointIndex}
+                    beginRecentSession={beginRecentSession}
+                    previewRecent={previewRecent}
+                    commitRecent={commitRecent}
+                    pushRecent={pushRecent}
+                    recentColors={recentColors}
+                  />
+                );
+              }
+
+              if (targetNode.type === 'polygon') {
+                const polygon = targetNode as PolygonNode;
+                const updatePolygon = createUpdateFn(polygon.id);
+                return (
+                  <PolygonAttributesPanel
+                    polygon={polygon}
+                    lastFillById={lastFillById}
+                    lastStrokeById={lastStrokeById}
+                    setLastFillById={setLastFillById}
+                    setLastStrokeById={setLastStrokeById}
+                    updateNode={updatePolygon}
                     beginRecentSession={beginRecentSession}
                     previewRecent={previewRecent}
                     commitRecent={commitRecent}

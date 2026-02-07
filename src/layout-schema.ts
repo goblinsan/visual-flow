@@ -11,7 +11,8 @@ export type NodeType =
   | "group"
   | "ellipse"
   | "line"
-  | "curve";
+  | "curve"
+  | "polygon";
 
 export interface BaseNode {
   id: string;
@@ -170,18 +171,42 @@ export interface LineNode extends BaseNode {
   strokeWidth?: number;  // px
   strokeDash?: number[]; // dash pattern
   lineCap?: "butt" | "round" | "square";
+  startArrow?: boolean;  // arrow at start point
+  endArrow?: boolean;    // arrow at end point
+  arrowSize?: number;    // arrow size multiplier (default 1)
 }
 
 /** Curve/bezier shape node (quadratic or cubic bezier). */
 export interface CurveNode extends BaseNode {
   type: "curve";
-  points: number[];      // [x1, y1, cx1, cy1, (cx2, cy2,) x2, y2] for quadratic/cubic
+  points: number[];      // anchor points [x1, y1, x2, y2, ...] (relative to position)
+  handles?: number[];    // per-segment bezier control handle offsets [(N-1)*4 numbers]
+                         // each segment: [outDx, outDy, inDx, inDy]
+  anchorTypes?: ("smooth" | "sharp")[]; // per-anchor handle constraint type
   position?: Pos;        // offset for the curve group
+  closed?: boolean;      // whether the shape is closed (connects last point to first)
+  fill?: string;         // CSS fill color (can be applied to open or closed shapes)
+  fillGradient?: GradientFill; // gradient fill
   stroke?: string;       // CSS stroke color
   strokeWidth?: number;  // px
   strokeDash?: number[]; // dash pattern
   lineCap?: "butt" | "round" | "square";
-  tension?: number;      // spline tension (0-1)
+  tension?: number;      // spline tension (0-1), used when handles is absent
+  handleType?: "smooth" | "sharp"; // default handle constraint type
+}
+
+/** Polygon shape node (closed multi-point shape). */
+export interface PolygonNode extends BaseNode, Partial<AbsoluteChild> {
+  type: "polygon";
+  points: number[];      // [x1, y1, x2, y2, ..., xn, yn] array of vertices
+  position?: Pos;        // offset for the polygon group
+  fill?: string;         // CSS fill color (solid)
+  fillGradient?: GradientFill; // gradient fill (overrides fill if set)
+  stroke?: string;       // CSS stroke color
+  strokeWidth?: number;  // px
+  strokeDash?: number[]; // dash pattern
+  closed?: boolean;      // whether the polygon is closed (default true)
+  sides?: number;        // number of sides for regular polygon (3-30, default 5)
 }
 
 export type LayoutNode =
@@ -195,7 +220,8 @@ export type LayoutNode =
   | RectNode
   | EllipseNode
   | LineNode
-  | CurveNode;
+  | CurveNode
+  | PolygonNode;
 
 export interface LayoutSpec {
   version?: string; // schema version (e.g., "1.0.0"); undefined = legacy/pre-versioning

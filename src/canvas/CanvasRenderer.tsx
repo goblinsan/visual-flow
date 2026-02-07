@@ -1,10 +1,12 @@
-import { Group, Rect, Text, Ellipse, Line } from "react-konva";
+import { Group, Rect, Text, Ellipse, Line, Arrow, Shape } from "react-konva";
 import { type ReactNode, useEffect, useState } from "react";
 import { computeRectVisual } from "../renderer/rectVisual";
 import { estimateNodeHeight } from "../renderer/measurement";
-import type { LayoutNode, FrameNode, StackNode, TextNode, BoxNode, GridNode, GroupNode, ImageNode, RectNode, EllipseNode, LineNode, CurveNode } from "../layout-schema.ts";
+import type { LayoutNode, FrameNode, StackNode, TextNode, BoxNode, GridNode, GroupNode, ImageNode, RectNode, EllipseNode, LineNode, CurveNode, PolygonNode } from "../layout-schema.ts";
 import { CanvasImage } from "./components/CanvasImage";
 import { debugOnce, logger } from "../utils/logger";
+import { parseColor } from "../utils/color";
+import { getAnchors, computeBezierPath } from "./utils/bezierUtils";
 
 // Font loading cache and callbacks
 const loadedFonts = new Set<string>();
@@ -441,39 +443,306 @@ function renderEllipse(n: EllipseNode) {
   );
 }
 
-// Line shape (straight line)
+// Line shape (straight line, or arrow if start/end arrows are enabled)
 function renderLine(n: LineNode) {
   const x = n.position?.x ?? 0;
   const y = n.position?.y ?? 0;
+  const hasArrow = n.startArrow === true || n.endArrow === true;
+  
+  // Calculate arrow dimensions
+  const pointerLength = (n.arrowSize ?? 1) * 10;
+  const pointerWidth = (n.arrowSize ?? 1) * 8;
+  
   return (
     <Group key={n.id} id={n.id} name={`node ${n.type}`} x={x} y={y} rotation={n.rotation ?? 0} opacity={n.opacity ?? 1}>
-      <Line
-        points={n.points}
-        stroke={n.stroke ?? "#334155"}
-        strokeWidth={n.strokeWidth ?? 2}
-        dash={n.strokeDash}
-        lineCap={n.lineCap ?? "round"}
-      />
+      {hasArrow ? (
+        <Arrow
+          points={n.points}
+          stroke={n.stroke ?? "#334155"}
+          strokeWidth={n.strokeWidth ?? 2}
+          dash={n.strokeDash}
+          lineCap={n.lineCap ?? "round"}
+          fill={n.stroke ?? "#334155"}
+          pointerAtBeginning={n.startArrow === true}
+          pointerAtEnding={n.endArrow === true}
+          pointerLength={pointerLength}
+          pointerWidth={pointerWidth}
+          hitStrokeWidth={Math.max(20, (n.strokeWidth ?? 2) + 18)}
+        />
+      ) : (
+        <Line
+          points={n.points}
+          stroke={n.stroke ?? "#334155"}
+          strokeWidth={n.strokeWidth ?? 2}
+          dash={n.strokeDash}
+          lineCap={n.lineCap ?? "round"}
+          hitStrokeWidth={Math.max(20, (n.strokeWidth ?? 2) + 18)}
+        />
+      )}
     </Group>
   );
+}
+
+/**
+ * Compute control points for a tension-based cardinal spline (open path).
+ * Replicates Konva's internal _expandPoints() so we can draw the exact same
+ * open curve path in a custom sceneFunc and then close it with a straight line
+ * for fill purposes — avoiding the closed-spline wrap-around that distorts the shape.
+ */
+function expandOpenSpline(points: number[], tension: number): number[] {
+  const result: number[] = [];
+  const len = points.length;
+  for (let n = 2; n < len - 2; n += 2) {
+    const x0 = points[n - 2], y0 = points[n - 1];
+    const x1 = points[n],     y1 = points[n + 1];
+    const x2 = points[n + 2], y2 = points[n + 3];
+    const d01 = Math.sqrt((x1 - x0) ** 2 + (y1 - y0) ** 2);
+    const d12 = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+    const denom = d01 + d12;
+    if (denom === 0) continue;
+    const fa = (tension * d01) / denom;
+    const fb = (tension * d12) / denom;
+    result.push(
+      x1 - fa * (x2 - x0), y1 - fa * (y2 - y0),  // before-control
+      x1, y1,                                      // anchor point
+      x1 + fb * (x2 - x0), y1 + fb * (y2 - y0)   // after-control
+    );
+  }
+  return result;
+}
+
+/**
+ * Draw the open curve path on a Canvas2D context, matching Konva's open Line
+ * rendering exactly (quadratic end segments + cubic bezier middle segments).
+ */
+function traceOpenCurvePath(
+  ctx: { beginPath(): void; moveTo(x: number, y: number): void; lineTo(x: number, y: number): void; quadraticCurveTo(cpx: number, cpy: number, x: number, y: number): void; bezierCurveTo(cp1x: number, cp1y: number, cp2x: number, cp2y: number, x: number, y: number): void },
+  pts: number[],
+  tensionVal: number,
+  isBezier: boolean
+): void {
+  ctx.beginPath();
+  ctx.moveTo(pts[0], pts[1]);
+
+  if (isBezier) {
+    // Cubic bezier: control points are baked into the array as groups of 6
+    for (let i = 2; i < pts.length; i += 6) {
+      ctx.bezierCurveTo(pts[i], pts[i+1], pts[i+2], pts[i+3], pts[i+4], pts[i+5]);
+    }
+  } else if (tensionVal !== 0 && pts.length > 4) {
+    // Cardinal spline — expand to control points then draw
+    const tp = expandOpenSpline(pts, tensionVal);
+    const tpLen = tp.length;
+    // First segment: quadratic from first anchor to first interior point
+    ctx.quadraticCurveTo(tp[0], tp[1], tp[2], tp[3]);
+    // Middle segments: cubic bezier between interior points
+    for (let i = 4; i < tpLen - 2; i += 6) {
+      ctx.bezierCurveTo(tp[i], tp[i+1], tp[i+2], tp[i+3], tp[i+4], tp[i+5]);
+    }
+    // Last segment: quadratic from last interior point to last anchor
+    ctx.quadraticCurveTo(tp[tpLen - 2], tp[tpLen - 1], pts[pts.length - 2], pts[pts.length - 1]);
+  } else {
+    // Simple line segments
+    for (let i = 2; i < pts.length; i += 2) {
+      ctx.lineTo(pts[i], pts[i + 1]);
+    }
+  }
 }
 
 // Curve shape (bezier/spline)
 function renderCurve(n: CurveNode) {
   const x = n.position?.x ?? 0;
   const y = n.position?.y ?? 0;
+  const closed = n.closed ?? false;
+
+  // If handles exist, render as cubic Bezier. Otherwise use tension-based spline.
+  const hasHandles = n.handles && n.handles.length > 0;
+  let renderPoints: number[];
+  let useBezier: boolean;
+
+  if (hasHandles) {
+    const anchors = getAnchors(n.points);
+    renderPoints = computeBezierPath(anchors, n.handles!);
+    useBezier = true;
+  } else {
+    renderPoints = n.points;
+    useBezier = false;
+  }
+
+  // Determine fill (supports gradient)
+  let fillProps: any = {};
+  if (n.fill !== undefined || n.fillGradient !== undefined) {
+    if (n.fillGradient) {
+      const colorStops: number[] = [];
+      n.fillGradient.colors.forEach((color, index) => {
+        const position = index / (n.fillGradient!.colors.length - 1);
+        const rgba = parseColor(color);
+        if (rgba) {
+          colorStops.push(position, rgba.r / 255, rgba.g / 255, rgba.b / 255);
+        }
+      });
+
+      if (n.fillGradient.type === 'linear') {
+        const xs = renderPoints.filter((_, i) => i % 2 === 0);
+        const ys = renderPoints.filter((_, i) => i % 2 === 1);
+        const minX = Math.min(...xs);
+        const maxX = Math.max(...xs);
+        const minY = Math.min(...ys);
+        const maxY = Math.max(...ys);
+        const angle = (n.fillGradient.angle ?? 0) * (Math.PI / 180);
+        const dx = Math.cos(angle) * (maxX - minX);
+        const dy = Math.sin(angle) * (maxY - minY);
+        fillProps = {
+          fillLinearGradientStartPoint: { x: minX, y: minY },
+          fillLinearGradientEndPoint: { x: minX + dx, y: minY + dy },
+          fillLinearGradientColorStops: colorStops,
+        };
+      } else {
+        const xs = renderPoints.filter((_, i) => i % 2 === 0);
+        const ys = renderPoints.filter((_, i) => i % 2 === 1);
+        const centerX = (Math.min(...xs) + Math.max(...xs)) / 2;
+        const centerY = (Math.min(...ys) + Math.max(...ys)) / 2;
+        const radius = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) / 2;
+        fillProps = {
+          fillRadialGradientStartPoint: { x: centerX, y: centerY },
+          fillRadialGradientEndPoint: { x: centerX, y: centerY },
+          fillRadialGradientStartRadius: 0,
+          fillRadialGradientEndRadius: radius,
+          fillRadialGradientColorStops: colorStops,
+        };
+      }
+    } else {
+      fillProps = { fill: n.fill };
+    }
+  }
+
+  const hasFill = Object.keys(fillProps).length > 0;
+  const tensionVal = useBezier ? 0 : (n.tension ?? 0.5);
+
+  // For open curves with fill, render two layers:
+  // 1. A Shape using sceneFunc that traces the exact open curve path, then
+  //    closePath() (straight line back to start) so the fill hugs the curve.
+  //    Using <Line closed={true}> would use a *closed* spline interpolation
+  //    that wraps around the endpoints and distorts the fill boundary.
+  // 2. A normal open <Line> for the stroke.
+  // For closed curves or no fill, a single <Line> suffices.
+  const needsSplitRender = hasFill && !closed;
+
+  /* Captured for the sceneFunc closure */
+  const _fillPoints = renderPoints;
+  const _fillTension = tensionVal;
+  const _fillBezier = useBezier;
+
+  return (
+    <Group key={n.id} id={n.id} name={`node ${n.type}`} x={x} y={y} rotation={n.rotation ?? 0} opacity={n.opacity ?? 1}>
+      {needsSplitRender ? (
+        <>
+          {/* Fill layer: traces exact open path then closes with straight line */}
+          <Shape
+            sceneFunc={(ctx, shape) => {
+              traceOpenCurvePath(ctx, _fillPoints, _fillTension, _fillBezier);
+              ctx.closePath();
+              ctx.fillShape(shape);
+            }}
+            {...fillProps}
+            listening={false}
+          />
+          {/* Stroke layer: open path so stroke doesn't show closing segment */}
+          <Line
+            points={renderPoints}
+            closed={false}
+            stroke={n.stroke}
+            strokeWidth={n.strokeWidth ?? 2}
+            dash={n.strokeDash}
+            lineCap={n.lineCap ?? "round"}
+            tension={tensionVal}
+            bezier={useBezier}
+            listening={true}
+            hitStrokeWidth={20}
+          />
+        </>
+      ) : (
+        <Line
+          points={renderPoints}
+          closed={closed}
+          {...fillProps}
+          stroke={n.stroke}
+          strokeWidth={n.strokeWidth ?? 2}
+          dash={n.strokeDash}
+          lineCap={n.lineCap ?? "round"}
+          tension={tensionVal}
+          bezier={useBezier}
+          listening={true}
+          hitStrokeWidth={20}
+        />
+      )}
+    </Group>
+  );
+}
+
+// Polygon shape (multi-point closed/open shape)
+function renderPolygon(n: PolygonNode) {
+  const x = n.position?.x ?? 0;
+  const y = n.position?.y ?? 0;
+  const closed = n.closed ?? true;
+  
+  // Determine fill and stroke status
+  const hasFill = n.fill !== undefined || n.fillGradient !== undefined;
+  const hasStroke = n.stroke !== undefined;
+  
+  // Handle gradient fills
+  let gradientProps: any = {};
+  if (n.fillGradient) {
+    const colorStops: number[] = [];
+    n.fillGradient.colors.forEach((color, index) => {
+      const position = index / (n.fillGradient!.colors.length - 1);
+      const rgba = parseColor(color);
+      if (rgba) {
+        colorStops.push(position, rgba.r / 255, rgba.g / 255, rgba.b / 255);
+      }
+    });
+    
+    if (n.fillGradient.type === 'linear') {
+      // Calculate bounding box for gradient positioning
+      const xs = n.points.filter((_, i) => i % 2 === 0);
+      const ys = n.points.filter((_, i) => i % 2 === 1);
+      const minX = Math.min(...xs);
+      const maxX = Math.max(...xs);
+      const minY = Math.min(...ys);
+      const maxY = Math.max(...ys);
+      const centerX = (minX + maxX) / 2;
+      const centerY = (minY + maxY) / 2;
+      
+      const angle = n.fillGradient.angle ?? 0;
+      const rad = (angle * Math.PI) / 180;
+      const len = Math.max(maxX - minX, maxY - minY);
+      
+      gradientProps = {
+        fillLinearGradientStartPoint: {
+          x: centerX - Math.cos(rad) * len / 2,
+          y: centerY - Math.sin(rad) * len / 2,
+        },
+        fillLinearGradientEndPoint: {
+          x: centerX + Math.cos(rad) * len / 2,
+          y: centerY + Math.sin(rad) * len / 2,
+        },
+        fillLinearGradientColorStops: colorStops,
+      };
+    }
+  }
+  
   return (
     <Group key={n.id} id={n.id} name={`node ${n.type}`} x={x} y={y} rotation={n.rotation ?? 0} opacity={n.opacity ?? 1}>
       <Line
         points={n.points}
+        closed={closed}
+        fill={n.fillGradient ? undefined : (n.fill ?? "#ffffff")}
+        fillEnabled={hasFill}
         stroke={n.stroke ?? "#334155"}
-        strokeWidth={n.strokeWidth ?? 2}
+        strokeEnabled={hasStroke || !hasFill}
+        strokeWidth={n.strokeWidth ?? 1}
         dash={n.strokeDash}
-        lineCap={n.lineCap ?? "round"}
-        tension={n.tension ?? 0.5}
-        bezier={n.tension === undefined || n.tension === 0}
-        listening={true}
-        hitStrokeWidth={20}
+        {...gradientProps}
       />
     </Group>
   );
@@ -493,6 +762,7 @@ export function renderNode(n: LayoutNode): ReactNode {
     case "ellipse": return renderEllipse(n);
     case "line": return renderLine(n);
     case "curve": return renderCurve(n);
+    case "polygon": return renderPolygon(n);
     default:
       logger.warn('Unknown node type', n);
       return null;

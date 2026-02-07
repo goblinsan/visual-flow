@@ -1,10 +1,11 @@
-import { Stage, Layer, Transformer, Rect, Group, Circle } from "react-konva";
+import { Stage, Layer, Transformer, Rect, Group, Circle, Line } from "react-konva";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { JSX } from "react";
 import type Konva from "konva";
 import type { LayoutNode, LayoutSpec, TextNode } from "../layout-schema.ts";
 import { renderNode, useFontLoading } from "./CanvasRenderer.tsx";
 import type { DragSession } from "../interaction/types";
+import type { SnapGuideLine, SpacingGuide, SnapAnchor } from "../interaction/snapping";
 import type { MarqueeSession } from "../interaction/marquee";
 import { applyPosition, groupNodes, ungroupNodes } from "./stage-internal";
 import { nodeHasChildren } from "../commands/types";
@@ -63,6 +64,11 @@ interface CanvasStageProps {
   focusNodeId?: string | null;
   onUngroup?: (ids: string[]) => void;
   rectDefaults?: { fill?: string; stroke?: string; strokeWidth: number; radius: number; opacity: number; strokeDash?: number[] };
+  lineDefaults?: { stroke?: string; strokeWidth: number; startArrow?: boolean; endArrow?: boolean; arrowSize?: number };
+  curveDefaults?: { fill?: string; stroke?: string; strokeWidth: number; opacity: number; closed: boolean; tension: number };
+  textDefaults?: { fontFamily: string; fontSize: number; fontWeight: string; fontStyle: string; color: string };
+  polygonSides?: number;
+  setPolygonSides?: (sides: number) => void;
   selection: string[];
   setSelection: (ids: string[]) => void;
   selectedCurvePointIndex?: number | null;
@@ -79,6 +85,11 @@ interface CanvasStageProps {
     _key?: string;
   } | null;
   onViewportChange?: (viewport: { scale: number; x: number; y: number }) => void; // For collaboration overlays
+  snapToGrid?: boolean;
+  snapToObjects?: boolean;
+  snapToSpacing?: boolean;
+  gridSize?: number;
+  snapAnchor?: SnapAnchor;
 }
 
 // Infinite dot grid component
@@ -88,9 +99,10 @@ interface InfiniteGridProps {
   scale: number;
   offsetX: number;
   offsetY: number;
+  gridSize: number;
 }
 
-function InfiniteGrid({ width, height, scale, offsetX, offsetY }: InfiniteGridProps) {
+function InfiniteGrid({ width, height, scale, offsetX, offsetY, gridSize }: InfiniteGridProps) {
   if (scale <= 0.5) return null;
   // Calculate visible area in world coordinates
   const worldLeft = -offsetX / scale;
@@ -104,7 +116,7 @@ function InfiniteGrid({ width, height, scale, offsetX, offsetY }: InfiniteGridPr
     : scale >= 0.25 ? 4
     : scale >= 0.18 ? 5
     : 6;
-  const spacing = GRID_SPACING * decimation;
+  const spacing = gridSize * decimation;
   
   // Snap to grid boundaries with padding
   const startX = Math.floor(worldLeft / spacing) * spacing - spacing;
@@ -135,10 +147,14 @@ function InfiniteGrid({ width, height, scale, offsetX, offsetY }: InfiniteGridPr
 
 function CanvasStage({ 
   spec, setSpec, width = 800, height = 600, tool = "select", onToolChange, selectedIconId, selectedComponentId, 
-  onUndo, onRedo, focusNodeId, onUngroup, rectDefaults, selection, setSelection, selectedCurvePointIndex, setSelectedCurvePointIndex, 
+  onUndo, onRedo, focusNodeId, onUngroup, rectDefaults, lineDefaults, curveDefaults, textDefaults, polygonSides: propPolygonSides, setPolygonSides: propSetPolygonSides,
+  selection, setSelection, selectedCurvePointIndex, setSelectedCurvePointIndex, 
   editingCurveId: propsEditingCurveId, onEditingCurveIdChange,
   blockCanvasClicksRef, skipNormalizationRef,
-  fitToContentKey, viewportTransition, onViewportChange 
+  fitToContentKey, viewportTransition, onViewportChange,
+  snapToGrid: propSnapToGrid, snapToObjects: propSnapToObjects,
+  snapToSpacing: propSnapToSpacing, gridSize: propGridSize,
+  snapAnchor: propSnapAnchor
 }: CanvasStageProps) {
   // View / interaction state
   const [scale, setScale] = useState(1);
@@ -165,8 +181,18 @@ function CanvasStage({
   // Marquee session (pure helper based)
   const [marqueeSession, setMarqueeSession] = useState<MarqueeSession | null>(null);
 
+  // Snap guide lines (rendered while dragging)
+  const [snapGuides, setSnapGuides] = useState<SnapGuideLine[]>([]);
+  const [spacingGuides, setSpacingGuides] = useState<SpacingGuide[]>([]);
+
+  // Resolved grid size (default to 20px)
+  const gridSize = propGridSize ?? GRID_SPACING;
+
   // justStartedTextEditRef tracks if text editing just started to prevent immediate commit
   const justStartedTextEditRef = useRef(false);
+  
+  // justCreatedShapeRef prevents onClick from clearing selection right after shape creation
+  const justCreatedShapeRef = useRef(false);
   
   // Curve editing mode - use external state if provided, otherwise use internal
   const editingCurveId = propsEditingCurveId !== undefined ? propsEditingCurveId : null;
@@ -204,6 +230,7 @@ function CanvasStage({
   const isEllipseMode = tool === 'ellipse';
   const isLineMode = tool === 'line';
   const isCurveMode = tool === 'curve';
+  const isPolygonMode = tool === 'polygon';
   const [spacePan, setSpacePan] = useState(false);
   // Track shift key globally for aspect-ratio constrained resize
   const [shiftPressed, setShiftPressed] = useState(false);
@@ -216,10 +243,13 @@ function CanvasStage({
   const wrapperRef = useRef<HTMLDivElement>(null);
   const marqueeRectRef = useRef<Konva.Rect>(null);
 
+  // Track last-handled focusNodeId so we only pan once per focus request
+  const lastFocusedRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!focusNodeId) return;
+    if (!focusNodeId || focusNodeId === lastFocusedRef.current) return;
     const node = findNode(spec.root, focusNodeId);
     if (!node) return;
+    lastFocusedRef.current = focusNodeId;
     const pos = node.position ?? { x: 0, y: 0 };
     const size = node.size ?? { width: 300, height: 200 };
     const padding = 60;
@@ -267,9 +297,21 @@ function CanvasStage({
     points: { x: number; y: number }[];
     current: { x: number; y: number };
   }>(null);
+  
+  // Polygon draft state (drag to create like rect/ellipse)
+  const [polygonDraft, setPolygonDraft] = useState<null | {
+    start: { x: number; y: number };
+    current: { x: number; y: number };
+  }>(null);
+  
+  // Polygon sides (adjustable with mouse wheel during creation)
+  // Use prop if provided, otherwise fall back to local state
+  const [localPolygonSides, setLocalPolygonSides] = useState(5);
+  const polygonSides = propPolygonSides ?? localPolygonSides;
+  const setPolygonSides = propSetPolygonSides ?? setLocalPolygonSides;
 
   // Use shape tools hook
-  const shapeTools = useShapeTools(setSpec, setSelection, onToolChange, rectDefaults, undefined, undefined, undefined);
+  const shapeTools = useShapeTools(setSpec, setSelection, onToolChange, rectDefaults, undefined, lineDefaults, curveDefaults);
 
   // Use selection manager hook
   const selectionManager = useSelectionManager(stageRef, spec.root.id, getTopContainerAncestorMemo);
@@ -298,6 +340,7 @@ function CanvasStage({
     editingTextSpans,
     textSelection,
     richTextEditorRef,
+    textEditContainerRef,
     startTextEdit,
     commitTextEdit,
     cancelTextEdit,
@@ -312,25 +355,36 @@ function CanvasStage({
     if (!isRectMode || !rectDraft) return;
     shapeTools.finalizeRect(rectDraft, altPressed, shiftPressed);
     setRectDraft(null);
+    justCreatedShapeRef.current = true;
   }, [isRectMode, rectDraft, altPressed, shiftPressed, shapeTools]);
 
   const finalizeEllipse = useCallback(() => {
     if (!isEllipseMode || !ellipseDraft) return;
     shapeTools.finalizeEllipse(ellipseDraft, altPressed, shiftPressed);
     setEllipseDraft(null);
+    justCreatedShapeRef.current = true;
   }, [isEllipseMode, ellipseDraft, altPressed, shiftPressed, shapeTools]);
 
   const finalizeLine = useCallback(() => {
     if (!isLineMode || !lineDraft) return;
     shapeTools.finalizeLine(lineDraft);
     setLineDraft(null);
+    justCreatedShapeRef.current = true;
   }, [isLineMode, lineDraft, shapeTools]);
 
   const finalizeCurve = useCallback(() => {
     if (!isCurveMode || !curveDraft) return;
     shapeTools.finalizeCurve(curveDraft);
     setCurveDraft(null);
+    justCreatedShapeRef.current = true;
   }, [isCurveMode, curveDraft, shapeTools]);
+
+  const finalizePolygon = useCallback(() => {
+    if (!isPolygonMode || !polygonDraft) return;
+    shapeTools.finalizePolygon(polygonDraft, altPressed, shiftPressed, polygonSides);
+    setPolygonDraft(null);
+    justCreatedShapeRef.current = true;
+  }, [isPolygonMode, polygonDraft, shapeTools, altPressed, shiftPressed, polygonSides]);
 
   // Helper: open image picker at click position
   const createImage = useCallback((worldPos: { x: number; y: number }) => {
@@ -344,6 +398,7 @@ function CanvasStage({
     setSpec(prev => appendNodesToRoot(prev, [iconNode]));
     setSelection([iconNode.id]);
     onToolChange?.('select');
+    justCreatedShapeRef.current = true;
   }, [selectedIconId, setSelection, setSpec, onToolChange]);
 
   const createComponentAtPosition = useCallback((worldPos: { x: number; y: number }) => {
@@ -352,6 +407,7 @@ function CanvasStage({
     setSpec(prev => appendNodesToRoot(prev, [groupNode]));
     setSelection([groupNode.id]);
     onToolChange?.('select');
+    justCreatedShapeRef.current = true;
   }, [selectedComponentId, setSelection, setSpec, spec.root, onToolChange]);
 
   // Actually insert the image after picker selection
@@ -361,6 +417,7 @@ function CanvasStage({
     setSpec(prev => appendNodesToRoot(prev, [imageNode]));
     setSelection([imageNode.id]);
     onToolChange?.('select');
+    justCreatedShapeRef.current = true;
     setImagePickerOpen(false);
     setPendingImagePosition(null);
   }, [pendingImagePosition, setSpec, onToolChange, setSelection]);
@@ -390,6 +447,10 @@ function CanvasStage({
     setLineDraft,
     curveDraft,
     setCurveDraft,
+    polygonDraft,
+    setPolygonDraft,
+    polygonSides,
+    setPolygonSides,
     dragSession,
     setDragSession,
     marqueeSession,
@@ -410,10 +471,21 @@ function CanvasStage({
     finalizeRect,
     finalizeEllipse,
     finalizeLine,
+    finalizeCurve,
+    finalizePolygon,
     startTextEdit,
     justStartedTextEditRef,
+    justCreatedShapeRef,
+    textDefaults,
     onToolChange,
     setMenu,
+    snapToGrid: propSnapToGrid ?? false,
+    snapToObjects: propSnapToObjects ?? false,
+    snapToSpacing: propSnapToSpacing ?? false,
+    gridSize,
+    snapAnchor: propSnapAnchor ?? 'both',
+    setSnapGuides,
+    setSpacingGuides,
   });
 
   const { onMouseDown, onMouseMove, onMouseUp } = mouseHandlers;
@@ -464,6 +536,31 @@ function CanvasStage({
     window.addEventListener('keydown', onKey, CAPTURE_OPTIONS);
     return () => window.removeEventListener('keydown', onKey, CAPTURE_OPTIONS);
   }, [isCurveMode, curveDraft, finalizeCurve]);
+
+  // Global listeners for polygon draft (supports dragging outside stage bounds)
+  useEffect(() => {
+    if (!isPolygonMode || !polygonDraft) return;
+    return setupGlobalDraftListeners(stageRef, setPolygonDraft, finalizePolygon);
+  }, [isPolygonMode, polygonDraft, finalizePolygon]);
+
+  // Cancel polygon draft with Escape
+  useEffect(() => {
+    if (!isPolygonMode || !polygonDraft) return;
+    return setupEscapeCancelListener(setPolygonDraft, CAPTURE_OPTIONS);
+  }, [isPolygonMode, polygonDraft]);
+  
+  // Polygon: adjust sides with mouse wheel during creation
+  useEffect(() => {
+    if (!isPolygonMode || !polygonDraft) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -1 : 1;
+      const newSides = Math.max(3, Math.min(30, polygonSides + delta));
+      setPolygonSides(newSides);
+    };
+    window.addEventListener('wheel', onWheel, { passive: false, capture: true });
+    return () => window.removeEventListener('wheel', onWheel, { capture: true } as any);
+  }, [isPolygonMode, polygonDraft]);
 
   // Curve edit mode: exit on Escape or Enter
   useEffect(() => {
@@ -538,6 +635,12 @@ function CanvasStage({
   const onClick = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     // Block canvas clicks if requested (e.g., when selecting from attribute panel)
     if (blockCanvasClicksRef?.current) {
+      return;
+    }
+
+    // If a shape was just created, skip this click to preserve the new selection
+    if (justCreatedShapeRef.current) {
+      justCreatedShapeRef.current = false;
       return;
     }
     
@@ -805,7 +908,8 @@ function CanvasStage({
             height={height} 
             scale={scale} 
             offsetX={pos.x} 
-            offsetY={pos.y} 
+            offsetY={pos.y}
+            gridSize={gridSize} 
           />
         </Layer>
         
@@ -863,16 +967,90 @@ function CanvasStage({
             dash={[4,4]}
           />
           
+          {/* Snap guide lines (shown during drag) */}
+          {snapGuides.map((guide, i) => {
+            // Draw lines that span the visible viewport in world coordinates
+            const worldLeft = -pos.x / scale;
+            const worldTop = -pos.y / scale;
+            const worldRight = worldLeft + width / scale;
+            const worldBottom = worldTop + height / scale;
+            if (guide.orientation === 'vertical') {
+              return (
+                <Line
+                  key={`snap-v-${i}`}
+                  points={[guide.position, worldTop, guide.position, worldBottom]}
+                  stroke="rgba(244, 63, 94, 0.45)"
+                  strokeWidth={1 / scale}
+                  dash={[4 / scale, 4 / scale]}
+                  listening={false}
+                />
+              );
+            } else {
+              return (
+                <Line
+                  key={`snap-h-${i}`}
+                  points={[worldLeft, guide.position, worldRight, guide.position]}
+                  stroke="rgba(244, 63, 94, 0.45)"
+                  strokeWidth={1 / scale}
+                  dash={[4 / scale, 4 / scale]}
+                  listening={false}
+                />
+              );
+            }
+          })}
+          
+          {/* Spacing guide lines (equal distance indicators during drag) */}
+          {spacingGuides.map((sg, i) => {
+            const s = 1 / scale;
+            if (sg.orientation === 'horizontal') {
+              // Horizontal gap indicator: a line with arrows between from and to at crossPosition
+              const y = sg.crossPosition;
+              const arrowSize = 4 * s;
+              return (
+                <Group key={`spacing-h-${i}`} listening={false}>
+                  {/* Main line */}
+                  <Line points={[sg.from, y, sg.to, y]} stroke="#8b5cf6" strokeWidth={1 * s} listening={false} />
+                  {/* Left arrow */}
+                  <Line points={[sg.from + arrowSize, y - arrowSize, sg.from, y, sg.from + arrowSize, y + arrowSize]} stroke="#8b5cf6" strokeWidth={1 * s} listening={false} />
+                  {/* Right arrow */}
+                  <Line points={[sg.to - arrowSize, y - arrowSize, sg.to, y, sg.to - arrowSize, y + arrowSize]} stroke="#8b5cf6" strokeWidth={1 * s} listening={false} />
+                  {/* Vertical end caps */}
+                  <Line points={[sg.from, y - 6 * s, sg.from, y + 6 * s]} stroke="#8b5cf6" strokeWidth={1 * s} listening={false} />
+                  <Line points={[sg.to, y - 6 * s, sg.to, y + 6 * s]} stroke="#8b5cf6" strokeWidth={1 * s} listening={false} />
+                </Group>
+              );
+            } else {
+              // Vertical gap indicator
+              const x = sg.crossPosition;
+              const arrowSize = 4 * s;
+              return (
+                <Group key={`spacing-v-${i}`} listening={false}>
+                  <Line points={[x, sg.from, x, sg.to]} stroke="#8b5cf6" strokeWidth={1 * s} listening={false} />
+                  {/* Top arrow */}
+                  <Line points={[x - arrowSize, sg.from + arrowSize, x, sg.from, x + arrowSize, sg.from + arrowSize]} stroke="#8b5cf6" strokeWidth={1 * s} listening={false} />
+                  {/* Bottom arrow */}
+                  <Line points={[x - arrowSize, sg.to - arrowSize, x, sg.to, x + arrowSize, sg.to - arrowSize]} stroke="#8b5cf6" strokeWidth={1 * s} listening={false} />
+                  {/* Horizontal end caps */}
+                  <Line points={[x - 6 * s, sg.from, x + 6 * s, sg.from]} stroke="#8b5cf6" strokeWidth={1 * s} listening={false} />
+                  <Line points={[x - 6 * s, sg.to, x + 6 * s, sg.to]} stroke="#8b5cf6" strokeWidth={1 * s} listening={false} />
+                </Group>
+              );
+            }
+          })}
+          
           {/* Draft preview layer */}
           <DraftPreviewLayer
             isRectMode={isRectMode}
             isEllipseMode={isEllipseMode}
             isLineMode={isLineMode}
             isCurveMode={isCurveMode}
+            isPolygonMode={isPolygonMode}
             rectDraft={rectDraft}
             ellipseDraft={ellipseDraft}
             lineDraft={lineDraft}
             curveDraft={curveDraft}
+            polygonDraft={polygonDraft}
+            polygonSides={polygonSides}
             altPressed={altPressed}
             shiftPressed={shiftPressed}
           />
@@ -916,21 +1094,23 @@ function CanvasStage({
         const toolbarAnchor = { x: textX + textWidth / 2, y: textY };
         
         return (
-          <TextEditingOverlay
-            visible={true}
-            editingTextValue={editingTextValue}
-            editingTextSpans={editingTextSpans}
-            baseStyles={baseStyles}
-            textEditStyle={getTextEditStyle()}
-            textSelection={textSelection}
-            toolbarAnchorPosition={toolbarAnchor}
-            richTextEditorRef={richTextEditorRef}
-            onChange={handleTextChange}
-            onCommit={commitTextEdit}
-            onCancel={cancelTextEdit}
-            onSelectionChange={setTextSelection}
-            onApplyFormat={applyFormat}
-          />
+          <div ref={textEditContainerRef}>
+            <TextEditingOverlay
+              visible={true}
+              editingTextValue={editingTextValue}
+              editingTextSpans={editingTextSpans}
+              baseStyles={baseStyles}
+              textEditStyle={getTextEditStyle()}
+              textSelection={textSelection}
+              toolbarAnchorPosition={toolbarAnchor}
+              richTextEditorRef={richTextEditorRef}
+              onChange={handleTextChange}
+              onCommit={commitTextEdit}
+              onCancel={cancelTextEdit}
+              onSelectionChange={setTextSelection}
+              onApplyFormat={applyFormat}
+            />
+          </div>
         );
       })()}
       

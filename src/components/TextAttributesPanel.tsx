@@ -252,6 +252,24 @@ export const TextAttributesPanel: React.FC<TextAttributesPanelProps> = ({
         </div>
       </label>
 
+      {/* Text Stretch Indicator */}
+      {(textNode.textScaleX !== undefined && Math.abs((textNode.textScaleX ?? 1) - 1) > 0.001) && (
+        <div className="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200 rounded-md">
+          <i className="fa-solid fa-arrows-left-right text-amber-600 text-[10px]" />
+          <span className="text-[11px] text-amber-700 font-medium flex-1">
+            Stretched ({Math.round((textNode.textScaleX ?? 1) * 100)}%)
+          </span>
+          <button
+            type="button"
+            onClick={() => updateNode({ textScaleX: 1, textScaleY: 1 })}
+            className="text-[10px] px-2 py-0.5 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded border border-amber-300 transition-colors"
+            title="Reset text proportions"
+          >
+            Reset
+          </button>
+        </div>
+      )}
+
       {/* Opacity */}
       <label className="flex flex-col gap-1.5">
         <span className="text-[11px] font-medium text-gray-600 flex items-center gap-1">

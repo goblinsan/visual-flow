@@ -3,10 +3,12 @@ import type Konva from 'konva';
 import type { LayoutSpec, LayoutNode, TextNode } from '../../layout-schema';
 import { computeClickSelection, computeMarqueeSelection } from '../../renderer/interaction';
 import { beginDrag, updateDrag, finalizeDrag } from '../../interaction/drag';
+import { computeSnap, type SnapGuideLine, type SpacingGuide, type SnapBounds, type SnapAnchor } from '../../interaction/snapping';
 import type { DragSession } from '../../interaction/types';
 import { beginMarquee, updateMarquee, finalizeMarquee, type MarqueeSession } from '../../interaction/marquee';
 import { applyPosition } from '../stage-internal';
 import { nodeHasChildren } from '../../commands/types';
+import { getNodeBounds } from '../utils/canvasUtils';
 
 interface DraftState {
   start: { x: number; y: number };
@@ -43,6 +45,10 @@ interface UseMouseEventHandlersProps {
   setLineDraft: (draft: DraftState | null | ((prev: DraftState | null) => DraftState | null)) => void;
   curveDraft: CurveDraftState | null;
   setCurveDraft: (draft: CurveDraftState | null | ((prev: CurveDraftState | null) => CurveDraftState | null)) => void;
+  polygonDraft: DraftState | null;
+  setPolygonDraft: (draft: DraftState | null | ((prev: DraftState | null) => DraftState | null)) => void;
+  polygonSides: number;
+  setPolygonSides: (sides: number) => void;
   
   // Interaction sessions
   dragSession: DragSession | null;
@@ -69,14 +75,27 @@ interface UseMouseEventHandlersProps {
   finalizeRect: () => void;
   finalizeEllipse: () => void;
   finalizeLine: () => void;
+  finalizeCurve: () => void;
+  finalizePolygon: () => void;
   
   // Text editing
   startTextEdit: (id: string, node: TextNode) => void;
   justStartedTextEditRef: React.MutableRefObject<boolean>;
+  justCreatedShapeRef?: React.MutableRefObject<boolean>;
+  textDefaults?: { fontFamily: string; fontSize: number; fontWeight: string; fontStyle: string; color: string };
   
   // Callbacks
   onToolChange?: (tool: string) => void;
   setMenu: (menu: { x: number; y: number } | null) => void;
+  
+  // Snapping
+  snapToGrid: boolean;
+  snapToObjects: boolean;
+  snapToSpacing: boolean;
+  gridSize: number;
+  snapAnchor: SnapAnchor;
+  setSnapGuides: (guides: SnapGuideLine[]) => void;
+  setSpacingGuides: (guides: SpacingGuide[]) => void;
 }
 
 const updateRootChildren = (spec: LayoutSpec, updater: (children: LayoutNode[]) => LayoutNode[]): LayoutSpec => {
@@ -114,6 +133,8 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
     setLineDraft,
     curveDraft,
     setCurveDraft,
+    polygonDraft,
+    setPolygonDraft,
     dragSession,
     setDragSession,
     marqueeSession,
@@ -134,10 +155,20 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
     finalizeRect,
     finalizeEllipse,
     finalizeLine,
+    finalizePolygon,
     startTextEdit,
     justStartedTextEditRef,
+    justCreatedShapeRef,
+    textDefaults,
     onToolChange,
     setMenu,
+    snapToGrid,
+    snapToObjects,
+    snapToSpacing,
+    gridSize,
+    snapAnchor,
+    setSnapGuides,
+    setSpacingGuides,
   } = props;
 
   // Tool mode flags
@@ -148,6 +179,7 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
   const isEllipseMode = tool === 'ellipse';
   const isLineMode = tool === 'line';
   const isCurveMode = tool === 'curve';
+  const isPolygonMode = tool === 'polygon';
   const isTextMode = tool === 'text';
   const isImageMode = tool === 'image';
   const isIconMode = tool === 'icon';
@@ -206,6 +238,16 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
       return;
     }
     
+    // Polygon tool creation pathway - drag to create regular polygon
+    if (isPolygonMode) {
+      if (e.evt.button !== 0) return;
+      const stage = e.target.getStage(); if (!stage) return;
+      const pointer = stage.getPointerPosition(); if (!pointer) return;
+      const world = toWorld(stage, pointer);
+      setPolygonDraft({ start: world, current: world });
+      return;
+    }
+    
     // Text tool - single click creates text (creates empty text and immediately edits)
     if (isTextMode) {
       if (e.evt.button !== 0) return;
@@ -213,21 +255,32 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
       const pointer = stage.getPointerPosition(); if (!pointer) return;
       const world = toWorld(stage, pointer);
       
+      // Compute font size so text appears ~30px tall on screen regardless of zoom
+      const zoomAdjustedFontSize = Math.round(Math.max(8, Math.min(200, 30 / scale)));
+      const initialFontSize = zoomAdjustedFontSize;
+      const initialHeight = Math.round(initialFontSize * 1.4);
+      const initialWidth = Math.round(Math.max(200, initialFontSize * 10));
+      
       const id = 'text_' + Math.random().toString(36).slice(2, 9);
       const placeholderText: TextNode = {
         id,
         type: 'text',
         position: world,
-        size: { width: 200, height: 24 },
+        size: { width: initialWidth, height: initialHeight },
         text: ' ',
-        fontSize: 14,
-        fontFamily: 'Arial',
-        color: '#000000',
+        fontSize: initialFontSize,
+        fontFamily: textDefaults?.fontFamily ?? 'Arial',
+        fontWeight: (textDefaults?.fontWeight ?? '400') as TextNode['fontWeight'],
+        fontStyle: (textDefaults?.fontStyle ?? 'normal') as TextNode['fontStyle'],
+        color: textDefaults?.color ?? '#000000',
         spans: [],
       };
       setSpec(prev => appendNodesToRoot(prev, [placeholderText]));
       setSelection([id]);
       onToolChange?.('select');
+      
+      // Mark as just created so onClick doesn't clear selection
+      if (justCreatedShapeRef) justCreatedShapeRef.current = true;
       
       // Immediately start editing
       // We do NOT clear selection here because we just set it.
@@ -404,6 +457,8 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
     setEllipseDraft,
     setLineDraft,
     setCurveDraft,
+    isPolygonMode,
+    setPolygonDraft,
     setScale,
     setPos,
     setPanning,
@@ -413,6 +468,7 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
     setMenu,
     startTextEdit,
     justStartedTextEditRef,
+    justCreatedShapeRef,
   ]);
 
   const onMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -452,6 +508,14 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
       return;
     }
     
+    if (isPolygonMode) {
+      if (!polygonDraft) return;
+      const pointer = stage.getPointerPosition(); if (!pointer) return;
+      const worldPos = toWorld(stage, pointer);
+      setPolygonDraft(prev => prev ? { ...prev, current: worldPos } : prev);
+      return;
+    }
+    
     if (!isSelectMode && !isPanMode) return;
 
     if (panning) {
@@ -478,12 +542,39 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
       const session = dragSession; // mutate in place via helper
       const update = updateDrag(session, worldPos);
       if (update.passedThreshold) {
-        for (const movedNode of update.moved) {
-          const node = stage.findOne(`#${CSS.escape(movedNode.id)}`);
-            if (node) {
-              node.position({ x: movedNode.x, y: movedNode.y });
-            }
+        // Compute bounds of dragged and other nodes for snapping
+        const draggedBounds: SnapBounds[] = [];
+        const otherBounds: SnapBounds[] = [];
+        const rootChildren = spec.root.children ?? [];
+        for (const child of rootChildren) {
+          const bounds = getNodeBounds(child, 0, 0);
+          if (!bounds) continue;
+          if (session.nodeIds.includes(child.id)) {
+            draggedBounds.push({ id: child.id, ...bounds });
+          } else {
+            otherBounds.push({ id: child.id, ...bounds });
+          }
         }
+
+        // Apply snapping to the raw delta
+        const snapResult = computeSnap(
+          update.dx, update.dy,
+          session.originPositions, session.nodeIds,
+          draggedBounds, otherBounds,
+          { snapToGrid, snapToObjects, snapToSpacing, gridSize, snapAnchor }
+        );
+
+        // Position nodes using snapped delta
+        for (const id of session.nodeIds) {
+          const origin = session.originPositions[id];
+          if (!origin) continue;
+          const node = stage.findOne(`#${CSS.escape(id)}`);
+          if (node) {
+            node.position({ x: origin.x + snapResult.dx, y: origin.y + snapResult.dy });
+          }
+        }
+        setSnapGuides(snapResult.guides);
+        setSpacingGuides(snapResult.spacingGuides ?? []);
         trRef.current?.forceUpdate();
       }
       // Force state update so dependent callbacks (e.g. click clearing) see threshold transition
@@ -518,16 +609,27 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
     lineDraft,
     isCurveMode,
     curveDraft,
+    isPolygonMode,
+    polygonDraft,
     setRectDraft,
     setEllipseDraft,
     setLineDraft,
     setCurveDraft,
+    setPolygonDraft,
     panLastPosRef,
     setPos,
     setDragSession,
     trRef,
     setMarqueeSession,
     marqueeRectRef,
+    snapToGrid,
+    snapToObjects,
+    snapToSpacing,
+    gridSize,
+    snapAnchor,
+    setSnapGuides,
+    setSpacingGuides,
+    spec.root.children,
   ]);
 
   const onMouseUp = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -543,6 +645,9 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
     // Finalize line creation
     if (isLineMode && lineDraft) { finalizeLine(); return; }
     
+    // Finalize polygon creation
+    if (isPolygonMode && polygonDraft) { finalizePolygon(); return; }
+    
     // Note: Curve finalization happens on double-click or Enter, not mouseup
 
     if (panning) {
@@ -555,15 +660,45 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
     if (dragSession) {
       const summary = finalizeDrag(dragSession);
       if (summary.moved.length > 0) {
+        // Compute snapped final positions using the actual delta from the drag
+        const rawDx = summary.moved[0].to.x - summary.moved[0].from.x;
+        const rawDy = summary.moved[0].to.y - summary.moved[0].from.y;
+
+        // Compute bounds for snapping
+        const draggedBounds: SnapBounds[] = [];
+        const otherBounds: SnapBounds[] = [];
+        const rootChildren = spec.root.children ?? [];
+        for (const child of rootChildren) {
+          const bounds = getNodeBounds(child, 0, 0);
+          if (!bounds) continue;
+          if (dragSession.nodeIds.includes(child.id)) {
+            draggedBounds.push({ id: child.id, ...bounds });
+          } else {
+            otherBounds.push({ id: child.id, ...bounds });
+          }
+        }
+
+        const snapResult = computeSnap(
+          rawDx, rawDy,
+          dragSession.originPositions, dragSession.nodeIds,
+          draggedBounds, otherBounds,
+          { snapToGrid, snapToObjects, snapToSpacing, gridSize, snapAnchor }
+        );
+
         setSpec(prev => {
           let next = prev;
-          for (const mv of summary.moved) {
-            next = applyPosition(next, mv.id, { x: mv.to.x, y: mv.to.y });
+          for (const id of dragSession.nodeIds) {
+            const origin = dragSession.originPositions[id];
+            if (origin) {
+              next = applyPosition(next, id, { x: origin.x + snapResult.dx, y: origin.y + snapResult.dy });
+            }
           }
           return next;
         });
       }
       setDragSession(null);
+      setSnapGuides([]);
+      setSpacingGuides([]);
     }
 
     // Handle marquee completion via helper
@@ -601,12 +736,23 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
     isLineMode,
     lineDraft,
     finalizeLine,
+    isPolygonMode,
+    polygonDraft,
+    finalizePolygon,
     setSelection,
     setPanning,
     panLastPosRef,
     setDragSession,
     setMarqueeSession,
     marqueeRectRef,
+    snapToGrid,
+    snapToObjects,
+    snapToSpacing,
+    gridSize,
+    snapAnchor,
+    setSnapGuides,
+    setSpacingGuides,
+    spec.root.children,
   ]);
 
   return {

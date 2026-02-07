@@ -1,4 +1,4 @@
-import { useCallback, useState, useRef, useEffect } from 'react';
+import { useCallback, useState, useRef, useEffect, type MutableRefObject } from 'react';
 import type Konva from 'konva';
 import type { LayoutSpec, TextNode, TextSpan, FrameNode } from '../../layout-schema';
 import { mapNode } from '../../commands/types';
@@ -23,6 +23,7 @@ export interface UseTextEditingReturn {
   editingTextSpans: TextSpan[];
   textSelection: { start: number; end: number } | null;
   richTextEditorRef: React.MutableRefObject<RichTextEditorHandle | null>;
+  textEditContainerRef: MutableRefObject<HTMLDivElement | null>;
   startTextEdit: (nodeId: string, textNode: TextNode) => void;
   commitTextEdit: () => void;
   cancelTextEdit: () => void;
@@ -49,6 +50,35 @@ export function useTextEditing({
   const [editingTextSpans, setEditingTextSpans] = useState<TextSpan[]>([]);
   const [textSelection, setTextSelection] = useState<{ start: number; end: number } | null>(null);
   const richTextEditorRef = useRef<RichTextEditorHandle>(null);
+  const textEditContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // Commit text edit when clicking outside the text editing overlay
+  const commitTextEditRef = useRef<() => void>(() => {});
+  useEffect(() => { commitTextEditRef.current = commitTextEdit; });
+  
+  useEffect(() => {
+    if (!editingTextId) return;
+    
+    const handlePointerDown = (e: PointerEvent) => {
+      const container = textEditContainerRef.current;
+      if (!container) return;
+      const target = e.target as Node;
+      // If click is inside the text editing container (editor + toolbar), ignore
+      if (container.contains(target)) return;
+      // Commit the text edit
+      commitTextEditRef.current();
+    };
+    
+    // Use a small delay so the initial click that starts editing doesn't immediately commit
+    const timer = setTimeout(() => {
+      document.addEventListener('pointerdown', handlePointerDown, true);
+    }, 0);
+    
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('pointerdown', handlePointerDown, true);
+    };
+  }, [editingTextId]);
 
   // Start editing a text node
   const startTextEdit = useCallback((nodeId: string, textNode: TextNode) => {
@@ -68,6 +98,71 @@ export function useTextEditing({
       richTextEditorRef.current?.selectAll();
     }, 0);
   }, []);
+
+  // Sync formatting from spec when attribute panel changes during editing.
+  // This watches the spec's text node and merges formatting changes into the
+  // editing spans WITHOUT overwriting the user's typed text content.
+  const prevSpecFormattingRef = useRef<{ fontSize?: number; fontFamily?: string; fontWeight?: string; fontStyle?: string; color?: string } | null>(null);
+  useEffect(() => {
+    if (!editingTextId) {
+      prevSpecFormattingRef.current = null;
+      return;
+    }
+    const textNode = findNode(spec.root, editingTextId) as TextNode | null;
+    if (!textNode) return;
+    
+    const currentFormatting = {
+      fontSize: textNode.fontSize,
+      fontFamily: textNode.fontFamily,
+      fontWeight: textNode.fontWeight,
+      fontStyle: textNode.fontStyle,
+      color: textNode.color,
+    };
+    
+    // On first render when editing starts, just record the formatting
+    if (!prevSpecFormattingRef.current) {
+      prevSpecFormattingRef.current = currentFormatting;
+      return;
+    }
+    
+    // Check if any formatting changed in the spec (from attribute panel)
+    const prev = prevSpecFormattingRef.current;
+    const changed = 
+      prev.fontSize !== currentFormatting.fontSize ||
+      prev.fontFamily !== currentFormatting.fontFamily ||
+      prev.fontWeight !== currentFormatting.fontWeight ||
+      prev.fontStyle !== currentFormatting.fontStyle ||
+      prev.color !== currentFormatting.color;
+    
+    if (changed) {
+      prevSpecFormattingRef.current = currentFormatting;
+      // Update editing spans with new formatting from spec
+      setEditingTextSpans(spans => {
+        const newSpans = spans.map(span => {
+          const updated = { ...span };
+          if (currentFormatting.fontSize !== undefined) updated.fontSize = currentFormatting.fontSize;
+          if (currentFormatting.fontFamily !== undefined) updated.fontFamily = currentFormatting.fontFamily;
+          if (currentFormatting.fontWeight !== undefined) updated.fontWeight = currentFormatting.fontWeight as TextSpan['fontWeight'];
+          if (currentFormatting.fontStyle !== undefined) updated.fontStyle = currentFormatting.fontStyle as TextSpan['fontStyle'];
+          if (currentFormatting.color !== undefined) updated.color = currentFormatting.color;
+          return updated;
+        });
+        // Also re-render the editor content with new formatting
+        setTimeout(() => {
+          if (richTextEditorRef.current) {
+            richTextEditorRef.current.reinitializeContent(newSpans, {
+              fontFamily: currentFormatting.fontFamily || 'Arial',
+              fontSize: currentFormatting.fontSize ?? 14,
+              fontWeight: currentFormatting.fontWeight || '400',
+              fontStyle: currentFormatting.fontStyle || 'normal',
+              color: currentFormatting.color ?? '#0f172a',
+            });
+          }
+        }, 0);
+        return newSpans;
+      });
+    }
+  }, [editingTextId, spec.root, findNode]);
 
   // Commit text edit and close editor
   const commitTextEdit = useCallback(() => {
@@ -195,6 +290,7 @@ export function useTextEditing({
     editingTextSpans,
     textSelection,
     richTextEditorRef,
+    textEditContainerRef,
     startTextEdit,
     commitTextEdit,
     cancelTextEdit,

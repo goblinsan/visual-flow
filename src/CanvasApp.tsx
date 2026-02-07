@@ -31,6 +31,7 @@ import { HeaderToolbar } from './components/canvas/HeaderToolbar';
 import { LeftToolbar } from './components/canvas/LeftToolbar';
 import { AttributesSidebar } from './components/canvas/AttributesSidebar';
 import { AgentPanel } from './components/canvas/AgentPanel';
+import { ToolSettingsBar } from './components/canvas/ToolSettingsBar';
 
 /** Get room ID from URL query param ?room=xxx */
 function getRoomIdFromURL(): string | null {
@@ -379,6 +380,31 @@ export default function CanvasApp() {
   
   // Rectangle default attributes (persisted)
   const { defaults: rectDefaults, update: updateRectDefaults } = usePersistentRectDefaults({ fill: '#ffffff', stroke: '#334155', strokeWidth: 1, radius: 0, opacity: 1, strokeDash: undefined });
+  // Line default attributes
+  const [lineDefaults, setLineDefaults] = useState({ stroke: '#334155', strokeWidth: 2, startArrow: false, endArrow: false, arrowSize: 1 });
+  const updateLineDefaults = useCallback((patch: Record<string, unknown>) => {
+    setLineDefaults(prev => ({ ...prev, ...patch }));
+  }, []);
+  // Curve default attributes
+  const [curveDefaults, setCurveDefaults] = useState({ fill: undefined as string | undefined, stroke: '#334155', strokeWidth: 2, opacity: 1, closed: false, tension: 0.5 });
+  const updateCurveDefaults = useCallback((patch: Record<string, unknown>) => {
+    setCurveDefaults(prev => ({ ...prev, ...patch }));
+  }, []);
+  // Text default attributes
+  const [textDefaults, setTextDefaults] = useState({ fontFamily: 'Arial', fontSize: 14, fontWeight: '400' as string, fontStyle: 'normal' as string, color: '#000000' });
+  const updateTextDefaults = useCallback((patch: Record<string, unknown>) => {
+    setTextDefaults(prev => ({ ...prev, ...patch }));
+  }, []);
+  // Polygon sides (lifted from CanvasStage so ToolSettingsBar can control it)
+  const [polygonSides, setPolygonSides] = useState(5);
+  // Snapping toggles
+  const [snapToGrid, setSnapToGrid] = useState(true);
+  const [snapToObjects, setSnapToObjects] = useState(true);
+  const [snapToSpacing, setSnapToSpacing] = useState(true);
+  // Grid size (px between dots)
+  const [gridSize, setGridSize] = useState(20);
+  // Snap anchor mode: which part of the object snaps
+  const [snapAnchor, setSnapAnchor] = useState<'center' | 'border' | 'both'>('both');
   // Recent colors via hook
   const { recentColors, beginSession: beginRecentSession, previewColor: previewRecent, commitColor: commitRecent } = useRecentColors();
   const [canvasRef, canvasSize] = useElementSize<HTMLDivElement>();
@@ -705,6 +731,37 @@ export default function CanvasApp() {
         <main 
           className="flex-1 relative min-w-0"
         >
+          {/* Tool settings bar overlays the top of the canvas */}
+          <ToolSettingsBar
+            tool={tool}
+            polygonSides={polygonSides}
+            setPolygonSides={setPolygonSides}
+            rectDefaults={{
+              fill: rectDefaults.fill,
+              stroke: rectDefaults.stroke,
+              strokeWidth: rectDefaults.strokeWidth ?? 1,
+              radius: rectDefaults.radius ?? 0,
+              opacity: rectDefaults.opacity ?? 1,
+            }}
+            updateRectDefaults={updateRectDefaults}
+            lineDefaults={lineDefaults}
+            updateLineDefaults={updateLineDefaults}
+            curveDefaults={curveDefaults}
+            updateCurveDefaults={updateCurveDefaults}
+            textDefaults={textDefaults}
+            updateTextDefaults={updateTextDefaults}
+            snapToGrid={snapToGrid}
+            setSnapToGrid={setSnapToGrid}
+            snapToObjects={snapToObjects}
+            setSnapToObjects={setSnapToObjects}
+            snapToSpacing={snapToSpacing}
+            setSnapToSpacing={setSnapToSpacing}
+            gridSize={gridSize}
+            setGridSize={setGridSize}
+            snapAnchor={snapAnchor}
+            setSnapAnchor={setSnapAnchor}
+            selectedCount={selectedIds.length}
+          />
           <div 
             ref={canvasRef} 
             className="absolute inset-0 overflow-hidden"
@@ -765,6 +822,8 @@ export default function CanvasApp() {
                 blockCanvasClicksRef={blockCanvasClicksRef}
                 skipNormalizationRef={skipNormalizationRef}
                 fitToContentKey={fitToContentKey}
+                polygonSides={polygonSides}
+                setPolygonSides={setPolygonSides}
                 rectDefaults={{
                   fill: rectDefaults.fill,
                   stroke: rectDefaults.stroke,
@@ -773,8 +832,16 @@ export default function CanvasApp() {
                   opacity: rectDefaults.opacity ?? 1,
                   strokeDash: rectDefaults.strokeDash,
                 }}
+                lineDefaults={lineDefaults}
+                curveDefaults={curveDefaults}
+                textDefaults={textDefaults}
                 viewportTransition={viewportTransition}
                 onViewportChange={handleViewportChange}
+                snapToGrid={snapToGrid}
+                snapToObjects={snapToObjects}
+                snapToSpacing={snapToSpacing}
+                gridSize={gridSize}
+                snapAnchor={snapAnchor}
                 />
               );
             })()}
@@ -813,6 +880,24 @@ export default function CanvasApp() {
             <button
               onClick={() => {
                 setSidebarVisible(true);
+              }}
+              className="fixed right-0 z-10 h-12 bg-gradient-to-b from-gray-200 to-gray-300 hover:from-gray-300 hover:to-gray-400 shadow-md transition-colors flex items-center justify-center"
+              title="Show Panel"
+              style={{ 
+                padding: 0,
+                width: '20px',
+                top: '116px',
+                borderRadius: '8px 0 0 8px',
+                borderLeft: '1px solid #9ca3af',
+                borderTop: '1px solid #9ca3af',
+                borderBottom: '1px solid #9ca3af'
+              }}
+            >
+              <span className="text-xs text-gray-600">◀</span>
+            </button>
+            <button
+              onClick={() => {
+                setSidebarVisible(true);
                 setPanelMode('attributes');
               }}
               className={`fixed right-0 z-10 h-32 shadow-md transition-colors flex items-center justify-center ${
@@ -824,7 +909,7 @@ export default function CanvasApp() {
               style={{ 
                 padding: 0,
                 width: '20px',
-                top: '96px',
+                top: '168px',
                 borderRadius: '8px 0 0 8px',
                 borderLeft: `1px solid ${panelMode === 'attributes' ? '#0d9488' : '#9ca3af'}`,
                 borderTop: `1px solid ${panelMode === 'attributes' ? '#0d9488' : '#9ca3af'}`,
@@ -856,7 +941,7 @@ export default function CanvasApp() {
               style={{ 
                 padding: 0,
                 width: '20px',
-                top: '260px',
+                top: '300px',
                 borderRadius: '8px 0 0 8px',
                 borderLeft: `1px solid ${panelMode === 'agent' ? '#0d9488' : '#9ca3af'}`,
                 borderTop: `1px solid ${panelMode === 'agent' ? '#0d9488' : '#9ca3af'}`,
@@ -878,7 +963,24 @@ export default function CanvasApp() {
         )}
         {sidebarVisible && (
           <aside className="w-72 border-l border-gray-200 bg-gradient-to-b from-white to-gray-50 flex flex-col shadow-sm relative">
-            {/* Vertical tab buttons on left edge */}
+            {/* Vertical tab buttons on left edge — collapse first, then panel tabs */}
+            <button
+              onClick={() => setSidebarVisible(false)}
+              className="fixed z-10 h-12 bg-gradient-to-b from-gray-200 to-gray-300 hover:from-gray-300 hover:to-gray-400 shadow-md transition-colors flex items-center justify-center"
+              title="Hide Panel"
+              style={{ 
+                padding: 0,
+                width: '20px',
+                top: '116px',
+                right: '288px',
+                borderRadius: '8px 0 0 8px',
+                borderLeft: '1px solid #9ca3af',
+                borderTop: '1px solid #9ca3af',
+                borderBottom: '1px solid #9ca3af'
+              }}
+            >
+              <span className="text-xs text-gray-600">▶</span>
+            </button>
             <button
               onClick={() => setPanelMode('attributes')}
               className={`fixed z-10 h-32 shadow-md transition-colors flex items-center justify-center ${
@@ -890,7 +992,7 @@ export default function CanvasApp() {
               style={{ 
                 padding: 0,
                 width: '20px',
-                top: '96px',
+                top: '168px',
                 right: '288px',
                 borderRadius: '8px 0 0 8px',
                 borderLeft: `1px solid ${panelMode === 'attributes' ? '#0d9488' : '#9ca3af'}`,
@@ -920,7 +1022,7 @@ export default function CanvasApp() {
               style={{ 
                 padding: 0,
                 width: '20px',
-                top: '260px',
+                top: '300px',
                 right: '288px',
                 borderRadius: '8px 0 0 8px',
                 borderLeft: `1px solid ${panelMode === 'agent' ? '#0d9488' : '#9ca3af'}`,
@@ -938,23 +1040,6 @@ export default function CanvasApp() {
               >
                 AGENT
               </span>
-            </button>
-            <button
-              onClick={() => setSidebarVisible(false)}
-              className="fixed z-10 h-12 bg-gradient-to-b from-gray-200 to-gray-300 hover:from-gray-300 hover:to-gray-400 shadow-md transition-colors flex items-center justify-center"
-              title="Hide Panel"
-              style={{ 
-                padding: 0,
-                width: '20px',
-                top: '420px',
-                right: '288px',
-                borderRadius: '8px 0 0 8px',
-                borderLeft: '1px solid #9ca3af',
-                borderTop: '1px solid #9ca3af',
-                borderBottom: '1px solid #9ca3af'
-              }}
-            >
-              <span className="text-xs text-gray-600">▶</span>
             </button>
             <div className="p-4 border-b border-gray-200 flex items-center gap-2">
               {panelMode === 'attributes' ? (

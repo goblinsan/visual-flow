@@ -8,6 +8,9 @@ export interface DraftState {
 
 /**
  * Setup global mouse listeners for draft mode (rect/ellipse/line)
+ * Handles mouseup events outside the Konva stage bounds.
+ * When mouseup occurs inside the stage, Konva's own handler fires,
+ * so we skip to prevent double-finalization.
  * Returns cleanup function
  */
 export function setupGlobalDraftListeners<T extends DraftState>(
@@ -18,8 +21,10 @@ export function setupGlobalDraftListeners<T extends DraftState>(
   const stage = stageRef.current;
   if (!stage) return () => {};
 
+  const container = stage.container();
+
   const onMove = (ev: MouseEvent) => {
-    const rect = stage.container().getBoundingClientRect();
+    const rect = container.getBoundingClientRect();
     const clientX = ev.clientX - rect.left;
     const clientY = ev.clientY - rect.top;
     const world = {
@@ -29,7 +34,10 @@ export function setupGlobalDraftListeners<T extends DraftState>(
     setDraft(prev => prev ? { ...prev, current: world } as T : prev);
   };
 
-  const onUp = () => {
+  const onUp = (ev: MouseEvent) => {
+    // Only finalize for mouseup events OUTSIDE the stage container.
+    // Konva handles in-stage mouseup via its own event system.
+    if (container.contains(ev.target as Node)) return;
     finalize();
   };
 

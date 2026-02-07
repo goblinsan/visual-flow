@@ -110,9 +110,13 @@ export function useViewportManager(
     };
   }, [viewportTransition?._key, viewportTransition?.targetId, viewportTransition?.durationMs, viewportTransition?.easing, width, height, scale, spec.root, findNodeBoundsById, easingFn, setPos]);
 
-  // Fit-to-content effect
+  // Fit-to-content effect — only fires when fitToContentKey changes (not on spec changes)
+  const lastFitKeyRef = useRef(fitToContentKey ?? 0);
   useEffect(() => {
     if (fitToContentKey === undefined || fitToContentKey === 0) return;
+    // Only run when the key actually increments
+    if (fitToContentKey === lastFitKeyRef.current) return;
+    lastFitKeyRef.current = fitToContentKey;
     
     const rootSize = spec.root.size;
     const children = spec.root.children || [];
