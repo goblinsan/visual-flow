@@ -45,7 +45,12 @@ export function SignIn() {
   if (!user) {
     return (
       <div className="flex items-center gap-2">
-        <button onClick={redirectToSignIn} className="px-3 py-1 rounded bg-blue-600 text-white text-sm">Sign in</button>
+        <button
+          onClick={redirectToSignIn}
+          className="text-sm px-3 py-1.5 rounded-md transition-colors duration-150 text-white/90 hover:bg-white/10"
+        >
+          Sign in
+        </button>
       </div>
     );
   }
@@ -60,17 +65,27 @@ export function SignIn() {
         )}
       </div>
       {user.display_name ? (
-        <button onClick={signOut} className="px-3 py-1 rounded border text-sm">Sign out</button>
+        <button
+          onClick={signOut}
+          className="text-sm px-3 py-1.5 rounded-md transition-colors duration-150 text-white/90 hover:bg-white/10 border border-white/10"
+        >
+          Sign out
+        </button>
       ) : (
         <div className="flex items-center gap-2">
           {editing ? (
             <>
-              <input value={nameInput} onChange={e => setNameInput(e.target.value)} className="px-2 py-1 rounded text-sm" />
-              <button onClick={saveDisplayName} className="px-2 py-1 rounded bg-green-600 text-white text-sm">Save</button>
-              <button onClick={() => setEditing(false)} className="px-2 py-1 rounded border text-sm">Cancel</button>
+              <input
+                value={nameInput}
+                onChange={e => setNameInput(e.target.value)}
+                className="text-sm px-2 py-1 rounded-md bg-white/10 text-white placeholder:text-white/60"
+                placeholder="Display name"
+              />
+              <button onClick={saveDisplayName} className="text-sm px-3 py-1.5 rounded-md bg-green-600 text-white">Save</button>
+              <button onClick={() => setEditing(false)} className="text-sm px-3 py-1.5 rounded-md transition-colors duration-150 text-white/90 hover:bg-white/10 border border-white/10">Cancel</button>
             </>
           ) : (
-            <button onClick={() => setEditing(true)} className="px-3 py-1 rounded bg-blue-600 text-white text-sm">Set name</button>
+            <button onClick={() => setEditing(true)} className="text-sm px-3 py-1.5 rounded-md transition-colors duration-150 text-white/90 hover:bg-white/10">Set name</button>
           )}
         </div>
       )}
