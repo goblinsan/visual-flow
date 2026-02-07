@@ -101,6 +101,23 @@ export default {
       });
     }
 
+    // User info endpoints
+    if (path === '/api/whoami' && method === 'GET') {
+      return jsonResponse({ id: user.id, email: user.email, display_name: (user as any).display_name || null }, { headers: corsHeaders });
+    }
+
+    if (path === '/api/user/display-name' && (method === 'POST' || method === 'PUT')) {
+      const body = await request.json().catch(() => ({}));
+      const newName = typeof body.display_name === 'string' ? body.display_name.trim() : '';
+      if (!newName) {
+        return errorResponse('display_name required', 400);
+      }
+      await env.DB.prepare('UPDATE users SET display_name = ?, updated_at = ? WHERE id = ?')
+        .bind(newName, Date.now(), user.id)
+        .run();
+      return jsonResponse({ ok: true, display_name: newName }, { headers: corsHeaders });
+    }
+
     // Rate limiting
     const rateLimitType = getRateLimitType(request.method, url.pathname);
     const rateLimit = checkRateLimit(user.id, rateLimitType);
