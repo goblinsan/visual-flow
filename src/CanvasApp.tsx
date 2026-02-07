@@ -390,6 +390,11 @@ export default function CanvasApp() {
   // Snapping toggles
   const [snapToGrid, setSnapToGrid] = useState(true);
   const [snapToObjects, setSnapToObjects] = useState(true);
+  const [snapToSpacing, setSnapToSpacing] = useState(true);
+  // Grid size (px between dots)
+  const [gridSize, setGridSize] = useState(20);
+  // Snap anchor mode: which part of the object snaps
+  const [snapAnchor, setSnapAnchor] = useState<'center' | 'border' | 'both'>('both');
   // Recent colors via hook
   const { recentColors, beginSession: beginRecentSession, previewColor: previewRecent, commitColor: commitRecent } = useRecentColors();
   const [canvasRef, canvasSize] = useElementSize<HTMLDivElement>();
@@ -735,6 +740,12 @@ export default function CanvasApp() {
             setSnapToGrid={setSnapToGrid}
             snapToObjects={snapToObjects}
             setSnapToObjects={setSnapToObjects}
+            snapToSpacing={snapToSpacing}
+            setSnapToSpacing={setSnapToSpacing}
+            gridSize={gridSize}
+            setGridSize={setGridSize}
+            snapAnchor={snapAnchor}
+            setSnapAnchor={setSnapAnchor}
             selectedCount={selectedIds.length}
           />
           <div 
@@ -812,6 +823,9 @@ export default function CanvasApp() {
                 onViewportChange={handleViewportChange}
                 snapToGrid={snapToGrid}
                 snapToObjects={snapToObjects}
+                snapToSpacing={snapToSpacing}
+                gridSize={gridSize}
+                snapAnchor={snapAnchor}
                 />
               );
             })()}

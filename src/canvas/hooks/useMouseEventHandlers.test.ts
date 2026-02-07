@@ -85,8 +85,11 @@ describe('useMouseEventHandlers', () => {
       setMenu: vi.fn(),
       snapToGrid: false,
       snapToObjects: false,
+      snapToSpacing: false,
       gridSize: 20,
+      snapAnchor: 'both' as const,
       setSnapGuides: vi.fn(),
+      setSpacingGuides: vi.fn(),
     };
   });
 

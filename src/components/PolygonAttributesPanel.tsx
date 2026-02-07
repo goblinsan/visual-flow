@@ -1,5 +1,6 @@
 import React from 'react';
 import { parseColor } from '../utils/color';
+import { generateRegularPolygonPoints } from '../utils/polygonPoints';
 
 export interface PolygonNode {
   id: string;
@@ -22,26 +23,6 @@ export interface PolygonAttributesPanelProps {
   commitRecent: (c?: string) => void;
   pushRecent: (c: string) => void;
   recentColors: string[];
-}
-
-// Helper function to regenerate polygon points when sides change
-function generateRegularPolygonPoints(width: number, height: number, sides: number): number[] {
-  const points: number[] = [];
-  const radiusX = width / 2;
-  const radiusY = height / 2;
-  const centerX = radiusX;
-  const centerY = radiusY;
-  
-  const angleOffset = -Math.PI / 2;
-  
-  for (let i = 0; i < sides; i++) {
-    const angle = angleOffset + (i * 2 * Math.PI) / sides;
-    const x = centerX + radiusX * Math.cos(angle);
-    const y = centerY + radiusY * Math.sin(angle);
-    points.push(x, y);
-  }
-  
-  return points;
 }
 
 export const PolygonAttributesPanel: React.FC<PolygonAttributesPanelProps> = ({

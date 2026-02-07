@@ -5,7 +5,7 @@ import type Konva from "konva";
 import type { LayoutNode, LayoutSpec, TextNode } from "../layout-schema.ts";
 import { renderNode, useFontLoading } from "./CanvasRenderer.tsx";
 import type { DragSession } from "../interaction/types";
-import type { SnapGuideLine } from "../interaction/snapping";
+import type { SnapGuideLine, SpacingGuide, SnapAnchor } from "../interaction/snapping";
 import type { MarqueeSession } from "../interaction/marquee";
 import { applyPosition, groupNodes, ungroupNodes } from "./stage-internal";
 import { nodeHasChildren } from "../commands/types";
@@ -85,6 +85,9 @@ interface CanvasStageProps {
   onViewportChange?: (viewport: { scale: number; x: number; y: number }) => void; // For collaboration overlays
   snapToGrid?: boolean;
   snapToObjects?: boolean;
+  snapToSpacing?: boolean;
+  gridSize?: number;
+  snapAnchor?: SnapAnchor;
 }
 
 // Infinite dot grid component
@@ -94,9 +97,10 @@ interface InfiniteGridProps {
   scale: number;
   offsetX: number;
   offsetY: number;
+  gridSize: number;
 }
 
-function InfiniteGrid({ width, height, scale, offsetX, offsetY }: InfiniteGridProps) {
+function InfiniteGrid({ width, height, scale, offsetX, offsetY, gridSize }: InfiniteGridProps) {
   if (scale <= 0.5) return null;
   // Calculate visible area in world coordinates
   const worldLeft = -offsetX / scale;
@@ -110,7 +114,7 @@ function InfiniteGrid({ width, height, scale, offsetX, offsetY }: InfiniteGridPr
     : scale >= 0.25 ? 4
     : scale >= 0.18 ? 5
     : 6;
-  const spacing = GRID_SPACING * decimation;
+  const spacing = gridSize * decimation;
   
   // Snap to grid boundaries with padding
   const startX = Math.floor(worldLeft / spacing) * spacing - spacing;
@@ -146,7 +150,9 @@ function CanvasStage({
   editingCurveId: propsEditingCurveId, onEditingCurveIdChange,
   blockCanvasClicksRef, skipNormalizationRef,
   fitToContentKey, viewportTransition, onViewportChange,
-  snapToGrid: propSnapToGrid, snapToObjects: propSnapToObjects 
+  snapToGrid: propSnapToGrid, snapToObjects: propSnapToObjects,
+  snapToSpacing: propSnapToSpacing, gridSize: propGridSize,
+  snapAnchor: propSnapAnchor
 }: CanvasStageProps) {
   // View / interaction state
   const [scale, setScale] = useState(1);
@@ -175,6 +181,10 @@ function CanvasStage({
 
   // Snap guide lines (rendered while dragging)
   const [snapGuides, setSnapGuides] = useState<SnapGuideLine[]>([]);
+  const [spacingGuides, setSpacingGuides] = useState<SpacingGuide[]>([]);
+
+  // Resolved grid size (default to 20px)
+  const gridSize = propGridSize ?? GRID_SPACING;
 
   // justStartedTextEditRef tracks if text editing just started to prevent immediate commit
   const justStartedTextEditRef = useRef(false);
@@ -467,8 +477,11 @@ function CanvasStage({
     setMenu,
     snapToGrid: propSnapToGrid ?? false,
     snapToObjects: propSnapToObjects ?? false,
-    gridSize: GRID_SPACING,
+    snapToSpacing: propSnapToSpacing ?? false,
+    gridSize,
+    snapAnchor: propSnapAnchor ?? 'both',
     setSnapGuides,
+    setSpacingGuides,
   });
 
   const { onMouseDown, onMouseMove, onMouseUp } = mouseHandlers;
@@ -890,7 +903,8 @@ function CanvasStage({
             height={height} 
             scale={scale} 
             offsetX={pos.x} 
-            offsetY={pos.y} 
+            offsetY={pos.y}
+            gridSize={gridSize} 
           />
         </Layer>
         
@@ -960,7 +974,7 @@ function CanvasStage({
                 <Line
                   key={`snap-v-${i}`}
                   points={[guide.position, worldTop, guide.position, worldBottom]}
-                  stroke="#f43f5e"
+                  stroke="rgba(244, 63, 94, 0.45)"
                   strokeWidth={1 / scale}
                   dash={[4 / scale, 4 / scale]}
                   listening={false}
@@ -971,11 +985,50 @@ function CanvasStage({
                 <Line
                   key={`snap-h-${i}`}
                   points={[worldLeft, guide.position, worldRight, guide.position]}
-                  stroke="#f43f5e"
+                  stroke="rgba(244, 63, 94, 0.45)"
                   strokeWidth={1 / scale}
                   dash={[4 / scale, 4 / scale]}
                   listening={false}
                 />
+              );
+            }
+          })}
+          
+          {/* Spacing guide lines (equal distance indicators during drag) */}
+          {spacingGuides.map((sg, i) => {
+            const s = 1 / scale;
+            if (sg.orientation === 'horizontal') {
+              // Horizontal gap indicator: a line with arrows between from and to at crossPosition
+              const y = sg.crossPosition;
+              const arrowSize = 4 * s;
+              return (
+                <Group key={`spacing-h-${i}`} listening={false}>
+                  {/* Main line */}
+                  <Line points={[sg.from, y, sg.to, y]} stroke="#8b5cf6" strokeWidth={1 * s} listening={false} />
+                  {/* Left arrow */}
+                  <Line points={[sg.from + arrowSize, y - arrowSize, sg.from, y, sg.from + arrowSize, y + arrowSize]} stroke="#8b5cf6" strokeWidth={1 * s} listening={false} />
+                  {/* Right arrow */}
+                  <Line points={[sg.to - arrowSize, y - arrowSize, sg.to, y, sg.to - arrowSize, y + arrowSize]} stroke="#8b5cf6" strokeWidth={1 * s} listening={false} />
+                  {/* Vertical end caps */}
+                  <Line points={[sg.from, y - 6 * s, sg.from, y + 6 * s]} stroke="#8b5cf6" strokeWidth={1 * s} listening={false} />
+                  <Line points={[sg.to, y - 6 * s, sg.to, y + 6 * s]} stroke="#8b5cf6" strokeWidth={1 * s} listening={false} />
+                </Group>
+              );
+            } else {
+              // Vertical gap indicator
+              const x = sg.crossPosition;
+              const arrowSize = 4 * s;
+              return (
+                <Group key={`spacing-v-${i}`} listening={false}>
+                  <Line points={[x, sg.from, x, sg.to]} stroke="#8b5cf6" strokeWidth={1 * s} listening={false} />
+                  {/* Top arrow */}
+                  <Line points={[x - arrowSize, sg.from + arrowSize, x, sg.from, x + arrowSize, sg.from + arrowSize]} stroke="#8b5cf6" strokeWidth={1 * s} listening={false} />
+                  {/* Bottom arrow */}
+                  <Line points={[x - arrowSize, sg.to - arrowSize, x, sg.to, x + arrowSize, sg.to - arrowSize]} stroke="#8b5cf6" strokeWidth={1 * s} listening={false} />
+                  {/* Horizontal end caps */}
+                  <Line points={[x - 6 * s, sg.from, x + 6 * s, sg.from]} stroke="#8b5cf6" strokeWidth={1 * s} listening={false} />
+                  <Line points={[x - 6 * s, sg.to, x + 6 * s, sg.to]} stroke="#8b5cf6" strokeWidth={1 * s} listening={false} />
+                </Group>
               );
             }
           })}

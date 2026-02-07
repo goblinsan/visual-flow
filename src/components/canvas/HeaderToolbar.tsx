@@ -62,7 +62,7 @@ export function HeaderToolbar({
               <i className="fa-solid fa-chevron-down ml-1.5 text-[10px] text-white/50" />
             </button>
             {fileOpen && (
-              <div className="absolute left-0 mt-1.5 w-48 rounded-lg border border-gray-200 bg-white shadow-xl z-30 p-1.5 flex flex-col overflow-hidden">
+              <div className="absolute left-0 mt-1.5 w-48 rounded-lg border border-gray-200 bg-white shadow-xl z-50 p-1.5 flex flex-col overflow-hidden">
                 {[
                   ["fa-regular fa-file", "New", "new", "⌘N"],
                   ["fa-regular fa-folder-open", "Open…", "open", "⌘O"],
@@ -97,7 +97,7 @@ export function HeaderToolbar({
               <i className="fa-solid fa-chevron-down ml-1.5 text-[10px] text-white/50" />
             </button>
             {helpOpen && (
-              <div className="absolute left-0 mt-1.5 w-52 rounded-lg border border-gray-200 bg-white shadow-xl z-30 p-1.5 flex flex-col overflow-hidden">
+              <div className="absolute left-0 mt-1.5 w-52 rounded-lg border border-gray-200 bg-white shadow-xl z-50 p-1.5 flex flex-col overflow-hidden">
                 <button
                   onClick={() => { setAboutOpen(true); setHelpOpen(false); }}
                   className="w-full flex items-center gap-2.5 px-3 py-2 text-sm rounded-md hover:bg-gray-100 transition-colors duration-100"

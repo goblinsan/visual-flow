@@ -1,4 +1,5 @@
 import { Rect, Ellipse, Line } from "react-konva";
+import { generateRegularPolygonPoints } from "../utils/polygonPoints";
 
 interface DraftState {
   start: { x: number; y: number };
@@ -177,18 +178,12 @@ export function DraftPreviewLayer({
           if (h < 0) { y = y + h; h = Math.abs(h);} 
         }
         
-        // Generate regular polygon points
-        const radiusX = Math.max(1, w) / 2;
-        const radiusY = Math.max(1, h) / 2;
-        const centerX = x + radiusX;
-        const centerY = y + radiusY;
-        const angleOffset = -Math.PI / 2;
+        // Generate regular polygon points (normalized to bounding box)
+        const localPoints = generateRegularPolygonPoints(Math.max(1, w), Math.max(1, h), polygonSides);
+        // Offset to absolute position
         const points: number[] = [];
-        for (let i = 0; i < polygonSides; i++) {
-          const angle = angleOffset + (i * 2 * Math.PI) / polygonSides;
-          const px = centerX + radiusX * Math.cos(angle);
-          const py = centerY + radiusY * Math.sin(angle);
-          points.push(px, py);
+        for (let i = 0; i < localPoints.length; i += 2) {
+          points.push(localPoints[i] + x, localPoints[i + 1] + y);
         }
         
         return (

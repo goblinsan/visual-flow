@@ -3,7 +3,7 @@ import type Konva from 'konva';
 import type { LayoutSpec, LayoutNode, TextNode } from '../../layout-schema';
 import { computeClickSelection, computeMarqueeSelection } from '../../renderer/interaction';
 import { beginDrag, updateDrag, finalizeDrag } from '../../interaction/drag';
-import { computeSnap, type SnapGuideLine, type SnapBounds } from '../../interaction/snapping';
+import { computeSnap, type SnapGuideLine, type SpacingGuide, type SnapBounds, type SnapAnchor } from '../../interaction/snapping';
 import type { DragSession } from '../../interaction/types';
 import { beginMarquee, updateMarquee, finalizeMarquee, type MarqueeSession } from '../../interaction/marquee';
 import { applyPosition } from '../stage-internal';
@@ -90,8 +90,11 @@ interface UseMouseEventHandlersProps {
   // Snapping
   snapToGrid: boolean;
   snapToObjects: boolean;
+  snapToSpacing: boolean;
   gridSize: number;
+  snapAnchor: SnapAnchor;
   setSnapGuides: (guides: SnapGuideLine[]) => void;
+  setSpacingGuides: (guides: SpacingGuide[]) => void;
 }
 
 const updateRootChildren = (spec: LayoutSpec, updater: (children: LayoutNode[]) => LayoutNode[]): LayoutSpec => {
@@ -160,8 +163,11 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
     setMenu,
     snapToGrid,
     snapToObjects,
+    snapToSpacing,
     gridSize,
+    snapAnchor,
     setSnapGuides,
+    setSpacingGuides,
   } = props;
 
   // Tool mode flags
@@ -546,7 +552,7 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
           update.dx, update.dy,
           session.originPositions, session.nodeIds,
           draggedBounds, otherBounds,
-          { snapToGrid, snapToObjects, gridSize }
+          { snapToGrid, snapToObjects, snapToSpacing, gridSize, snapAnchor }
         );
 
         // Position nodes using snapped delta
@@ -559,6 +565,7 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
           }
         }
         setSnapGuides(snapResult.guides);
+        setSpacingGuides(snapResult.spacingGuides ?? []);
         trRef.current?.forceUpdate();
       }
       // Force state update so dependent callbacks (e.g. click clearing) see threshold transition
@@ -608,8 +615,11 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
     marqueeRectRef,
     snapToGrid,
     snapToObjects,
+    snapToSpacing,
     gridSize,
+    snapAnchor,
     setSnapGuides,
+    setSpacingGuides,
     spec.root.children,
   ]);
 
@@ -663,7 +673,7 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
           rawDx, rawDy,
           dragSession.originPositions, dragSession.nodeIds,
           draggedBounds, otherBounds,
-          { snapToGrid, snapToObjects, gridSize }
+          { snapToGrid, snapToObjects, snapToSpacing, gridSize, snapAnchor }
         );
 
         setSpec(prev => {
@@ -679,6 +689,7 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
       }
       setDragSession(null);
       setSnapGuides([]);
+      setSpacingGuides([]);
     }
 
     // Handle marquee completion via helper
@@ -727,8 +738,11 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
     marqueeRectRef,
     snapToGrid,
     snapToObjects,
+    snapToSpacing,
     gridSize,
+    snapAnchor,
     setSnapGuides,
+    setSpacingGuides,
     spec.root.children,
   ]);
 

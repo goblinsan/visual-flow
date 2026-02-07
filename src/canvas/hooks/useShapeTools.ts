@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import type { LayoutSpec, LayoutNode, EllipseNode, LineNode, CurveNode, PolygonNode } from '../../layout-schema';
+import { generateRegularPolygonPoints } from '../../utils/polygonPoints';
 
 interface DraftState {
   start: { x: number; y: number };
@@ -378,23 +379,3 @@ export function useShapeTools(
   };
 }
 
-// Helper function to generate regular polygon points
-function generateRegularPolygonPoints(width: number, height: number, sides: number): number[] {
-  const points: number[] = [];
-  const radiusX = width / 2;
-  const radiusY = height / 2;
-  const centerX = radiusX;
-  const centerY = radiusY;
-  
-  // Start from top (angle offset to make polygon upright)
-  const angleOffset = -Math.PI / 2;
-  
-  for (let i = 0; i < sides; i++) {
-    const angle = angleOffset + (i * 2 * Math.PI) / sides;
-    const x = centerX + radiusX * Math.cos(angle);
-    const y = centerY + radiusY * Math.sin(angle);
-    points.push(x, y);
-  }
-  
-  return points;
-}

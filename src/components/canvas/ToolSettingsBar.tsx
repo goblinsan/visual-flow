@@ -28,6 +28,14 @@ interface ToolSettingsBarProps {
   setSnapToGrid: (snap: boolean) => void;
   snapToObjects: boolean;
   setSnapToObjects: (snap: boolean) => void;
+  snapToSpacing: boolean;
+  setSnapToSpacing: (snap: boolean) => void;
+  /** Grid size (px between dots) */
+  gridSize: number;
+  setGridSize: (size: number) => void;
+  /** Snap anchor mode */
+  snapAnchor: 'center' | 'border' | 'both';
+  setSnapAnchor: (anchor: 'center' | 'border' | 'both') => void;
   /** Selection info */
   selectedCount: number;
 }
@@ -58,6 +66,12 @@ export function ToolSettingsBar({
   setSnapToGrid,
   snapToObjects,
   setSnapToObjects,
+  snapToSpacing,
+  setSnapToSpacing,
+  gridSize,
+  setGridSize,
+  snapAnchor,
+  setSnapAnchor,
   selectedCount,
 }: ToolSettingsBarProps) {
   const isDrawingTool = Boolean(DRAWING_TOOLS[tool]);
@@ -282,6 +296,51 @@ export function ToolSettingsBar({
           <i className="fa-solid fa-object-group text-[10px]" />
           <span>Objects</span>
         </label>
+        <label className="flex items-center gap-1 text-gray-600 cursor-pointer" title="Snap to equal spacing between objects">
+          <input
+            type="checkbox"
+            checked={snapToSpacing}
+            onChange={(e) => setSnapToSpacing(e.target.checked)}
+            className="w-3.5 h-3.5 accent-violet-500 rounded"
+          />
+          <i className="fa-solid fa-ruler-combined text-[10px]" />
+          <span>Spacing</span>
+        </label>
+        <div className="w-px h-4 bg-gray-200" />
+        <label className="flex items-center gap-1 text-gray-600" title="Grid spacing in pixels">
+          <i className="fa-solid fa-grid text-[10px]" />
+          <input
+            type="number"
+            min={5}
+            max={100}
+            step={5}
+            value={gridSize}
+            onChange={(e) => {
+              const v = parseInt(e.target.value, 10);
+              if (!isNaN(v) && v >= 5 && v <= 100) setGridSize(v);
+            }}
+            className="w-12 px-1 py-0.5 border border-gray-300 rounded text-center text-xs focus:outline-none focus:ring-1 focus:ring-teal-400"
+          />
+          <span className="text-gray-400">px</span>
+        </label>
+        <div className="w-px h-4 bg-gray-200" />
+        <span className="text-gray-500 font-medium text-[10px]" title="Which part of the object snaps">Anchor</span>
+        <div className="flex items-center rounded border border-gray-300 overflow-hidden">
+          {(['center', 'border', 'both'] as const).map((mode) => (
+            <button
+              key={mode}
+              onClick={() => setSnapAnchor(mode)}
+              title={`Snap on ${mode === 'both' ? 'center & borders' : mode}`}
+              className={`px-1.5 py-0.5 text-[10px] capitalize transition-colors ${
+                snapAnchor === mode
+                  ? 'bg-teal-500 text-white'
+                  : 'bg-white text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              {mode}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Tip text for drawing tools */}

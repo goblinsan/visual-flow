@@ -3,6 +3,7 @@ import {
   snapToGridValue,
   computeGridSnap,
   computeObjectSnap,
+  computeSpacingSnap,
   computeSnap,
   type SnapBounds,
 } from './snapping';
@@ -124,6 +125,7 @@ describe('computeSnap (combined)', () => {
     const result = computeSnap(23, 37, origins, ['a'], dragged, others, {
       snapToGrid: true,
       snapToObjects: false,
+      snapToSpacing: false,
       gridSize: 20,
     });
     expect(result.dx).toBe(20);
@@ -139,6 +141,7 @@ describe('computeSnap (combined)', () => {
     const result = computeSnap(45, 97, origins, ['a'], dragged, others, {
       snapToGrid: false,
       snapToObjects: true,
+      snapToSpacing: false,
       gridSize: 20,
     });
     expect(result.dx).toBe(50); // snaps left edge 95→100
@@ -151,8 +154,142 @@ describe('computeSnap (combined)', () => {
     const result = computeSnap(23, 37, origins, ['a'], [], [], {
       snapToGrid: false,
       snapToObjects: false,
+      snapToSpacing: false,
       gridSize: 20,
     });
-    expect(result).toEqual({ dx: 23, dy: 37, guides: [] });
+    expect(result).toEqual({ dx: 23, dy: 37, guides: [], spacingGuides: [] });
+  });
+});
+
+describe('computeGridSnap with bounds & snapAnchor', () => {
+  it('prioritises bottom edge in both mode', () => {
+    const origins = { a: { x: 0, y: 0 } };
+    const bounds: SnapBounds[] = [{ id: 'a', x: 0, y: 0, width: 40, height: 47 }];
+    // dy=0, bottom = 0+47=47 → nearest grid (20) = 40 → adj -7
+    // top = 0 → snap 0 → adj 0 → dist 0 (closer!) BUT both mode lists bottom first:
+    //   bottom 47→40 dist=7, center 23.5→20 dist=3.5, top 0→0 dist=0
+    //   best = top (dist=0), so adj = 0
+    const result = computeGridSnap(0, 0, origins, ['a'], 20, bounds, 'both');
+    expect(result.dy).toBe(0); // top is already on grid, wins with dist 0
+  });
+
+  it('snaps bottom edge to grid when it is the closest', () => {
+    const origins = { a: { x: 0, y: 3 } };
+    const bounds: SnapBounds[] = [{ id: 'a', x: 0, y: 3, width: 40, height: 40 }];
+    // bottom = 3+40=43 → snap 40 → dist 3
+    // center = 23 → snap 20 → dist 3  (tie, but bottom is listed first → wins)
+    // top = 3 → snap 0 → dist 3
+    const result = computeGridSnap(0, 0, origins, ['a'], 20, bounds, 'both');
+    // All equal distance 3; bottom has priority → adj = 40-43 = -3
+    expect(result.dy).toBe(-3);
+  });
+
+  it('snaps only center in center mode', () => {
+    const origins = { a: { x: 0, y: 0 } };
+    const bounds: SnapBounds[] = [{ id: 'a', x: 0, y: 0, width: 40, height: 43 }];
+    // center = 21.5 → snap 20 → dist 1.5
+    const result = computeGridSnap(0, 0, origins, ['a'], 20, bounds, 'center');
+    expect(result.dy).toBeCloseTo(-1.5);
+  });
+
+  it('snaps only borders in border mode', () => {
+    const origins = { a: { x: 0, y: 2 } };
+    const bounds: SnapBounds[] = [{ id: 'a', x: 0, y: 2, width: 40, height: 40 }];
+    // border mode: bottom=42→40 dist=2, top=2→0 dist=2 → bottom first wins → adj=-2
+    const result = computeGridSnap(0, 0, origins, ['a'], 20, bounds, 'border');
+    expect(result.dy).toBe(-2);
+  });
+
+  it('falls back to top-left snap without bounds', () => {
+    const origins = { a: { x: 0, y: 0 } };
+    const result = computeGridSnap(23, 37, origins, ['a'], 20);
+    expect(result.dx).toBe(20);
+    expect(result.dy).toBe(40);
+  });
+});
+
+describe('computeSpacingSnap', () => {
+  it('snaps to equal horizontal spacing between objects', () => {
+    // Two objects with a 50px gap between them
+    const objA: SnapBounds = { id: 'a', x: 0, y: 100, width: 40, height: 40 };
+    const objB: SnapBounds = { id: 'b', x: 90, y: 100, width: 40, height: 40 };
+    // Gap between A and B: 90 - (0+40) = 50px
+    // Dragging a third object: origin x=200, width=40
+    // dx=-18 → tentative left=182, right=222
+    // Gap from B right edge (130) to dragged left (182) = 52 → close to 50 → snap to 50
+    const dragged: SnapBounds[] = [
+      { id: 'c', x: 200, y: 100, width: 40, height: 40 },
+    ];
+    const others: SnapBounds[] = [objA, objB];
+    const result = computeSpacingSnap(-18, 0, dragged, others);
+    // Tentative gap = 200-18 - 130 = 52, existing gap = 50, so adj = -2
+    expect(result.dx).toBe(-20); // -18 + (-2) = -20, placing dragged at x=180
+    expect(result.spacingGuides.length).toBeGreaterThan(0);
+    expect(result.spacingGuides.some(g => g.orientation === 'horizontal')).toBe(true);
+  });
+
+  it('snaps to equal vertical spacing between objects', () => {
+    const objA: SnapBounds = { id: 'a', x: 100, y: 0, width: 40, height: 40 };
+    const objB: SnapBounds = { id: 'b', x: 100, y: 80, width: 40, height: 40 };
+    // Gap between A and B: 80 - 40 = 40px
+    const dragged: SnapBounds[] = [
+      { id: 'c', x: 100, y: 200, width: 40, height: 40 },
+    ];
+    const others: SnapBounds[] = [objA, objB];
+    // dx=0, dy=-38 → tentative top=162, gap from B bottom (120) = 42 → snap to 40
+    const result = computeSpacingSnap(0, -38, dragged, others);
+    expect(result.dy).toBe(-40); // -38 + (-2) = -40, placing at y=160
+    expect(result.spacingGuides.some(g => g.orientation === 'vertical')).toBe(true);
+  });
+
+  it('returns original deltas when fewer than 2 other objects', () => {
+    const dragged: SnapBounds[] = [
+      { id: 'c', x: 200, y: 100, width: 40, height: 40 },
+    ];
+    const result = computeSpacingSnap(10, 20, dragged, [
+      { id: 'a', x: 0, y: 0, width: 40, height: 40 },
+    ]);
+    expect(result).toEqual({ dx: 10, dy: 20, spacingGuides: [] });
+  });
+
+  it('does not snap when gap difference exceeds threshold', () => {
+    const objA: SnapBounds = { id: 'a', x: 0, y: 100, width: 40, height: 40 };
+    const objB: SnapBounds = { id: 'b', x: 90, y: 100, width: 40, height: 40 };
+    // Gap = 50
+    const dragged: SnapBounds[] = [
+      { id: 'c', x: 200, y: 100, width: 40, height: 40 },
+    ];
+    // dx=0 → tentative gap = 200-130 = 70 → diff from 50 = 20 → way outside threshold
+    const result = computeSpacingSnap(0, 0, dragged, [objA, objB]);
+    expect(result.dx).toBe(0);
+    expect(result.spacingGuides).toEqual([]);
+  });
+
+  it('shows spacing arrows between all equally-spaced objects in a row', () => {
+    // 4 boxes in a row, each 40px wide, 50px gap between them:
+    // A: x=0..40, B: x=90..130, C: x=180..220, D: x=270..310
+    // Gaps: A-B=50, B-C=50, C-D=50
+    const objA: SnapBounds = { id: 'a', x: 0,   y: 100, width: 40, height: 40 };
+    const objB: SnapBounds = { id: 'b', x: 90,  y: 100, width: 40, height: 40 };
+    const objC: SnapBounds = { id: 'c', x: 180, y: 100, width: 40, height: 40 };
+    const objD: SnapBounds = { id: 'd', x: 270, y: 100, width: 40, height: 40 };
+    const others = [objA, objB, objC, objD];
+
+    // Dragging a 5th box to the right of D.
+    // D right edge = 310. Want a 50px gap → placed at x=360.
+    // Origin at x=400, dx needed to get to x=360 is -40.
+    // Tentative with dx=-38: left=362, gap=362-310=52, diff from 50=2 → within threshold
+    const dragged: SnapBounds[] = [
+      { id: 'e', x: 400, y: 100, width: 40, height: 40 },
+    ];
+    const result = computeSpacingSnap(-38, 0, dragged, others);
+
+    // Should snap to 50px gap: adj = -2, final dx = -40
+    expect(result.dx).toBe(-40);
+
+    // Should have spacing guides between ALL 4 gaps:
+    // 1) dragged↔D gap, 2) A↔B, 3) B↔C, 4) C↔D
+    const hGuides = result.spacingGuides.filter(g => g.orientation === 'horizontal');
+    expect(hGuides.length).toBe(4);
   });
 });
