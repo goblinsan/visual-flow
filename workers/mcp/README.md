@@ -11,11 +11,26 @@ Any MCP-compatible AI agent (Claude Desktop, Cursor, VS Code Copilot, custom age
 3. **Check status** — see if proposals were approved or rejected
 4. **Learn the system** — read built-in docs about node types and best practices
 
-## Quick Setup
+## Quick Setup (Under 2 Minutes!)
+
+### Option 1: npx (Easiest)
+
+```bash
+npx vizail-mcp-server --token=YOUR_TOKEN --canvas-id=YOUR_CANVAS_ID
+```
+
+This will start the MCP server immediately without installation.
+
+### Option 2: Install Globally
+
+```bash
+npm install -g vizail-mcp-server
+vizail-mcp --token=YOUR_TOKEN --canvas-id=YOUR_CANVAS_ID
+```
 
 ### 1. Generate an Agent Token
 
-The canvas owner generates a token from the UI (Agent tab → Share with Agent) or via API:
+The canvas owner generates a token from the UI (Agent tab → "🤖 Generate Token for ChatGPT") or via API:
 
 ```bash
 curl -X POST http://localhost:62587/api/canvases/YOUR_CANVAS_ID/agent-token \
@@ -28,6 +43,14 @@ This returns a token like `vz_agent_xxx_yyy` (valid for 24 hours).
 
 ### 2. Configure MCP Client
 
+#### Quick Start with npx
+
+For one-time use or testing:
+
+```bash
+npx vizail-mcp-server --token=vz_agent_xxx --canvas-id=canvas_123 --api-url=http://localhost:62587/api
+```
+
 #### Claude Desktop
 
 Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
@@ -37,10 +60,27 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
   "mcpServers": {
     "vizail-canvas": {
       "command": "npx",
-      "args": ["tsx", "/path/to/visual-flow/workers/mcp/src/index.ts"],
+      "args": ["-y", "vizail-mcp-server", "--token=vz_agent_xxx", "--canvas-id=canvas_123"],
+      "env": {
+        "VIZAIL_API_URL": "http://localhost:62587/api"
+      }
+    }
+  }
+}
+```
+
+Or using environment variables:
+
+```json
+{
+  "mcpServers": {
+    "vizail-canvas": {
+      "command": "npx",
+      "args": ["-y", "vizail-mcp-server"],
       "env": {
         "VIZAIL_API_URL": "http://localhost:62587/api",
-        "VIZAIL_AGENT_TOKEN": "vz_agent_xxx_yyy"
+        "VIZAIL_AGENT_TOKEN": "vz_agent_xxx_yyy",
+        "VIZAIL_CANVAS_ID": "canvas_123"
       }
     }
   }
@@ -56,10 +96,11 @@ Add to `.cursor/mcp.json` in your project:
   "mcpServers": {
     "vizail-canvas": {
       "command": "npx",
-      "args": ["tsx", "./workers/mcp/src/index.ts"],
+      "args": ["-y", "vizail-mcp-server"],
       "env": {
         "VIZAIL_API_URL": "http://localhost:62587/api",
-        "VIZAIL_AGENT_TOKEN": "vz_agent_xxx_yyy"
+        "VIZAIL_AGENT_TOKEN": "vz_agent_xxx_yyy",
+        "VIZAIL_CANVAS_ID": "canvas_123"
       }
     }
   }
@@ -75,10 +116,11 @@ Add to `.vscode/mcp.json`:
   "servers": {
     "vizail-canvas": {
       "command": "npx",
-      "args": ["tsx", "${workspaceFolder}/workers/mcp/src/index.ts"],
+      "args": ["-y", "vizail-mcp-server"],
       "env": {
         "VIZAIL_API_URL": "http://localhost:62587/api",
-        "VIZAIL_AGENT_TOKEN": "vz_agent_xxx_yyy"
+        "VIZAIL_AGENT_TOKEN": "vz_agent_xxx_yyy",
+        "VIZAIL_CANVAS_ID": "canvas_123"
       }
     }
   }
@@ -120,12 +162,17 @@ curl http://localhost:62587/api/canvases/CANVAS_ID \
 
 The discovery endpoint returns a full OpenAPI 3.1 spec with schemas, examples, and workflow documentation.
 
-## Environment Variables
+## Environment Variables / CLI Arguments
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `VIZAIL_API_URL` | Yes | Base URL of the Vizail API (e.g. `http://localhost:62587/api`) |
-| `VIZAIL_AGENT_TOKEN` | Yes | Agent token from the canvas owner |
+The server supports both environment variables and CLI arguments:
+
+| Config | CLI Argument | Environment Variable | Required | Description |
+|--------|--------------|---------------------|----------|-------------|
+| API URL | `--api-url` | `VIZAIL_API_URL` | No | Base URL of the Vizail API (default: `http://localhost:62587/api`) |
+| Token | `--token` | `VIZAIL_AGENT_TOKEN` | Yes | Agent token from the canvas owner |
+| Canvas ID | `--canvas-id` | `VIZAIL_CANVAS_ID` | No | Optional default canvas ID for tools |
+
+**Note:** CLI arguments take precedence over environment variables.
 
 ## Token Scopes
 

@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * Vizail Canvas MCP Server
  * 
@@ -8,6 +9,9 @@
  * - Understand the node type system
  * 
  * Usage:
+ *   npx vizail-mcp --token=vz_agent_xxx --canvas-id=canvas_123
+ * 
+ * Or via environment variables:
  *   VIZAIL_API_URL=http://localhost:62587/api \
  *   VIZAIL_AGENT_TOKEN=vz_agent_xxx \
  *   npx vizail-mcp
@@ -27,12 +31,38 @@ import { VizailApiClient } from './api-client.js';
 import { TOOL_DEFINITIONS, handleToolCall } from './tools.js';
 import { RESOURCE_DEFINITIONS, handleResourceRead } from './resources.js';
 
-const API_URL = process.env.VIZAIL_API_URL || 'http://localhost:62587/api';
-const AGENT_TOKEN = process.env.VIZAIL_AGENT_TOKEN || '';
+// Parse CLI arguments
+function parseArgs() {
+  const args = process.argv.slice(2);
+  const result: Record<string, string> = {};
+  
+  for (const arg of args) {
+    if (arg.startsWith('--')) {
+      const [key, value] = arg.slice(2).split('=');
+      if (key && value) {
+        result[key] = value;
+      }
+    }
+  }
+  
+  return result;
+}
+
+const cliArgs = parseArgs();
+
+// Support both CLI args and environment variables
+const API_URL = cliArgs['api-url'] || process.env.VIZAIL_API_URL || 'http://localhost:62587/api';
+const AGENT_TOKEN = cliArgs.token || process.env.VIZAIL_AGENT_TOKEN || '';
+const CANVAS_ID = cliArgs['canvas-id'] || process.env.VIZAIL_CANVAS_ID;
 
 if (!AGENT_TOKEN) {
   console.error('⚠️  VIZAIL_AGENT_TOKEN is not set. Get a token from the canvas owner.');
-  console.error('   Set it via: export VIZAIL_AGENT_TOKEN=vz_agent_...');
+  console.error('   Usage: npx vizail-mcp --token=vz_agent_xxx --canvas-id=canvas_123');
+  console.error('   Or set: export VIZAIL_AGENT_TOKEN=vz_agent_...');
+}
+
+if (CANVAS_ID) {
+  console.error(`📋 Canvas ID: ${CANVAS_ID}`);
 }
 
 const apiClient = new VizailApiClient(API_URL, AGENT_TOKEN);
