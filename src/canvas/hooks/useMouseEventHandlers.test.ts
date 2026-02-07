@@ -83,6 +83,10 @@ describe('useMouseEventHandlers', () => {
       justStartedTextEditRef: { current: false },
       onToolChange: vi.fn(),
       setMenu: vi.fn(),
+      snapToGrid: false,
+      snapToObjects: false,
+      gridSize: 20,
+      setSnapGuides: vi.fn(),
     };
   });
 

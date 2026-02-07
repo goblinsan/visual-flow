@@ -23,9 +23,16 @@ interface ToolSettingsBarProps {
     arrowSize: number;
   };
   updateLineDefaults: (patch: Record<string, unknown>) => void;
+  /** Snapping toggles */
+  snapToGrid: boolean;
+  setSnapToGrid: (snap: boolean) => void;
+  snapToObjects: boolean;
+  setSnapToObjects: (snap: boolean) => void;
+  /** Selection info */
+  selectedCount: number;
 }
 
-const TOOL_LABELS: Record<string, string> = {
+const DRAWING_TOOLS: Record<string, string> = {
   rect: 'Rectangle',
   ellipse: 'Ellipse',
   line: 'Line',
@@ -35,8 +42,9 @@ const TOOL_LABELS: Record<string, string> = {
 };
 
 /**
- * Contextual tool settings bar that appears below the header
- * when a drawing tool is selected, showing tool-specific options.
+ * Persistent tool settings bar at the top of the canvas area.
+ * Always visible — shows tool-specific options for drawing tools,
+ * selection info for select mode, and snapping toggles for all modes.
  */
 export function ToolSettingsBar({
   tool,
@@ -46,18 +54,32 @@ export function ToolSettingsBar({
   updateRectDefaults,
   lineDefaults,
   updateLineDefaults,
+  snapToGrid,
+  setSnapToGrid,
+  snapToObjects,
+  setSnapToObjects,
+  selectedCount,
 }: ToolSettingsBarProps) {
-  // Only show for drawing tools
-  if (!TOOL_LABELS[tool]) return null;
+  const isDrawingTool = Boolean(DRAWING_TOOLS[tool]);
+  const isShapeTool = tool === 'rect' || tool === 'ellipse' || tool === 'polygon';
+  const isLineTool = tool === 'line' || tool === 'curve';
 
   return (
-    <div className="absolute top-0 left-0 right-0 z-40 flex items-center gap-4 px-4 py-1.5 bg-white/95 backdrop-blur-sm border-b border-gray-200 text-xs select-none shadow-sm">
-      {/* Tool label */}
-      <span className="font-semibold text-gray-700 uppercase tracking-wide text-[10px]">
-        {TOOL_LABELS[tool]}
-      </span>
+    <div className="absolute top-0 left-0 right-0 z-40 flex items-center gap-3 px-4 py-1.5 bg-white/95 backdrop-blur-sm border-b border-gray-200 text-xs select-none shadow-sm">
+      {/* Tool label or select mode indicator */}
+      {isDrawingTool ? (
+        <span className="font-semibold text-gray-700 uppercase tracking-wide text-[10px]">
+          {DRAWING_TOOLS[tool]}
+        </span>
+      ) : (
+        <span className="font-semibold text-gray-500 uppercase tracking-wide text-[10px]">
+          {selectedCount > 0 ? `${selectedCount} selected` : 'Select'}
+        </span>
+      )}
 
       <div className="w-px h-4 bg-gray-200" />
+
+      {/* ─── Drawing-tool-specific options ─── */}
 
       {/* Polygon sides */}
       {tool === 'polygon' && (
@@ -78,7 +100,7 @@ export function ToolSettingsBar({
       )}
 
       {/* Fill & stroke for shape tools */}
-      {(tool === 'rect' || tool === 'ellipse' || tool === 'polygon') && (
+      {isShapeTool && (
         <>
           {/* Fill color */}
           <label className="flex items-center gap-1.5 text-gray-600">
@@ -161,7 +183,7 @@ export function ToolSettingsBar({
       )}
 
       {/* Line / Curve stroke settings */}
-      {(tool === 'line' || tool === 'curve') && (
+      {isLineTool && (
         <>
           <label className="flex items-center gap-1.5 text-gray-600">
             <span>Stroke</span>
@@ -236,15 +258,43 @@ export function ToolSettingsBar({
         </>
       )}
 
-      {/* Tip text */}
-      <div className="ml-auto text-gray-400 text-[10px]">
-        {tool === 'polygon' && 'Scroll wheel to adjust sides during creation'}
-        {tool === 'rect' && 'Hold Shift for square, Alt to draw from center'}
-        {tool === 'ellipse' && 'Hold Shift for circle, Alt to draw from center'}
-        {tool === 'line' && 'Click and drag to draw a line'}
-        {tool === 'curve' && 'Click to add points, double-click to finish'}
-        {tool === 'text' && 'Click to place text on canvas'}
+      {/* ─── Snapping toggles (always visible, pushed to the right) ─── */}
+      <div className="w-px h-4 bg-gray-200 ml-auto" />
+
+      <div className="flex items-center gap-3 pr-6">
+        <label className="flex items-center gap-1 text-gray-600 cursor-pointer" title="Snap to grid lines while moving objects">
+          <input
+            type="checkbox"
+            checked={snapToGrid}
+            onChange={(e) => setSnapToGrid(e.target.checked)}
+            className="w-3.5 h-3.5 accent-teal-500 rounded"
+          />
+          <i className="fa-solid fa-border-all text-[10px]" />
+          <span>Grid</span>
+        </label>
+        <label className="flex items-center gap-1 text-gray-600 cursor-pointer" title="Snap to other objects for alignment">
+          <input
+            type="checkbox"
+            checked={snapToObjects}
+            onChange={(e) => setSnapToObjects(e.target.checked)}
+            className="w-3.5 h-3.5 accent-teal-500 rounded"
+          />
+          <i className="fa-solid fa-object-group text-[10px]" />
+          <span>Objects</span>
+        </label>
       </div>
+
+      {/* Tip text for drawing tools */}
+      {isDrawingTool && (
+        <div className="text-gray-400 text-[10px] pr-6 whitespace-nowrap">
+          {tool === 'polygon' && 'Scroll to adjust sides'}
+          {tool === 'rect' && 'Shift=square, Alt=center'}
+          {tool === 'ellipse' && 'Shift=circle, Alt=center'}
+          {tool === 'line' && 'Drag to draw line'}
+          {tool === 'curve' && 'Click points, dbl-click to finish'}
+          {tool === 'text' && 'Click to place text'}
+        </div>
+      )}
     </div>
   );
 }

@@ -387,6 +387,9 @@ export default function CanvasApp() {
   }, []);
   // Polygon sides (lifted from CanvasStage so ToolSettingsBar can control it)
   const [polygonSides, setPolygonSides] = useState(5);
+  // Snapping toggles
+  const [snapToGrid, setSnapToGrid] = useState(true);
+  const [snapToObjects, setSnapToObjects] = useState(true);
   // Recent colors via hook
   const { recentColors, beginSession: beginRecentSession, previewColor: previewRecent, commitColor: commitRecent } = useRecentColors();
   const [canvasRef, canvasSize] = useElementSize<HTMLDivElement>();
@@ -728,6 +731,11 @@ export default function CanvasApp() {
             updateRectDefaults={updateRectDefaults}
             lineDefaults={lineDefaults}
             updateLineDefaults={updateLineDefaults}
+            snapToGrid={snapToGrid}
+            setSnapToGrid={setSnapToGrid}
+            snapToObjects={snapToObjects}
+            setSnapToObjects={setSnapToObjects}
+            selectedCount={selectedIds.length}
           />
           <div 
             ref={canvasRef} 
@@ -802,6 +810,8 @@ export default function CanvasApp() {
                 lineDefaults={lineDefaults}
                 viewportTransition={viewportTransition}
                 onViewportChange={handleViewportChange}
+                snapToGrid={snapToGrid}
+                snapToObjects={snapToObjects}
                 />
               );
             })()}
@@ -840,6 +850,24 @@ export default function CanvasApp() {
             <button
               onClick={() => {
                 setSidebarVisible(true);
+              }}
+              className="fixed right-0 z-10 h-12 bg-gradient-to-b from-gray-200 to-gray-300 hover:from-gray-300 hover:to-gray-400 shadow-md transition-colors flex items-center justify-center"
+              title="Show Panel"
+              style={{ 
+                padding: 0,
+                width: '20px',
+                top: '116px',
+                borderRadius: '8px 0 0 8px',
+                borderLeft: '1px solid #9ca3af',
+                borderTop: '1px solid #9ca3af',
+                borderBottom: '1px solid #9ca3af'
+              }}
+            >
+              <span className="text-xs text-gray-600">◀</span>
+            </button>
+            <button
+              onClick={() => {
+                setSidebarVisible(true);
                 setPanelMode('attributes');
               }}
               className={`fixed right-0 z-10 h-32 shadow-md transition-colors flex items-center justify-center ${
@@ -851,7 +879,7 @@ export default function CanvasApp() {
               style={{ 
                 padding: 0,
                 width: '20px',
-                top: '96px',
+                top: '168px',
                 borderRadius: '8px 0 0 8px',
                 borderLeft: `1px solid ${panelMode === 'attributes' ? '#0d9488' : '#9ca3af'}`,
                 borderTop: `1px solid ${panelMode === 'attributes' ? '#0d9488' : '#9ca3af'}`,
@@ -883,7 +911,7 @@ export default function CanvasApp() {
               style={{ 
                 padding: 0,
                 width: '20px',
-                top: '260px',
+                top: '300px',
                 borderRadius: '8px 0 0 8px',
                 borderLeft: `1px solid ${panelMode === 'agent' ? '#0d9488' : '#9ca3af'}`,
                 borderTop: `1px solid ${panelMode === 'agent' ? '#0d9488' : '#9ca3af'}`,
@@ -905,7 +933,24 @@ export default function CanvasApp() {
         )}
         {sidebarVisible && (
           <aside className="w-72 border-l border-gray-200 bg-gradient-to-b from-white to-gray-50 flex flex-col shadow-sm relative">
-            {/* Vertical tab buttons on left edge */}
+            {/* Vertical tab buttons on left edge — collapse first, then panel tabs */}
+            <button
+              onClick={() => setSidebarVisible(false)}
+              className="fixed z-10 h-12 bg-gradient-to-b from-gray-200 to-gray-300 hover:from-gray-300 hover:to-gray-400 shadow-md transition-colors flex items-center justify-center"
+              title="Hide Panel"
+              style={{ 
+                padding: 0,
+                width: '20px',
+                top: '116px',
+                right: '288px',
+                borderRadius: '8px 0 0 8px',
+                borderLeft: '1px solid #9ca3af',
+                borderTop: '1px solid #9ca3af',
+                borderBottom: '1px solid #9ca3af'
+              }}
+            >
+              <span className="text-xs text-gray-600">▶</span>
+            </button>
             <button
               onClick={() => setPanelMode('attributes')}
               className={`fixed z-10 h-32 shadow-md transition-colors flex items-center justify-center ${
@@ -917,7 +962,7 @@ export default function CanvasApp() {
               style={{ 
                 padding: 0,
                 width: '20px',
-                top: '96px',
+                top: '168px',
                 right: '288px',
                 borderRadius: '8px 0 0 8px',
                 borderLeft: `1px solid ${panelMode === 'attributes' ? '#0d9488' : '#9ca3af'}`,
@@ -947,7 +992,7 @@ export default function CanvasApp() {
               style={{ 
                 padding: 0,
                 width: '20px',
-                top: '260px',
+                top: '300px',
                 right: '288px',
                 borderRadius: '8px 0 0 8px',
                 borderLeft: `1px solid ${panelMode === 'agent' ? '#0d9488' : '#9ca3af'}`,
@@ -965,23 +1010,6 @@ export default function CanvasApp() {
               >
                 AGENT
               </span>
-            </button>
-            <button
-              onClick={() => setSidebarVisible(false)}
-              className="fixed z-10 h-12 bg-gradient-to-b from-gray-200 to-gray-300 hover:from-gray-300 hover:to-gray-400 shadow-md transition-colors flex items-center justify-center"
-              title="Hide Panel"
-              style={{ 
-                padding: 0,
-                width: '20px',
-                top: '420px',
-                right: '288px',
-                borderRadius: '8px 0 0 8px',
-                borderLeft: '1px solid #9ca3af',
-                borderTop: '1px solid #9ca3af',
-                borderBottom: '1px solid #9ca3af'
-              }}
-            >
-              <span className="text-xs text-gray-600">▶</span>
             </button>
             <div className="p-4 border-b border-gray-200 flex items-center gap-2">
               {panelMode === 'attributes' ? (

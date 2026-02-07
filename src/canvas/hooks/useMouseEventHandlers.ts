@@ -3,10 +3,12 @@ import type Konva from 'konva';
 import type { LayoutSpec, LayoutNode, TextNode } from '../../layout-schema';
 import { computeClickSelection, computeMarqueeSelection } from '../../renderer/interaction';
 import { beginDrag, updateDrag, finalizeDrag } from '../../interaction/drag';
+import { computeSnap, type SnapGuideLine, type SnapBounds } from '../../interaction/snapping';
 import type { DragSession } from '../../interaction/types';
 import { beginMarquee, updateMarquee, finalizeMarquee, type MarqueeSession } from '../../interaction/marquee';
 import { applyPosition } from '../stage-internal';
 import { nodeHasChildren } from '../../commands/types';
+import { findNode, getNodeBounds } from '../utils/canvasUtils';
 
 interface DraftState {
   start: { x: number; y: number };
@@ -79,10 +81,17 @@ interface UseMouseEventHandlersProps {
   // Text editing
   startTextEdit: (id: string, node: TextNode) => void;
   justStartedTextEditRef: React.MutableRefObject<boolean>;
+  justCreatedShapeRef?: React.MutableRefObject<boolean>;
   
   // Callbacks
   onToolChange?: (tool: string) => void;
   setMenu: (menu: { x: number; y: number } | null) => void;
+  
+  // Snapping
+  snapToGrid: boolean;
+  snapToObjects: boolean;
+  gridSize: number;
+  setSnapGuides: (guides: SnapGuideLine[]) => void;
 }
 
 const updateRootChildren = (spec: LayoutSpec, updater: (children: LayoutNode[]) => LayoutNode[]): LayoutSpec => {
@@ -146,8 +155,13 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
     finalizePolygon,
     startTextEdit,
     justStartedTextEditRef,
+    justCreatedShapeRef,
     onToolChange,
     setMenu,
+    snapToGrid,
+    snapToObjects,
+    gridSize,
+    setSnapGuides,
   } = props;
 
   // Tool mode flags
@@ -249,6 +263,9 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
       setSpec(prev => appendNodesToRoot(prev, [placeholderText]));
       setSelection([id]);
       onToolChange?.('select');
+      
+      // Mark as just created so onClick doesn't clear selection
+      if (justCreatedShapeRef) justCreatedShapeRef.current = true;
       
       // Immediately start editing
       // We do NOT clear selection here because we just set it.
@@ -436,6 +453,7 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
     setMenu,
     startTextEdit,
     justStartedTextEditRef,
+    justCreatedShapeRef,
   ]);
 
   const onMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -509,12 +527,38 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
       const session = dragSession; // mutate in place via helper
       const update = updateDrag(session, worldPos);
       if (update.passedThreshold) {
-        for (const movedNode of update.moved) {
-          const node = stage.findOne(`#${CSS.escape(movedNode.id)}`);
-            if (node) {
-              node.position({ x: movedNode.x, y: movedNode.y });
-            }
+        // Compute bounds of dragged and other nodes for snapping
+        const draggedBounds: SnapBounds[] = [];
+        const otherBounds: SnapBounds[] = [];
+        const rootChildren = spec.root.children ?? [];
+        for (const child of rootChildren) {
+          const bounds = getNodeBounds(child, 0, 0);
+          if (!bounds) continue;
+          if (session.nodeIds.includes(child.id)) {
+            draggedBounds.push({ id: child.id, ...bounds });
+          } else {
+            otherBounds.push({ id: child.id, ...bounds });
+          }
         }
+
+        // Apply snapping to the raw delta
+        const snapResult = computeSnap(
+          update.dx, update.dy,
+          session.originPositions, session.nodeIds,
+          draggedBounds, otherBounds,
+          { snapToGrid, snapToObjects, gridSize }
+        );
+
+        // Position nodes using snapped delta
+        for (const id of session.nodeIds) {
+          const origin = session.originPositions[id];
+          if (!origin) continue;
+          const node = stage.findOne(`#${CSS.escape(id)}`);
+          if (node) {
+            node.position({ x: origin.x + snapResult.dx, y: origin.y + snapResult.dy });
+          }
+        }
+        setSnapGuides(snapResult.guides);
         trRef.current?.forceUpdate();
       }
       // Force state update so dependent callbacks (e.g. click clearing) see threshold transition
@@ -562,6 +606,11 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
     trRef,
     setMarqueeSession,
     marqueeRectRef,
+    snapToGrid,
+    snapToObjects,
+    gridSize,
+    setSnapGuides,
+    spec.root.children,
   ]);
 
   const onMouseUp = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -592,15 +641,44 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
     if (dragSession) {
       const summary = finalizeDrag(dragSession);
       if (summary.moved.length > 0) {
+        // Compute snapped final positions using the actual delta from the drag
+        const rawDx = summary.moved[0].to.x - summary.moved[0].from.x;
+        const rawDy = summary.moved[0].to.y - summary.moved[0].from.y;
+
+        // Compute bounds for snapping
+        const draggedBounds: SnapBounds[] = [];
+        const otherBounds: SnapBounds[] = [];
+        const rootChildren = spec.root.children ?? [];
+        for (const child of rootChildren) {
+          const bounds = getNodeBounds(child, 0, 0);
+          if (!bounds) continue;
+          if (dragSession.nodeIds.includes(child.id)) {
+            draggedBounds.push({ id: child.id, ...bounds });
+          } else {
+            otherBounds.push({ id: child.id, ...bounds });
+          }
+        }
+
+        const snapResult = computeSnap(
+          rawDx, rawDy,
+          dragSession.originPositions, dragSession.nodeIds,
+          draggedBounds, otherBounds,
+          { snapToGrid, snapToObjects, gridSize }
+        );
+
         setSpec(prev => {
           let next = prev;
-          for (const mv of summary.moved) {
-            next = applyPosition(next, mv.id, { x: mv.to.x, y: mv.to.y });
+          for (const id of dragSession.nodeIds) {
+            const origin = dragSession.originPositions[id];
+            if (origin) {
+              next = applyPosition(next, id, { x: origin.x + snapResult.dx, y: origin.y + snapResult.dy });
+            }
           }
           return next;
         });
       }
       setDragSession(null);
+      setSnapGuides([]);
     }
 
     // Handle marquee completion via helper
@@ -647,6 +725,11 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
     setDragSession,
     setMarqueeSession,
     marqueeRectRef,
+    snapToGrid,
+    snapToObjects,
+    gridSize,
+    setSnapGuides,
+    spec.root.children,
   ]);
 
   return {

@@ -122,6 +122,7 @@ export function useShapeTools(
         strokeDash: defaults.strokeDash,
       }]));
       setSelection([id]);
+      onToolChange?.('select');
       return;
     }
     if (shift) {
@@ -188,6 +189,7 @@ export function useShapeTools(
         opacity: defaults.opacity,
       };
       setSpec(prev => appendNodesToRoot(prev, [ellipseNode]));
+      setSelection([id]);
       onToolChange?.('select');
       return;
     }

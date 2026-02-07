@@ -1,10 +1,11 @@
-import { Stage, Layer, Transformer, Rect, Group, Circle } from "react-konva";
+import { Stage, Layer, Transformer, Rect, Group, Circle, Line } from "react-konva";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { JSX } from "react";
 import type Konva from "konva";
 import type { LayoutNode, LayoutSpec, TextNode } from "../layout-schema.ts";
 import { renderNode, useFontLoading } from "./CanvasRenderer.tsx";
 import type { DragSession } from "../interaction/types";
+import type { SnapGuideLine } from "../interaction/snapping";
 import type { MarqueeSession } from "../interaction/marquee";
 import { applyPosition, groupNodes, ungroupNodes } from "./stage-internal";
 import { nodeHasChildren } from "../commands/types";
@@ -82,6 +83,8 @@ interface CanvasStageProps {
     _key?: string;
   } | null;
   onViewportChange?: (viewport: { scale: number; x: number; y: number }) => void; // For collaboration overlays
+  snapToGrid?: boolean;
+  snapToObjects?: boolean;
 }
 
 // Infinite dot grid component
@@ -142,7 +145,8 @@ function CanvasStage({
   selection, setSelection, selectedCurvePointIndex, setSelectedCurvePointIndex, 
   editingCurveId: propsEditingCurveId, onEditingCurveIdChange,
   blockCanvasClicksRef, skipNormalizationRef,
-  fitToContentKey, viewportTransition, onViewportChange 
+  fitToContentKey, viewportTransition, onViewportChange,
+  snapToGrid: propSnapToGrid, snapToObjects: propSnapToObjects 
 }: CanvasStageProps) {
   // View / interaction state
   const [scale, setScale] = useState(1);
@@ -169,8 +173,14 @@ function CanvasStage({
   // Marquee session (pure helper based)
   const [marqueeSession, setMarqueeSession] = useState<MarqueeSession | null>(null);
 
+  // Snap guide lines (rendered while dragging)
+  const [snapGuides, setSnapGuides] = useState<SnapGuideLine[]>([]);
+
   // justStartedTextEditRef tracks if text editing just started to prevent immediate commit
   const justStartedTextEditRef = useRef(false);
+  
+  // justCreatedShapeRef prevents onClick from clearing selection right after shape creation
+  const justCreatedShapeRef = useRef(false);
   
   // Curve editing mode - use external state if provided, otherwise use internal
   const editingCurveId = propsEditingCurveId !== undefined ? propsEditingCurveId : null;
@@ -332,30 +342,35 @@ function CanvasStage({
     if (!isRectMode || !rectDraft) return;
     shapeTools.finalizeRect(rectDraft, altPressed, shiftPressed);
     setRectDraft(null);
+    justCreatedShapeRef.current = true;
   }, [isRectMode, rectDraft, altPressed, shiftPressed, shapeTools]);
 
   const finalizeEllipse = useCallback(() => {
     if (!isEllipseMode || !ellipseDraft) return;
     shapeTools.finalizeEllipse(ellipseDraft, altPressed, shiftPressed);
     setEllipseDraft(null);
+    justCreatedShapeRef.current = true;
   }, [isEllipseMode, ellipseDraft, altPressed, shiftPressed, shapeTools]);
 
   const finalizeLine = useCallback(() => {
     if (!isLineMode || !lineDraft) return;
     shapeTools.finalizeLine(lineDraft);
     setLineDraft(null);
+    justCreatedShapeRef.current = true;
   }, [isLineMode, lineDraft, shapeTools]);
 
   const finalizeCurve = useCallback(() => {
     if (!isCurveMode || !curveDraft) return;
     shapeTools.finalizeCurve(curveDraft);
     setCurveDraft(null);
+    justCreatedShapeRef.current = true;
   }, [isCurveMode, curveDraft, shapeTools]);
 
   const finalizePolygon = useCallback(() => {
     if (!isPolygonMode || !polygonDraft) return;
     shapeTools.finalizePolygon(polygonDraft, altPressed, shiftPressed, polygonSides);
     setPolygonDraft(null);
+    justCreatedShapeRef.current = true;
   }, [isPolygonMode, polygonDraft, shapeTools, altPressed, shiftPressed, polygonSides]);
 
   // Helper: open image picker at click position
@@ -370,6 +385,7 @@ function CanvasStage({
     setSpec(prev => appendNodesToRoot(prev, [iconNode]));
     setSelection([iconNode.id]);
     onToolChange?.('select');
+    justCreatedShapeRef.current = true;
   }, [selectedIconId, setSelection, setSpec, onToolChange]);
 
   const createComponentAtPosition = useCallback((worldPos: { x: number; y: number }) => {
@@ -378,6 +394,7 @@ function CanvasStage({
     setSpec(prev => appendNodesToRoot(prev, [groupNode]));
     setSelection([groupNode.id]);
     onToolChange?.('select');
+    justCreatedShapeRef.current = true;
   }, [selectedComponentId, setSelection, setSpec, spec.root, onToolChange]);
 
   // Actually insert the image after picker selection
@@ -387,6 +404,7 @@ function CanvasStage({
     setSpec(prev => appendNodesToRoot(prev, [imageNode]));
     setSelection([imageNode.id]);
     onToolChange?.('select');
+    justCreatedShapeRef.current = true;
     setImagePickerOpen(false);
     setPendingImagePosition(null);
   }, [pendingImagePosition, setSpec, onToolChange, setSelection]);
@@ -444,8 +462,13 @@ function CanvasStage({
     finalizePolygon,
     startTextEdit,
     justStartedTextEditRef,
+    justCreatedShapeRef,
     onToolChange,
     setMenu,
+    snapToGrid: propSnapToGrid ?? false,
+    snapToObjects: propSnapToObjects ?? false,
+    gridSize: GRID_SPACING,
+    setSnapGuides,
   });
 
   const { onMouseDown, onMouseMove, onMouseUp } = mouseHandlers;
@@ -594,6 +617,12 @@ function CanvasStage({
   const onClick = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     // Block canvas clicks if requested (e.g., when selecting from attribute panel)
     if (blockCanvasClicksRef?.current) {
+      return;
+    }
+
+    // If a shape was just created, skip this click to preserve the new selection
+    if (justCreatedShapeRef.current) {
+      justCreatedShapeRef.current = false;
       return;
     }
     
@@ -918,6 +947,38 @@ function CanvasStage({
             stroke={'#3b82f6'}
             dash={[4,4]}
           />
+          
+          {/* Snap guide lines (shown during drag) */}
+          {snapGuides.map((guide, i) => {
+            // Draw lines that span the visible viewport in world coordinates
+            const worldLeft = -pos.x / scale;
+            const worldTop = -pos.y / scale;
+            const worldRight = worldLeft + width / scale;
+            const worldBottom = worldTop + height / scale;
+            if (guide.orientation === 'vertical') {
+              return (
+                <Line
+                  key={`snap-v-${i}`}
+                  points={[guide.position, worldTop, guide.position, worldBottom]}
+                  stroke="#f43f5e"
+                  strokeWidth={1 / scale}
+                  dash={[4 / scale, 4 / scale]}
+                  listening={false}
+                />
+              );
+            } else {
+              return (
+                <Line
+                  key={`snap-h-${i}`}
+                  points={[worldLeft, guide.position, worldRight, guide.position]}
+                  stroke="#f43f5e"
+                  strokeWidth={1 / scale}
+                  dash={[4 / scale, 4 / scale]}
+                  listening={false}
+                />
+              );
+            }
+          })}
           
           {/* Draft preview layer */}
           <DraftPreviewLayer
