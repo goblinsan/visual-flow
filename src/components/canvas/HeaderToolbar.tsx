@@ -66,6 +66,7 @@ export function HeaderToolbar({
                 {[
                   ["fa-regular fa-file", "New", "new", "⌘N"],
                   ["fa-regular fa-folder-open", "Open…", "open", "⌘O"],
+                  ["fa-solid fa-grid-2", "Templates…", "templates", ""],
                   ["fa-regular fa-floppy-disk", "Save", "save", "⌘S"],
                   ["fa-solid fa-file-export", "Save As…", "saveAs", "⇧⌘S"],
                 ].map(([icon, label, act, shortcut]) => (
@@ -78,7 +79,7 @@ export function HeaderToolbar({
                       <i className={`${icon} text-gray-500 w-4`} />
                       {label}
                     </span>
-                    <span className="text-[10px] text-gray-400 font-mono">{shortcut}</span>
+                    {shortcut && <span className="text-[10px] text-gray-400 font-mono">{shortcut}</span>}
                   </button>
                 ))}
               </div>

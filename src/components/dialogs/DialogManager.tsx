@@ -16,6 +16,16 @@ const COMPONENT_CATEGORIES = [
   { key: "layout", label: "Layout" },
 ] as const;
 
+const TEMPLATE_CATEGORIES = [
+  { key: "all", label: "All Templates" },
+  { key: "general", label: "General" },
+  { key: "web", label: "Web" },
+  { key: "mobile", label: "Mobile" },
+  { key: "game", label: "Game" },
+  { key: "ecommerce", label: "E-Commerce" },
+  { key: "layout", label: "Layout" },
+] as const;
+
 export interface DialogManagerProps {
   // Dialog state
   shareDialogOpen: boolean;
@@ -32,6 +42,8 @@ export interface DialogManagerProps {
   setNewDialogOpen: (open: boolean) => void;
   openDialogOpen: boolean;
   setOpenDialogOpen: (open: boolean) => void;
+  templateBrowserOpen: boolean;
+  setTemplateBrowserOpen: (open: boolean) => void;
   
   // Collaboration state
   isCollaborative: boolean;
@@ -63,6 +75,7 @@ export interface DialogManagerProps {
     name: string;
     icon: string;
     description: string;
+    category: string;
     build: () => LayoutSpec;
   }>;
 }
@@ -147,6 +160,95 @@ function ComponentLibraryBrowser({
   );
 }
 
+function TemplateBrowser({
+  templates,
+  onSelectTemplate,
+}: {
+  templates: Array<{
+    id: string;
+    name: string;
+    icon: string;
+    description: string;
+    category: string;
+    build: () => LayoutSpec;
+  }>;
+  onSelectTemplate: (templateId: string) => void;
+}) {
+  const [search, setSearch] = useState("");
+  const [activeCategory, setActiveCategory] = useState<string>("all");
+
+  const q = search.trim().toLowerCase();
+  const filtered = templates.filter((t) => {
+    const matchesCategory = activeCategory === "all" || t.category === activeCategory;
+    const matchesSearch =
+      !q ||
+      t.name.toLowerCase().includes(q) ||
+      t.description.toLowerCase().includes(q) ||
+      t.category.toLowerCase().includes(q);
+    return matchesCategory && matchesSearch;
+  });
+
+  return (
+    <>
+      {/* Search */}
+      <div className="relative mb-3">
+        <i className="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-[10px]" />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search templates..."
+          className="w-full border border-gray-200 rounded-md pl-7 pr-2 py-2 text-[11px] bg-white focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition-colors"
+        />
+      </div>
+
+      {/* Category tabs */}
+      <div className="flex gap-1.5 mb-4 pb-2 border-b border-gray-200 overflow-x-auto">
+        {TEMPLATE_CATEGORIES.map((cat) => (
+          <button
+            key={cat.key}
+            onClick={() => setActiveCategory(cat.key)}
+            className={`px-3 py-1.5 text-[11px] font-medium rounded-md transition-all whitespace-nowrap ${
+              activeCategory === cat.key
+                ? "bg-blue-100 text-blue-700"
+                : "text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            {cat.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Templates grid */}
+      <div className="grid grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto pr-1">
+        {filtered.map((template) => (
+          <button
+            key={template.id}
+            onClick={() => onSelectTemplate(template.id)}
+            className="flex flex-col items-start p-4 rounded-lg border border-gray-200 bg-white hover:border-blue-400 hover:bg-blue-50 transition-all duration-150 text-left group"
+          >
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white shadow-sm group-hover:scale-105 transition-transform">
+                <i className={`${template.icon} text-lg`} />
+              </div>
+              <span className="font-medium text-gray-900">{template.name}</span>
+            </div>
+            <p className="text-xs text-gray-500 leading-relaxed">{template.description}</p>
+            <span className="mt-2 text-[10px] px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">
+              {TEMPLATE_CATEGORIES.find(c => c.key === template.category)?.label || template.category}
+            </span>
+          </button>
+        ))}
+      </div>
+      {filtered.length === 0 && (
+        <div className="mt-3 text-[11px] text-gray-500 text-center py-8">
+          <i className="fa-solid fa-search text-3xl text-gray-300 mb-2" />
+          <p>No templates match your search.</p>
+        </div>
+      )}
+    </>
+  );
+}
+
 export function DialogManager({
   shareDialogOpen,
   setShareDialogOpen,
@@ -162,6 +264,8 @@ export function DialogManager({
   setNewDialogOpen,
   openDialogOpen,
   setOpenDialogOpen,
+  templateBrowserOpen,
+  setTemplateBrowserOpen,
   isCollaborative,
   roomId,
   selectedIconId,
@@ -406,6 +510,17 @@ export function DialogManager({
             </div>
           );
         })()}
+      </Modal>
+
+      {/* Template Browser Dialog */}
+      <Modal open={templateBrowserOpen} onClose={() => setTemplateBrowserOpen(false)} title="Template Browser" size="lg" variant="light">
+        <TemplateBrowser
+          templates={templates}
+          onSelectTemplate={(templateId) => {
+            onApplyTemplate(templateId);
+            setTemplateBrowserOpen(false);
+          }}
+        />
       </Modal>
     </>
   );
