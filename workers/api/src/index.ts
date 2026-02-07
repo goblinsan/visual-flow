@@ -87,6 +87,10 @@ export default {
       });
     }
 
+    // Route handling
+    const path = url.pathname;
+    const method = request.method;
+
     // Authenticate user (supports both CF Access headers and agent tokens)
     const user = await authenticateUser(request, env);
     if (!user) {
@@ -103,19 +107,19 @@ export default {
 
     // User info endpoints
     if (path === '/api/whoami' && method === 'GET') {
-      return jsonResponse({ id: user.id, email: user.email, display_name: (user as any).display_name || null }, { headers: corsHeaders });
+      return jsonResponse({ id: user.id, email: user.email, display_name: (user as any).display_name || null }, 200, env, origin);
     }
 
     if (path === '/api/user/display-name' && (method === 'POST' || method === 'PUT')) {
-      const body = await request.json().catch(() => ({}));
+      const body = await request.json().catch(() => ({})) as Record<string, unknown>;
       const newName = typeof body.display_name === 'string' ? body.display_name.trim() : '';
       if (!newName) {
-        return errorResponse('display_name required', 400);
+        return errorResponse('display_name required', 400, env, origin);
       }
       await env.DB.prepare('UPDATE users SET display_name = ?, updated_at = ? WHERE id = ?')
         .bind(newName, Date.now(), user.id)
         .run();
-      return jsonResponse({ ok: true, display_name: newName }, { headers: corsHeaders });
+      return jsonResponse({ ok: true, display_name: newName }, 200, env, origin);
     }
 
     // Rate limiting
@@ -131,10 +135,6 @@ export default {
         },
       });
     }
-
-    // Route handling
-    const path = url.pathname;
-    const method = request.method;
 
     try {
       // Canvas routes

@@ -156,6 +156,18 @@ export class ApiClient {
     });
   }
 
+  // User identity
+  async whoami(): Promise<{ data?: { id: string; email: string; display_name?: string | null }; error?: string }> {
+    return this.request<{ id: string; email: string; display_name?: string | null }>('/whoami', { method: 'GET' });
+  }
+
+  async updateDisplayName(displayName: string): Promise<{ data?: { ok: boolean; display_name: string }; error?: string }> {
+    return this.request<{ ok: boolean; display_name: string }>('/user/display-name', {
+      method: 'POST',
+      body: JSON.stringify({ display_name: displayName }),
+    });
+  }
+
   // Health check
   async health(): Promise<{ data?: { status: string; timestamp: number }; error?: string }> {
     return this.request<{ status: string; timestamp: number }>('/health', { method: 'GET' });
