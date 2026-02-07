@@ -165,7 +165,6 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
     finalizeRect,
     finalizeEllipse,
     finalizeLine,
-    finalizeCurve,
     finalizeDraw,
     drawDefaults,
     finalizePolygon,
