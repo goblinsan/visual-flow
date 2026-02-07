@@ -8,7 +8,7 @@ import type { DragSession } from '../../interaction/types';
 import { beginMarquee, updateMarquee, finalizeMarquee, type MarqueeSession } from '../../interaction/marquee';
 import { applyPosition } from '../stage-internal';
 import { nodeHasChildren } from '../../commands/types';
-import { findNode, getNodeBounds } from '../utils/canvasUtils';
+import { getNodeBounds } from '../utils/canvasUtils';
 
 interface DraftState {
   start: { x: number; y: number };
@@ -155,7 +155,6 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
     finalizeRect,
     finalizeEllipse,
     finalizeLine,
-    finalizeCurve,
     finalizePolygon,
     startTextEdit,
     justStartedTextEditRef,

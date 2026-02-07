@@ -554,7 +554,8 @@ function CanvasStage({
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       const delta = e.deltaY > 0 ? -1 : 1;
-      setPolygonSides(prev => Math.max(3, Math.min(30, prev + delta)));
+      const newSides = Math.max(3, Math.min(30, polygonSides + delta));
+      setPolygonSides(newSides);
     };
     window.addEventListener('wheel', onWheel, { passive: false, capture: true });
     return () => window.removeEventListener('wheel', onWheel, { capture: true } as any);

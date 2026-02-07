@@ -6,7 +6,7 @@ import type { LayoutNode, FrameNode, StackNode, TextNode, BoxNode, GridNode, Gro
 import { CanvasImage } from "./components/CanvasImage";
 import { debugOnce, logger } from "../utils/logger";
 import { parseColor } from "../utils/color";
-import { getAnchors, computeDefaultHandles, computeBezierPath } from "./utils/bezierUtils";
+import { getAnchors, computeBezierPath } from "./utils/bezierUtils";
 
 // Font loading cache and callbacks
 const loadedFonts = new Set<string>();

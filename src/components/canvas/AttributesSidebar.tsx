@@ -385,6 +385,10 @@ export function AttributesSidebar({
                 return (
                   <PolygonAttributesPanel
                     polygon={polygon}
+                    lastFillById={lastFillById}
+                    lastStrokeById={lastStrokeById}
+                    setLastFillById={setLastFillById}
+                    setLastStrokeById={setLastStrokeById}
                     updateNode={updatePolygon}
                     beginRecentSession={beginRecentSession}
                     previewRecent={previewRecent}
