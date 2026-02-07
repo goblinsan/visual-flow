@@ -1,4 +1,136 @@
 // ToolSettingsBar — persistent settings bar at top of canvas area
+import { useState, useRef, useEffect, useMemo } from 'react';
+
+/** Curated font list for quick selection in the toolbar */
+const TOOLBAR_FONTS = [
+  // System
+  { name: 'Arial', value: 'Arial' },
+  { name: 'Helvetica', value: 'Helvetica' },
+  { name: 'Verdana', value: 'Verdana' },
+  { name: 'Georgia', value: 'Georgia' },
+  { name: 'Times New Roman', value: 'Times New Roman' },
+  { name: 'Courier New', value: 'Courier New' },
+  // Google - Sans-serif
+  { name: 'Inter', value: 'Inter' },
+  { name: 'Roboto', value: 'Roboto' },
+  { name: 'Open Sans', value: 'Open Sans' },
+  { name: 'Lato', value: 'Lato' },
+  { name: 'Montserrat', value: 'Montserrat' },
+  { name: 'Poppins', value: 'Poppins' },
+  { name: 'Nunito', value: 'Nunito' },
+  { name: 'Raleway', value: 'Raleway' },
+  { name: 'Work Sans', value: 'Work Sans' },
+  { name: 'DM Sans', value: 'DM Sans' },
+  { name: 'Rubik', value: 'Rubik' },
+  { name: 'Space Grotesk', value: 'Space Grotesk' },
+  { name: 'Outfit', value: 'Outfit' },
+  { name: 'Figtree', value: 'Figtree' },
+  // Google - Serif
+  { name: 'Playfair Display', value: 'Playfair Display' },
+  { name: 'Merriweather', value: 'Merriweather' },
+  { name: 'Lora', value: 'Lora' },
+  { name: 'Libre Baskerville', value: 'Libre Baskerville' },
+  // Google - Display
+  { name: 'Oswald', value: 'Oswald' },
+  { name: 'Bebas Neue', value: 'Bebas Neue' },
+  // Google - Handwriting
+  { name: 'Dancing Script', value: 'Dancing Script' },
+  { name: 'Pacifico', value: 'Pacifico' },
+  { name: 'Caveat', value: 'Caveat' },
+  // Google - Monospace
+  { name: 'Fira Code', value: 'Fira Code' },
+  { name: 'JetBrains Mono', value: 'JetBrains Mono' },
+  { name: 'Source Code Pro', value: 'Source Code Pro' },
+];
+
+// Set of system fonts that don't need loading
+const SYSTEM_FONT_NAMES = new Set(['Arial', 'Helvetica', 'Verdana', 'Georgia', 'Times New Roman', 'Courier New']);
+const loadedToolbarFonts = new Set<string>();
+
+function loadToolbarFont(fontName: string): void {
+  if (SYSTEM_FONT_NAMES.has(fontName) || loadedToolbarFonts.has(fontName)) return;
+  loadedToolbarFonts.add(fontName);
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(fontName).replace(/%20/g, '+')}:wght@400;700&display=swap`;
+  document.head.appendChild(link);
+}
+
+/** Compact searchable font dropdown for the toolbar */
+function ToolbarFontPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Load selected font
+  useEffect(() => { loadToolbarFont(value); }, [value]);
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  // Focus search on open
+  useEffect(() => { if (open) inputRef.current?.focus(); }, [open]);
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    return q ? TOOLBAR_FONTS.filter(f => f.name.toLowerCase().includes(q)) : TOOLBAR_FONTS;
+  }, [search]);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        onClick={() => { setOpen(!open); setSearch(''); }}
+        className="flex items-center gap-1 px-1.5 py-0.5 border border-gray-300 rounded text-xs bg-white hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-blue-400 min-w-[90px] max-w-[130px]"
+        style={{ fontFamily: value }}
+        title={value}
+      >
+        <span className="truncate flex-1 text-left">{value || 'Font'}</span>
+        <i className="fa-solid fa-caret-down text-[8px] text-gray-400 flex-shrink-0" />
+      </button>
+      {open && (
+        <div className="absolute top-full left-0 mt-1 w-52 bg-white border border-gray-200 rounded-lg shadow-lg z-50 overflow-hidden">
+          <div className="p-1.5 border-b border-gray-100">
+            <input
+              ref={inputRef}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search fonts..."
+              className="w-full px-2 py-1 text-[11px] border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
+            />
+          </div>
+          <div className="max-h-48 overflow-y-auto">
+            {filtered.map(f => (
+              <button
+                key={f.value}
+                type="button"
+                onMouseEnter={() => loadToolbarFont(f.value)}
+                onClick={() => { onChange(f.value); setOpen(false); }}
+                className={`w-full text-left px-2.5 py-1.5 text-[11px] hover:bg-blue-50 transition-colors ${
+                  value === f.value ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'
+                }`}
+                style={{ fontFamily: f.value }}
+              >
+                {f.name}
+              </button>
+            ))}
+            {filtered.length === 0 && (
+              <div className="px-2.5 py-2 text-[10px] text-gray-400 italic">No fonts match</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface ToolSettingsBarProps {
   tool: string;
@@ -211,17 +343,14 @@ export function ToolSettingsBar({
       {/* Text tool settings */}
       {isTextTool && (
         <>
-          {/* Font Family */}
-          <label className="flex items-center gap-1.5 text-gray-600">
+          {/* Font Family - searchable dropdown */}
+          <div className="flex items-center gap-1.5 text-gray-600">
             <span>Font</span>
-            <input
-              type="text"
+            <ToolbarFontPicker
               value={textDefaults.fontFamily}
-              onChange={(e) => updateTextDefaults({ fontFamily: e.target.value })}
-              className="w-24 px-1 py-0.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-400"
-              placeholder="Arial"
+              onChange={(v) => updateTextDefaults({ fontFamily: v })}
             />
-          </label>
+          </div>
 
           {/* Font size auto-adjusts to zoom — show hint instead of static input */}
           <span className="text-[10px] text-gray-400 italic" title="Font size auto-scales to match canvas zoom">Size: auto</span>
