@@ -165,6 +165,15 @@ interface ToolSettingsBarProps {
     tension: number;
   };
   updateCurveDefaults: (patch: Record<string, unknown>) => void;
+  /** Draw defaults */
+  drawDefaults: {
+    stroke: string;
+    strokeWidth: number;
+    strokeDash?: number[];
+    lineCap: CanvasLineCap;
+    smoothing: number;
+  };
+  updateDrawDefaults: (patch: Record<string, unknown>) => void;
   /** Text defaults */
   textDefaults: {
     fontFamily: string;
@@ -215,6 +224,8 @@ export function ToolSettingsBar({
   updateLineDefaults,
   curveDefaults,
   updateCurveDefaults,
+  drawDefaults,
+  updateDrawDefaults,
   textDefaults,
   updateTextDefaults,
   snapToGrid,
@@ -573,6 +584,99 @@ export function ToolSettingsBar({
               />
             </label>
           )}
+        </>
+      )}
+
+      {/* Draw tool settings */}
+      {tool === 'draw' && (
+        <>
+          {/* Stroke color */}
+          <label className="flex items-center gap-1.5 text-gray-600">
+            <span>Stroke</span>
+            <span className="relative">
+              <input
+                type="color"
+                value={drawDefaults.stroke}
+                onChange={(e) => updateDrawDefaults({ stroke: e.target.value })}
+                className="w-5 h-5 border border-gray-300 rounded cursor-pointer appearance-none p-0"
+                style={{ backgroundColor: drawDefaults.stroke }}
+              />
+            </span>
+          </label>
+
+          {/* Stroke width */}
+          <label className="flex items-center gap-1.5 text-gray-600">
+            <span>Weight</span>
+            <input
+              type="number"
+              min={1}
+              max={20}
+              step={0.5}
+              value={drawDefaults.strokeWidth}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value);
+                if (!isNaN(v) && v >= 1) updateDrawDefaults({ strokeWidth: v });
+              }}
+              className="w-12 px-1 py-0.5 border border-gray-300 rounded text-center text-xs focus:outline-none focus:ring-1 focus:ring-blue-400"
+            />
+          </label>
+
+          <div className="w-px h-4 bg-gray-200" />
+
+          {/* Stroke dash pattern */}
+          <label className="flex items-center gap-1.5 text-gray-600">
+            <span>Style</span>
+            <select
+              value={drawDefaults.strokeDash ? 'dashed' : 'solid'}
+              onChange={(e) => {
+                if (e.target.value === 'solid') {
+                  updateDrawDefaults({ strokeDash: undefined });
+                } else if (e.target.value === 'dashed') {
+                  updateDrawDefaults({ strokeDash: [10, 5] });
+                } else if (e.target.value === 'dotted') {
+                  updateDrawDefaults({ strokeDash: [2, 4] });
+                }
+              }}
+              className="px-1.5 py-0.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white"
+            >
+              <option value="solid">Solid</option>
+              <option value="dashed">Dashed</option>
+              <option value="dotted">Dotted</option>
+            </select>
+          </label>
+
+          {/* Line cap */}
+          <label className="flex items-center gap-1.5 text-gray-600">
+            <span>Cap</span>
+            <select
+              value={drawDefaults.lineCap}
+              onChange={(e) => updateDrawDefaults({ lineCap: e.target.value as CanvasLineCap })}
+              className="px-1.5 py-0.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white"
+            >
+              <option value="round">Round</option>
+              <option value="butt">Butt</option>
+              <option value="square">Square</option>
+            </select>
+          </label>
+
+          <div className="w-px h-4 bg-gray-200" />
+
+          {/* Smoothing */}
+          <label className="flex items-center gap-1.5 text-gray-600">
+            <span>Smoothing</span>
+            <input
+              type="number"
+              min={1}
+              max={30}
+              step={1}
+              value={drawDefaults.smoothing}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value);
+                if (!isNaN(v) && v >= 1) updateDrawDefaults({ smoothing: v });
+              }}
+              className="w-12 px-1 py-0.5 border border-gray-300 rounded text-center text-xs focus:outline-none focus:ring-1 focus:ring-blue-400"
+            />
+          </label>
         </>
       )}
 

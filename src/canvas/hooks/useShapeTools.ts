@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import type { LayoutSpec, LayoutNode, EllipseNode, LineNode, CurveNode, PolygonNode } from '../../layout-schema';
+import type { LayoutSpec, LayoutNode, EllipseNode, LineNode, CurveNode, DrawNode, PolygonNode } from '../../layout-schema';
 import { generateRegularPolygonPoints } from '../../utils/polygonPoints';
 
 interface DraftState {
@@ -45,6 +45,14 @@ interface CurveDefaults {
   tension: number;
 }
 
+export interface DrawDefaults {
+  stroke?: string;
+  strokeWidth: number;
+  strokeDash?: number[];
+  lineCap?: "butt" | "round" | "square";
+  smoothing: number; // Point sampling threshold in world units
+}
+
 interface PolygonDefaults {
   fill?: string;
   stroke?: string;
@@ -59,6 +67,7 @@ const DEFAULT_RECT_STYLE: RectDefaults = { fill: '#ffffff', stroke: '#334155', s
 const DEFAULT_ELLIPSE_STYLE: EllipseDefaults = { fill: '#ffffff', stroke: '#334155', strokeWidth: 1, opacity: 1 };
 const DEFAULT_LINE_STYLE: LineDefaults = { stroke: '#334155', strokeWidth: 2 };
 const DEFAULT_CURVE_STYLE: CurveDefaults = { stroke: '#334155', strokeWidth: 2, tension: 0.5, opacity: 1, closed: false };
+const DEFAULT_DRAW_STYLE: DrawDefaults = { stroke: '#334155', strokeWidth: 2, lineCap: 'round', smoothing: 15 };
 const DEFAULT_POLYGON_STYLE: PolygonDefaults = { fill: '#ffffff', stroke: '#334155', strokeWidth: 1, opacity: 1, closed: true, sides: 5 };
 
 const updateRootChildren = (spec: LayoutSpec, updater: (children: LayoutNode[]) => LayoutNode[]): LayoutSpec => {
@@ -85,6 +94,7 @@ export function useShapeTools(
   ellipseDefaults?: EllipseDefaults,
   lineDefaults?: LineDefaults,
   curveDefaults?: CurveDefaults,
+  drawDefaults?: DrawDefaults,
   polygonDefaults?: PolygonDefaults
 ) {
   const finalizeRect = useCallback((
@@ -291,6 +301,43 @@ export function useShapeTools(
     onToolChange?.('select');
   }, [setSpec, onToolChange, curveDefaults, setSelection]);
 
+  const finalizeDraw = useCallback((points: { x: number; y: number }[] | null) => {
+    if (!points || points.length < 2) return;
+    
+    // Find bounding box
+    const xs = points.map(p => p.x);
+    const ys = points.map(p => p.y);
+    const minX = Math.min(...xs);
+    const minY = Math.min(...ys);
+    
+    // Convert to relative points
+    const relativePoints: number[] = [];
+    for (const p of points) {
+      relativePoints.push(p.x - minX, p.y - minY);
+    }
+    
+    const defaults = drawDefaults || DEFAULT_DRAW_STYLE;
+    const id = 'draw_' + Math.random().toString(36).slice(2, 9);
+    // Calculate tension inversely to smoothing: higher smoothing = lower tension
+    // smoothing: 1-30, tension: 0.8-0.3
+    const tension = Math.max(0.3, Math.min(0.8, 0.9 - (defaults.smoothing / 40)));
+    const drawNode: DrawNode = {
+      id,
+      type: 'draw',
+      position: { x: minX, y: minY },
+      points: relativePoints,
+      stroke: defaults.stroke,
+      strokeWidth: defaults.strokeWidth,
+      strokeDash: defaults.strokeDash,
+      lineCap: defaults.lineCap ?? 'round',
+      lineJoin: 'round',
+      tension,
+    };
+    setSpec(prev => appendNodesToRoot(prev, [drawNode]));
+    setSelection([id]);
+    onToolChange?.('select');
+  }, [setSpec, onToolChange, drawDefaults, setSelection]);
+
   const finalizePolygon = useCallback((
     polygonDraft: DraftState | null,
     altPressed: boolean,
@@ -381,6 +428,7 @@ export function useShapeTools(
     finalizeEllipse,
     finalizeLine,
     finalizeCurve,
+    finalizeDraw,
     finalizePolygon,
   };
 }

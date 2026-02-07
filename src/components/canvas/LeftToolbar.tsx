@@ -33,6 +33,7 @@ export function LeftToolbar({
     { customIcon: 'pentagon', val: "polygon", tooltip: "Polygon (G)" },
     { icon: "fa-solid fa-minus", val: "line", tooltip: "Line (L)" },
     { icon: "fa-solid fa-bezier-curve", val: "curve", tooltip: "Curve (P)" },
+    { icon: "fa-solid fa-pencil", val: "draw", tooltip: "Draw (D)" },
     { icon: "fa-solid fa-font", val: "text", tooltip: "Text (T)" },
     { icon: "fa-regular fa-image", val: "image", tooltip: "Image (I)" },
     { icon: "fa-solid fa-icons", val: "icon", tooltip: "Icon Library" },

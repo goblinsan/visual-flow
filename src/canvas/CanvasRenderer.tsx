@@ -2,7 +2,7 @@ import { Group, Rect, Text, Ellipse, Line, Arrow, Shape } from "react-konva";
 import { type ReactNode, useEffect, useState } from "react";
 import { computeRectVisual } from "../renderer/rectVisual";
 import { estimateNodeHeight } from "../renderer/measurement";
-import type { LayoutNode, FrameNode, StackNode, TextNode, BoxNode, GridNode, GroupNode, ImageNode, RectNode, EllipseNode, LineNode, CurveNode, PolygonNode } from "../layout-schema.ts";
+import type { LayoutNode, FrameNode, StackNode, TextNode, BoxNode, GridNode, GroupNode, ImageNode, RectNode, EllipseNode, LineNode, CurveNode, DrawNode, PolygonNode } from "../layout-schema.ts";
 import { CanvasImage } from "./components/CanvasImage";
 import { debugOnce, logger } from "../utils/logger";
 import { parseColor } from "../utils/color";
@@ -680,6 +680,28 @@ function renderCurve(n: CurveNode) {
   );
 }
 
+// Draw/freehand shape (captured mouse path)
+function renderDraw(n: DrawNode) {
+  const x = n.position?.x ?? 0;
+  const y = n.position?.y ?? 0;
+
+  return (
+    <Group key={n.id} id={n.id} name={`node ${n.type}`} x={x} y={y} rotation={n.rotation ?? 0} opacity={n.opacity ?? 1}>
+      <Line
+        points={n.points}
+        stroke={n.stroke}
+        strokeWidth={n.strokeWidth ?? 2}
+        dash={n.strokeDash}
+        lineCap={n.lineCap ?? "round"}
+        lineJoin={n.lineJoin ?? "round"}
+        tension={n.tension ?? 0.5}
+        listening={true}
+        hitStrokeWidth={20}
+      />
+    </Group>
+  );
+}
+
 // Polygon shape (multi-point closed/open shape)
 function renderPolygon(n: PolygonNode) {
   const x = n.position?.x ?? 0;
@@ -762,6 +784,7 @@ export function renderNode(n: LayoutNode): ReactNode {
     case "ellipse": return renderEllipse(n);
     case "line": return renderLine(n);
     case "curve": return renderCurve(n);
+    case "draw": return renderDraw(n);
     case "polygon": return renderPolygon(n);
     default:
       logger.warn('Unknown node type', n);

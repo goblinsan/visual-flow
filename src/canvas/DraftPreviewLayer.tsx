@@ -11,16 +11,23 @@ interface CurveDraftState {
   current: { x: number; y: number };
 }
 
+interface DrawDraftState {
+  points: { x: number; y: number }[];
+}
+
 interface DraftPreviewLayerProps {
   isRectMode: boolean;
   isEllipseMode: boolean;
   isLineMode: boolean;
   isCurveMode: boolean;
+  isDrawMode: boolean;
   isPolygonMode: boolean;
   rectDraft: DraftState | null;
   ellipseDraft: DraftState | null;
   lineDraft: DraftState | null;
   curveDraft: CurveDraftState | null;
+  drawDraft: DrawDraftState | null;
+  drawDefaults?: { smoothing: number };
   polygonDraft: DraftState | null;
   polygonSides: number;
   altPressed: boolean;
@@ -32,11 +39,14 @@ export function DraftPreviewLayer({
   isEllipseMode,
   isLineMode,
   isCurveMode,
+  isDrawMode,
   isPolygonMode,
   rectDraft,
   ellipseDraft,
   lineDraft,
   curveDraft,
+  drawDraft,
+  drawDefaults,
   polygonDraft,
   polygonSides,
   altPressed,
@@ -150,6 +160,28 @@ export function DraftPreviewLayer({
             dash={[6,4]}
             lineCap="round"
             tension={0.5}
+            listening={false}
+          />
+        );
+      })()}
+      
+      {/* Draw/freehand draft preview */}
+      {isDrawMode && drawDraft && drawDraft.points.length > 0 && (() => {
+        const pts: number[] = [];
+        for (const p of drawDraft.points) {
+          pts.push(p.x, p.y);
+        }
+        // Calculate tension inversely to smoothing
+        const smoothing = drawDefaults?.smoothing ?? 15;
+        const tension = Math.max(0.3, Math.min(0.8, 0.9 - (smoothing / 40)));
+        return (
+          <Line
+            points={pts}
+            stroke={'#334155'}
+            strokeWidth={2}
+            lineCap="round"
+            lineJoin="round"
+            tension={tension}
             listening={false}
           />
         );

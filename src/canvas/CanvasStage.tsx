@@ -66,6 +66,7 @@ interface CanvasStageProps {
   rectDefaults?: { fill?: string; stroke?: string; strokeWidth: number; radius: number; opacity: number; strokeDash?: number[] };
   lineDefaults?: { stroke?: string; strokeWidth: number; startArrow?: boolean; endArrow?: boolean; arrowSize?: number };
   curveDefaults?: { fill?: string; stroke?: string; strokeWidth: number; opacity: number; closed: boolean; tension: number };
+  drawDefaults?: { stroke?: string; strokeWidth: number; strokeDash?: number[]; lineCap?: "butt" | "round" | "square"; smoothing: number };
   textDefaults?: { fontFamily: string; fontSize: number; fontWeight: string; fontStyle: string; color: string };
   polygonSides?: number;
   setPolygonSides?: (sides: number) => void;
@@ -147,7 +148,7 @@ function InfiniteGrid({ width, height, scale, offsetX, offsetY, gridSize }: Infi
 
 function CanvasStage({ 
   spec, setSpec, width = 800, height = 600, tool = "select", onToolChange, selectedIconId, selectedComponentId, 
-  onUndo, onRedo, focusNodeId, onUngroup, rectDefaults, lineDefaults, curveDefaults, textDefaults, polygonSides: propPolygonSides, setPolygonSides: propSetPolygonSides,
+  onUndo, onRedo, focusNodeId, onUngroup, rectDefaults, lineDefaults, curveDefaults, drawDefaults, textDefaults, polygonSides: propPolygonSides, setPolygonSides: propSetPolygonSides,
   selection, setSelection, selectedCurvePointIndex, setSelectedCurvePointIndex, 
   editingCurveId: propsEditingCurveId, onEditingCurveIdChange,
   blockCanvasClicksRef, skipNormalizationRef,
@@ -230,6 +231,7 @@ function CanvasStage({
   const isEllipseMode = tool === 'ellipse';
   const isLineMode = tool === 'line';
   const isCurveMode = tool === 'curve';
+  const isDrawMode = tool === 'draw';
   const isPolygonMode = tool === 'polygon';
   const [spacePan, setSpacePan] = useState(false);
   // Track shift key globally for aspect-ratio constrained resize
@@ -298,6 +300,11 @@ function CanvasStage({
     current: { x: number; y: number };
   }>(null);
   
+  // Draw/freehand draft state (collect points during drag)
+  const [drawDraft, setDrawDraft] = useState<null | {
+    points: { x: number; y: number }[];
+  }>(null);
+  
   // Polygon draft state (drag to create like rect/ellipse)
   const [polygonDraft, setPolygonDraft] = useState<null | {
     start: { x: number; y: number };
@@ -311,7 +318,7 @@ function CanvasStage({
   const setPolygonSides = propSetPolygonSides ?? setLocalPolygonSides;
 
   // Use shape tools hook
-  const shapeTools = useShapeTools(setSpec, setSelection, onToolChange, rectDefaults, undefined, lineDefaults, curveDefaults);
+  const shapeTools = useShapeTools(setSpec, setSelection, onToolChange, rectDefaults, undefined, lineDefaults, curveDefaults, drawDefaults);
 
   // Use selection manager hook
   const selectionManager = useSelectionManager(stageRef, spec.root.id, getTopContainerAncestorMemo);
@@ -378,6 +385,13 @@ function CanvasStage({
     setCurveDraft(null);
     justCreatedShapeRef.current = true;
   }, [isCurveMode, curveDraft, shapeTools]);
+
+  const finalizeDraw = useCallback(() => {
+    if (!isDrawMode || !drawDraft) return;
+    shapeTools.finalizeDraw(drawDraft.points);
+    setDrawDraft(null);
+    justCreatedShapeRef.current = true;
+  }, [isDrawMode, drawDraft, shapeTools]);
 
   const finalizePolygon = useCallback(() => {
     if (!isPolygonMode || !polygonDraft) return;
@@ -447,6 +461,8 @@ function CanvasStage({
     setLineDraft,
     curveDraft,
     setCurveDraft,
+    drawDraft,
+    setDrawDraft,
     polygonDraft,
     setPolygonDraft,
     polygonSides,
@@ -472,6 +488,8 @@ function CanvasStage({
     finalizeEllipse,
     finalizeLine,
     finalizeCurve,
+    finalizeDraw,
+    drawDefaults,
     finalizePolygon,
     startTextEdit,
     justStartedTextEditRef,
@@ -1044,11 +1062,14 @@ function CanvasStage({
             isEllipseMode={isEllipseMode}
             isLineMode={isLineMode}
             isCurveMode={isCurveMode}
+            isDrawMode={isDrawMode}
             isPolygonMode={isPolygonMode}
             rectDraft={rectDraft}
             ellipseDraft={ellipseDraft}
             lineDraft={lineDraft}
             curveDraft={curveDraft}
+            drawDraft={drawDraft}
+            drawDefaults={drawDefaults}
             polygonDraft={polygonDraft}
             polygonSides={polygonSides}
             altPressed={altPressed}
