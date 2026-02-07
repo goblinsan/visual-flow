@@ -808,6 +808,11 @@ export default function CanvasApp() {
   const updateCurveDefaults = useCallback((patch: Record<string, unknown>) => {
     setCurveDefaults(prev => ({ ...prev, ...patch }));
   }, []);
+  // Draw default attributes
+  const [drawDefaults, setDrawDefaults] = useState({ stroke: '#334155', strokeWidth: 2, strokeDash: undefined as number[] | undefined, lineCap: 'round' as CanvasLineCap, smoothing: 15 });
+  const updateDrawDefaults = useCallback((patch: Record<string, unknown>) => {
+    setDrawDefaults(prev => ({ ...prev, ...patch }));
+  }, []);
   // Text default attributes
   const [textDefaults, setTextDefaults] = useState({ fontFamily: 'Arial', fontSize: 14, fontWeight: '400' as string, fontStyle: 'normal' as string, color: '#000000' });
   const updateTextDefaults = useCallback((patch: Record<string, unknown>) => {
@@ -1172,6 +1177,8 @@ export default function CanvasApp() {
             updateLineDefaults={updateLineDefaults}
             curveDefaults={curveDefaults}
             updateCurveDefaults={updateCurveDefaults}
+            drawDefaults={drawDefaults}
+            updateDrawDefaults={updateDrawDefaults}
             textDefaults={textDefaults}
             updateTextDefaults={updateTextDefaults}
             snapToGrid={snapToGrid}
@@ -1258,6 +1265,7 @@ export default function CanvasApp() {
                 }}
                 lineDefaults={lineDefaults}
                 curveDefaults={curveDefaults}
+                drawDefaults={drawDefaults}
                 textDefaults={textDefaults}
                 viewportTransition={viewportTransition}
                 onViewportChange={handleViewportChange}

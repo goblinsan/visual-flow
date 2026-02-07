@@ -12,6 +12,7 @@ export type NodeType =
   | "ellipse"
   | "line"
   | "curve"
+  | "draw"
   | "polygon";
 
 export interface BaseNode {
@@ -195,6 +196,19 @@ export interface CurveNode extends BaseNode {
   handleType?: "smooth" | "sharp"; // default handle constraint type
 }
 
+/** Draw/freehand shape node (captured mouse path). */
+export interface DrawNode extends BaseNode {
+  type: "draw";
+  points: number[];      // captured path points [x1, y1, x2, y2, ...] (relative to position)
+  position?: Pos;        // offset for the draw group
+  stroke?: string;       // CSS stroke color
+  strokeWidth?: number;  // px
+  strokeDash?: number[]; // dash pattern
+  lineCap?: "butt" | "round" | "square";
+  lineJoin?: "miter" | "round" | "bevel";
+  tension?: number;      // spline tension (0-1), calculated from smoothing
+}
+
 /** Polygon shape node (closed multi-point shape). */
 export interface PolygonNode extends BaseNode, Partial<AbsoluteChild> {
   type: "polygon";
@@ -221,6 +235,7 @@ export type LayoutNode =
   | EllipseNode
   | LineNode
   | CurveNode
+  | DrawNode
   | PolygonNode;
 
 export interface LayoutSpec {

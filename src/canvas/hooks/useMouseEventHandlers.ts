@@ -20,6 +20,10 @@ interface CurveDraftState {
   current: { x: number; y: number };
 }
 
+interface DrawDraftState {
+  points: { x: number; y: number }[];
+}
+
 interface UseMouseEventHandlersProps {
   // Tool state
   tool?: string;
@@ -45,6 +49,8 @@ interface UseMouseEventHandlersProps {
   setLineDraft: (draft: DraftState | null | ((prev: DraftState | null) => DraftState | null)) => void;
   curveDraft: CurveDraftState | null;
   setCurveDraft: (draft: CurveDraftState | null | ((prev: CurveDraftState | null) => CurveDraftState | null)) => void;
+  drawDraft: DrawDraftState | null;
+  setDrawDraft: (draft: DrawDraftState | null | ((prev: DrawDraftState | null) => DrawDraftState | null)) => void;
   polygonDraft: DraftState | null;
   setPolygonDraft: (draft: DraftState | null | ((prev: DraftState | null) => DraftState | null)) => void;
   polygonSides: number;
@@ -76,6 +82,8 @@ interface UseMouseEventHandlersProps {
   finalizeEllipse: () => void;
   finalizeLine: () => void;
   finalizeCurve: () => void;
+  finalizeDraw: () => void;
+  drawDefaults?: { smoothing: number };
   finalizePolygon: () => void;
   
   // Text editing
@@ -133,6 +141,8 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
     setLineDraft,
     curveDraft,
     setCurveDraft,
+    drawDraft,
+    setDrawDraft,
     polygonDraft,
     setPolygonDraft,
     dragSession,
@@ -155,6 +165,9 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
     finalizeRect,
     finalizeEllipse,
     finalizeLine,
+    finalizeCurve,
+    finalizeDraw,
+    drawDefaults,
     finalizePolygon,
     startTextEdit,
     justStartedTextEditRef,
@@ -179,6 +192,7 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
   const isEllipseMode = tool === 'ellipse';
   const isLineMode = tool === 'line';
   const isCurveMode = tool === 'curve';
+  const isDrawMode = tool === 'draw';
   const isPolygonMode = tool === 'polygon';
   const isTextMode = tool === 'text';
   const isImageMode = tool === 'image';
@@ -235,6 +249,16 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
         // Add point to curve
         setCurveDraft(prev => prev ? { ...prev, points: [...prev.points, world] } : prev);
       }
+      return;
+    }
+    
+    // Draw/freehand tool - drag to capture path
+    if (isDrawMode) {
+      if (e.evt.button !== 0) return;
+      const stage = e.target.getStage(); if (!stage) return;
+      const pointer = stage.getPointerPosition(); if (!pointer) return;
+      const world = toWorld(stage, pointer);
+      setDrawDraft({ points: [world] });
       return;
     }
     
@@ -457,6 +481,7 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
     setEllipseDraft,
     setLineDraft,
     setCurveDraft,
+    setDrawDraft,
     isPolygonMode,
     setPolygonDraft,
     setScale,
@@ -505,6 +530,24 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
       const pointer = stage.getPointerPosition(); if (!pointer) return;
       const worldPos = toWorld(stage, pointer);
       setCurveDraft(prev => prev ? { ...prev, current: worldPos } : prev);
+      return;
+    }
+    
+    if (isDrawMode) {
+      if (!drawDraft) return;
+      const pointer = stage.getPointerPosition(); if (!pointer) return;
+      const worldPos = toWorld(stage, pointer);
+      // Add point to path (sampling every few pixels to avoid too many points)
+      setDrawDraft(prev => {
+        if (!prev) return prev;
+        const lastPt = prev.points[prev.points.length - 1];
+        const dist = Math.sqrt((worldPos.x - lastPt.x) ** 2 + (worldPos.y - lastPt.y) ** 2);
+        const threshold = drawDefaults?.smoothing ?? 15;
+        if (dist > threshold) {
+          return { points: [...prev.points, worldPos] };
+        }
+        return prev;
+      });
       return;
     }
     
@@ -609,6 +652,8 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
     lineDraft,
     isCurveMode,
     curveDraft,
+    drawDraft,
+    setDrawDraft,
     isPolygonMode,
     polygonDraft,
     setRectDraft,
@@ -644,6 +689,9 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
     
     // Finalize line creation
     if (isLineMode && lineDraft) { finalizeLine(); return; }
+    
+    // Finalize draw/freehand creation
+    if (isDrawMode && drawDraft) { finalizeDraw(); return; }
     
     // Finalize polygon creation
     if (isPolygonMode && polygonDraft) { finalizePolygon(); return; }
@@ -736,6 +784,9 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
     isLineMode,
     lineDraft,
     finalizeLine,
+    isDrawMode,
+    drawDraft,
+    finalizeDraw,
     isPolygonMode,
     polygonDraft,
     finalizePolygon,
