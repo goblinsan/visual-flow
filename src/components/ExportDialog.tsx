@@ -116,7 +116,33 @@ export function ExportDialog({ isOpen, onClose, spec }: ExportDialogProps) {
   };
 
   return (
-    <Modal open={isOpen} onClose={onClose} title="Export Design">
+    <Modal 
+      open={isOpen} 
+      onClose={onClose} 
+      title="Export Design"
+      footer={
+        <>
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-lg border text-xs font-medium transition-colors border-gray-200 bg-gray-100 hover:bg-gray-200 text-gray-700"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleCopy}
+            className="px-4 py-2 rounded-lg text-xs font-medium transition-colors bg-gray-600 text-white hover:bg-gray-700"
+          >
+            {copied ? '✓ Copied!' : 'Copy to Clipboard'}
+          </button>
+          <button
+            onClick={handleDownload}
+            className="px-4 py-2 rounded-lg text-xs font-medium transition-colors bg-blue-600 text-white hover:bg-blue-700"
+          >
+            Download File
+          </button>
+        </>
+      }
+    >
       <div className="space-y-4">
         {/* Format Selection */}
         <div>
@@ -193,28 +219,6 @@ export function ExportDialog({ isOpen, onClose, spec }: ExportDialogProps) {
               {exportCode}
             </pre>
           </div>
-        </div>
-
-        {/* Actions */}
-        <div className="flex justify-end space-x-2 pt-4 border-t">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded transition"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleCopy}
-            className="px-4 py-2 text-sm bg-gray-600 text-white hover:bg-gray-700 rounded transition"
-          >
-            {copied ? '✓ Copied!' : 'Copy to Clipboard'}
-          </button>
-          <button
-            onClick={handleDownload}
-            className="px-4 py-2 text-sm bg-blue-600 text-white hover:bg-blue-700 rounded transition"
-          >
-            Download File
-          </button>
         </div>
       </div>
     </Modal>

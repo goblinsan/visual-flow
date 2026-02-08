@@ -37,15 +37,18 @@ export function Modal({ open, onClose, title, size='md', children, footer, varia
           {children}
         </div>
         <div className="flex justify-end pt-2 gap-2">
-          {footer}
-          <button
-            onClick={onClose}
-            className={`px-4 py-2 rounded-lg border text-xs font-medium transition-colors flex items-center gap-1.5
-              ${variant==='light' ? 'border-gray-200 bg-gray-100 hover:bg-gray-200 text-gray-700' : 'border-slate-600 bg-slate-800 text-slate-100 hover:bg-slate-700'}`}
-          >
-            <i className="fa-solid fa-check" />
-            Done
-          </button>
+          {footer ? (
+            footer
+          ) : (
+            <button
+              onClick={onClose}
+              className={`px-4 py-2 rounded-lg border text-xs font-medium transition-colors flex items-center gap-1.5
+                ${variant==='light' ? 'border-gray-200 bg-gray-100 hover:bg-gray-200 text-gray-700' : 'border-slate-600 bg-slate-800 text-slate-100 hover:bg-slate-700'}`}
+            >
+              <i className="fa-solid fa-check" />
+              Done
+            </button>
+          )}
         </div>
       </div>
     </div>
