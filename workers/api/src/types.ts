@@ -7,6 +7,10 @@ import type { LayoutSpec } from '../../src/layout-schema';
 export interface Env {
   DB: D1Database;
   ENVIRONMENT?: string;
+  /** Cloudflare Access team domain, e.g. "myteam.cloudflareaccess.com" */
+  CF_ACCESS_TEAM_DOMAIN?: string;
+  /** Cloudflare Access Application Audience (AUD) tag */
+  CF_ACCESS_AUD?: string;
 }
 
 export interface User {
