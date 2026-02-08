@@ -12,5 +12,15 @@ database_id = "313e76a2-8864-495d-abe2-5cbc6e419847"
 [env.production]
 vars = { ENVIRONMENT = "production" }
 
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "vizail-db"
+database_id = "313e76a2-8864-495d-abe2-5cbc6e419847"
+
 [env.staging]
 vars = { ENVIRONMENT = "staging" }
+
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "vizail-db"
+database_id = "313e76a2-8864-495d-abe2-5cbc6e419847"
