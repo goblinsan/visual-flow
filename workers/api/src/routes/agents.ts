@@ -29,36 +29,31 @@ export async function generateAgentToken(
   canvasId: string,
   request: Request
 ): Promise<Response> {
-  console.log('[generateAgentToken] START', { userId: user.id, canvasId, hasEnv: !!env, hasDB: !!env?.DB });
-  
-  // Check canvas access (owner only for token generation)
-  const access = await checkCanvasAccess(env, user.id, canvasId, 'owner');
-  if (!access.allowed) {
-    return errorResponse('Canvas not found or insufficient permissions', 404);
-  }
-
-  // Check quota before generating token
-  const quota = await checkAgentTokenQuota(env, canvasId);
-  if (!quota.allowed) {
-    return errorResponse(quota.error || 'Agent token quota exceeded', 403);
-  }
-
-  // Validate request body
-  const validation = await validateRequestBody(request, generateAgentTokenSchema);
-  if (!validation.success) {
-    return errorResponse(validation.error, 400);
-  }
-
-  const { agentId, scope } = validation.data;
-
   try {
+    // Check canvas access (owner only for token generation)
+    const access = await checkCanvasAccess(env, user.id, canvasId, 'owner');
+    if (!access.allowed) {
+      return errorResponse('Canvas not found or insufficient permissions', 404);
+    }
+
+    // Check quota before generating token
+    const quota = await checkAgentTokenQuota(env, canvasId);
+    if (!quota.allowed) {
+      return errorResponse(quota.error || 'Agent token quota exceeded', 403);
+    }
+
+    // Validate request body
+    const validation = await validateRequestBody(request, generateAgentTokenSchema);
+    if (!validation.success) {
+      return errorResponse(validation.error, 400);
+    }
+
+    const { agentId, scope } = validation.data;
+
     const now = Date.now();
     const tokenId = generateId();
-    const token = generateSecureToken(); // Generate secure token
-    const tokenHash = await hashToken(token); // Hash before storing
-    // Token expires in 365 days - long expiration suitable for agent automation
-    // Agents typically run continuously and token rotation can be disruptive
-    // Tokens can be manually revoked if compromised
+    const token = generateSecureToken();
+    const tokenHash = await hashToken(token);
     const expiresAt = now + (365 * 24 * 60 * 60 * 1000);
 
     await env.DB
@@ -73,7 +68,7 @@ export async function generateAgentToken(
       id: tokenId,
       canvas_id: canvasId,
       agent_id: agentId,
-      token, // Return plaintext token only once
+      token,
       scope: scope as AgentToken['scope'],
       expires_at: expiresAt,
       created_at: now,
@@ -82,7 +77,7 @@ export async function generateAgentToken(
     return jsonResponse(agentToken);
   } catch (error) {
     console.error('Error generating agent token:', error);
-    return errorResponse('Failed to generate agent token', 500);
+    return errorResponse(`Failed to generate agent token: ${error instanceof Error ? error.message : 'Unknown error'}`, 500);
   }
 }
 

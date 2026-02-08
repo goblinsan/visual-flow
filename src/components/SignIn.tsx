@@ -1,35 +1,21 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
-
-type UserInfo = { id: string | null; email: string | null; display_name?: string | null; authenticated?: boolean };
+import { useAuth } from '../hooks/useAuth';
 
 export function SignIn() {
-  const [user, setUser] = useState<UserInfo | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, loading, isAuthenticated, setDisplayName } = useAuth();
   const [editing, setEditing] = useState(false);
   const [nameInput, setNameInput] = useState('');
-
-  // Fetch current user identity via the ApiClient (which already handles
-  // the correct base URL and auth headers for both dev and production).
-  useEffect(() => {
-    apiClient.whoami().then(({ data }) => {
-      if (data) setUser(data);
-    }).finally(() => setLoading(false));
-  }, []);
 
   useEffect(() => {
     if (user?.display_name) setNameInput(user.display_name);
   }, [user]);
 
   const signIn = () => {
-    // Navigate to /api/auth/signin — CF Access protects /api/* and will
-    // intercept this request with the GitHub login flow. After auth,
-    // the Worker redirects back to the current page.
     window.location.href = `/api/auth/signin?redirect=${encodeURIComponent(window.location.href)}`;
   };
 
   const signOut = () => {
-    // Clear the CF Access session cookie via the Cloudflare logout endpoint
     window.location.href = `/cdn-cgi/access/logout`;
   };
 
@@ -38,12 +24,11 @@ export function SignIn() {
     if (!n) return;
     const { data } = await apiClient.updateDisplayName(n);
     if (data?.ok) {
-      setUser(prev => prev ? { ...prev, display_name: n } : prev);
+      setDisplayName(n);
       setEditing(false);
     }
   };
 
-  // Extract first name from display name or email
   const getFirstName = (): string => {
     if (user?.display_name) {
       return user.display_name.split(' ')[0];
@@ -54,11 +39,9 @@ export function SignIn() {
     return 'User';
   };
 
-  // Still loading — show nothing to avoid flash
   if (loading) return null;
 
-  // Not authenticated - show sign in button
-  if (!user || !user.authenticated || !user.id) {
+  if (!isAuthenticated) {
     return (
       <div className="flex items-center gap-2">
         <button
@@ -91,7 +74,7 @@ export function SignIn() {
         Sign out
       </button>
 
-      {!user.display_name && (
+      {!user?.display_name && (
         <button
           onClick={() => setEditing(true)}
           className="text-xs px-2 py-1 rounded-md transition-colors duration-150 text-white/70 hover:bg-white/10"

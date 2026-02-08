@@ -3,6 +3,7 @@ import type { LayoutSpec } from "../../layout-schema";
 import { applyProposalOperations } from '../../utils/proposalHelpers';
 import type { UseProposalsResult } from '../../hooks/useProposals';
 import type { AgentToken, AgentBranch } from '../../types/agent';
+import { useAuth } from '../../hooks/useAuth';
 
 interface AgentPanelProps {
   currentCanvasId: string | null;
@@ -39,6 +40,7 @@ export function AgentPanel({
   const [showChatGPTGuide, setShowChatGPTGuide] = useState(false);
   const [branches, setBranches] = useState<AgentBranch[]>([]);
   const [loadingBranches, setLoadingBranches] = useState(false);
+  const { isAuthenticated } = useAuth();
 
   const fetchBranches = useCallback(async () => {
     if (!currentCanvasId) return;
@@ -96,7 +98,7 @@ export function AgentPanel({
   const getApiUrl = () => {
     if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
     if (typeof window !== 'undefined' && window.location.hostname === 'vizail.com') {
-      return 'https://vizail-api.coghlanjames.workers.dev/api';
+      return 'https://vizail.com/api';
     }
     return 'http://localhost:62587/api';
   };
@@ -124,6 +126,16 @@ export function AgentPanel({
               </button>
             </div>
             <div className="text-xs text-gray-500">Share this ID with agents to allow proposals</div>
+          </div>
+        ) : !isAuthenticated ? (
+          <div className="space-y-2">
+            <div className="text-xs text-gray-500">Sign in to share your canvas with agents and enable cloud collaboration.</div>
+            <button
+              onClick={() => { window.location.href = `/api/auth/signin?redirect=${encodeURIComponent(window.location.href)}`; }}
+              className="w-full px-3 py-2 bg-gray-500 text-white text-xs font-medium rounded hover:bg-gray-600 transition"
+            >
+              Sign in to Share
+            </button>
           </div>
         ) : (
           <button
@@ -162,7 +174,7 @@ export function AgentPanel({
               disabled={generatingToken}
               className="w-full px-3 py-2 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700 transition disabled:opacity-50"
             >
-              {generatingToken ? 'Generating Token...' : '🤖 Generate Token for ChatGPT'}
+              {generatingToken ? 'Generating Token...' : 'Generate Token for ChatGPT'}
             </button>
           ) : (
             <div className="space-y-3">
