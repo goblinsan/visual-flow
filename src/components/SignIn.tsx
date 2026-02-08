@@ -74,7 +74,7 @@ export function SignIn() {
         Sign out
       </button>
 
-      {!user.display_name && (
+      {!user?.display_name && (
         <button
           onClick={() => setEditing(true)}
           className="text-xs px-2 py-1 rounded-md transition-colors duration-150 text-white/70 hover:bg-white/10"
