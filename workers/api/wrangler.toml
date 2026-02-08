@@ -10,7 +10,23 @@ database_id = "313e76a2-8864-495d-abe2-5cbc6e419847"
 
 # Environment configuration
 [env.production]
-vars = { ENVIRONMENT = "production" }
+[env.production.vars]
+ENVIRONMENT = "production"
+# Cloudflare Access JWT verification — fill in from Zero Trust dashboard
+# Team domain: Zero Trust → Settings → Custom Pages → Team domain
+CF_ACCESS_TEAM_DOMAIN = "REPLACE_WITH_YOUR_TEAM.cloudflareaccess.com"
+# Application Audience (AUD): Zero Trust → Access → Applications → your app → Overview → Application Audience tag
+CF_ACCESS_AUD = "REPLACE_WITH_YOUR_AUD_TAG"
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "vizail-db"
+database_id = "313e76a2-8864-495d-abe2-5cbc6e419847"
 
 [env.staging]
 vars = { ENVIRONMENT = "staging" }
+
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "vizail-db"
+database_id = "313e76a2-8864-495d-abe2-5cbc6e419847"

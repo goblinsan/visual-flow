@@ -1,14 +1,20 @@
 /**
  * Authentication middleware for Cloudflare Access + Agent Tokens
  * Supports two auth methods:
- *   1. CF-Access-Authenticated-User-Email header (human users via Cloudflare Access)
+ *   1. CF Access JWT (from CF_Authorization cookie) — cryptographically verified
  *   2. Authorization: Bearer vz_agent_... (agent tokens from Phase 4)
- * 
+ *
+ * In production, user identity is extracted by validating the CF Access JWT
+ * using Cloudflare's public signing keys. The CF-Access-Authenticated-User-Email
+ * header is NOT trusted because it can be spoofed on paths not covered by a
+ * CF Access Application.
+ *
  * Security: Agent tokens are hashed in the database using SHA-256
  */
 
 import type { Env, User } from './types';
 import { hashToken } from './tokenHash';
+import { getAuthenticatedEmailFromJwt } from './cfAccessJwt';
 
 export interface AuthResult {
   user: User;
@@ -22,7 +28,10 @@ export interface AuthResult {
 }
 
 /**
- * Extract user from Cloudflare Access headers or agent token
+ * Extract user from CF Access JWT cookie or agent token.
+ *
+ * Production: Validates the CF_Authorization JWT cookie directly.
+ * Development: Falls back to X-User-Email header for local testing.
  */
 export async function authenticateUser(request: Request, env: Env): Promise<User | null> {
   // Method 1: Agent token via Authorization header
@@ -31,17 +40,24 @@ export async function authenticateUser(request: Request, env: Env): Promise<User
     return authenticateAgentToken(authHeader.slice(7), env);
   }
 
-  // Method 2: Cloudflare Access email header (set by CF Access proxy)
-  // Production: Only accept CF-Access-Authenticated-User-Email (set by Cloudflare Access)
-  // Development: Accept X-User-Email for local testing
-  const email = env.ENVIRONMENT === 'production'
-    ? request.headers.get('CF-Access-Authenticated-User-Email')
-    : request.headers.get('CF-Access-Authenticated-User-Email') || request.headers.get('X-User-Email');
-  
-  if (!email) {
-    return null;
+  // Method 2: CF Access JWT validation (production)
+  if (env.ENVIRONMENT === 'production' && env.CF_ACCESS_TEAM_DOMAIN && env.CF_ACCESS_AUD) {
+    const email = await getAuthenticatedEmailFromJwt(
+      request,
+      env.CF_ACCESS_TEAM_DOMAIN,
+      env.CF_ACCESS_AUD,
+    );
+    if (!email) return null;
+    return getOrCreateUser(env, email);
   }
 
+  // Method 3: Header-based auth (development / fallback)
+  // In dev, CF Access isn't running so we accept test headers
+  const email =
+    request.headers.get('CF-Access-Authenticated-User-Email') ||
+    (env.ENVIRONMENT !== 'production' ? request.headers.get('X-User-Email') : null);
+
+  if (!email) return null;
   return getOrCreateUser(env, email);
 }
 
@@ -89,13 +105,25 @@ export async function authenticateRequest(request: Request, env: Env): Promise<A
     };
   }
 
-  // Cloudflare Access fallback - only in non-production environments
-  const email = env.ENVIRONMENT === 'production'
-    ? request.headers.get('CF-Access-Authenticated-User-Email')
-    : request.headers.get('CF-Access-Authenticated-User-Email') || request.headers.get('X-User-Email');
-  
-  if (!email) return null;
+  // CF Access JWT validation (production)
+  if (env.ENVIRONMENT === 'production' && env.CF_ACCESS_TEAM_DOMAIN && env.CF_ACCESS_AUD) {
+    const email = await getAuthenticatedEmailFromJwt(
+      request,
+      env.CF_ACCESS_TEAM_DOMAIN,
+      env.CF_ACCESS_AUD,
+    );
+    if (!email) return null;
+    const user = await getOrCreateUser(env, email);
+    if (!user) return null;
+    return { user };
+  }
 
+  // Header-based auth (development / fallback)
+  const email =
+    request.headers.get('CF-Access-Authenticated-User-Email') ||
+    (env.ENVIRONMENT !== 'production' ? request.headers.get('X-User-Email') : null);
+
+  if (!email) return null;
   const user = await getOrCreateUser(env, email);
   if (!user) return null;
 
