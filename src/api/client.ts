@@ -277,13 +277,13 @@ export class ApiClient {
 
 /** Resolve the API base URL at runtime:
  *  1. Explicit env var (VITE_API_URL) wins.
- *  2. On vizail.com (production) → deployed Worker.
+ *  2. On vizail.com (production) → same-origin /api (routed to Worker via Cloudflare Worker Route)
  *  3. Otherwise → local dev server.
  */
 function resolveApiUrl(): string {
   if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
   if (typeof window !== 'undefined' && window.location.hostname === 'vizail.com') {
-    return 'https://vizail-api.coghlanjames.workers.dev/api';
+    return '/api';  // Same-origin path; Cloudflare Worker Route handles vizail.com/api/*
   }
   return 'http://localhost:62587/api';
 }

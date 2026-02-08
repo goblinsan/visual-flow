@@ -87,11 +87,44 @@ export default {
       });
     }
 
+    // Debug endpoint - shows request headers to diagnose auth issues
+    if (url.pathname === '/api/debug' && request.method === 'GET') {
+      const headers: Record<string, string> = {};
+      request.headers.forEach((value, key) => {
+        headers[key] = value;
+      });
+      return new Response(JSON.stringify({
+        url: request.url,
+        method: request.method,
+        headers,
+        cf: request.cf ? {
+          country: request.cf.country,
+          colo: request.cf.colo,
+        } : null,
+        environment: env.ENVIRONMENT || 'not set',
+      }, null, 2), {
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders,
+        },
+      });
+    }
+
     // Route handling
     const path = url.pathname;
     const method = request.method;
 
-    // Authenticate user (supports both CF Access headers and agent tokens)
+    // Public endpoints - allow unauthenticated access
+    // Whoami returns null for guests, user info for authenticated users
+    if (path === '/api/whoami' && method === 'GET') {
+      const user = await authenticateUser(request, env);
+      if (!user) {
+        return jsonResponse({ id: null, email: null, display_name: null, authenticated: false }, 200, env, origin);
+      }
+      return jsonResponse({ id: user.id, email: user.email, display_name: (user as any).display_name || null, authenticated: true }, 200, env, origin);
+    }
+
+    // All other endpoints require authentication
     const user = await authenticateUser(request, env);
     if (!user) {
       return new Response(JSON.stringify({
@@ -105,10 +138,7 @@ export default {
       });
     }
 
-    // User info endpoints
-    if (path === '/api/whoami' && method === 'GET') {
-      return jsonResponse({ id: user.id, email: user.email, display_name: (user as any).display_name || null }, 200, env, origin);
-    }
+    // Protected user endpoints (require auth)
 
     if (path === '/api/user/display-name' && (method === 'POST' || method === 'PUT')) {
       const body = await request.json().catch(() => ({})) as Record<string, unknown>;
