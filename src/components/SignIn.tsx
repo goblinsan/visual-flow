@@ -41,6 +41,17 @@ export function SignIn() {
     }
   };
 
+  // Extract first name from display name or email
+  const getFirstName = (): string => {
+    if (user?.display_name) {
+      return user.display_name.split(' ')[0];
+    }
+    if (user?.email) {
+      return user.email.split('@')[0].split('.')[0];
+    }
+    return 'User';
+  };
+
   // Still loading — show nothing to avoid flash
   if (loading) return null;
 
@@ -50,7 +61,7 @@ export function SignIn() {
       <div className="flex items-center gap-2">
         <button
           onClick={signIn}
-          className="text-sm px-3 py-1.5 rounded-md transition-colors duration-150 text-white bg-blue-600 hover:bg-blue-500"
+          className="text-sm px-3 py-1.5 rounded-md transition-colors duration-150 text-white/90 hover:bg-white/10"
         >
           Sign in
         </button>
@@ -59,50 +70,63 @@ export function SignIn() {
   }
 
   const displayLabel = user.display_name || user.email || 'User';
+  const firstName = getFirstName();
 
   return (
     <div className="flex items-center gap-3">
       {/* Avatar circle */}
       <div className="w-7 h-7 rounded-full bg-white/15 flex items-center justify-center text-xs font-semibold text-white/90 uppercase select-none">
-        {displayLabel.charAt(0)}
+        {firstName.charAt(0)}
       </div>
 
       <div className="text-sm text-white/90">
-        {user.display_name ? (
-          <span>{user.display_name}</span>
-        ) : (
-          <span>{user.email}</span>
-        )}
+        <span>Hi, <strong>{firstName}</strong></span>
       </div>
 
-      {user.display_name ? (
+      <button
+        onClick={signOut}
+        className="text-sm px-3 py-1.5 rounded-md transition-colors duration-150 text-white/90 hover:bg-white/10 border border-white/10"
+      >
+        Sign out
+      </button>
+
+      {!user.display_name && (
         <button
-          onClick={signOut}
-          className="text-sm px-3 py-1.5 rounded-md transition-colors duration-150 text-white/90 hover:bg-white/10 border border-white/10"
+          onClick={() => setEditing(true)}
+          className="text-xs px-2 py-1 rounded-md transition-colors duration-150 text-white/70 hover:bg-white/10"
         >
-          Sign out
+          Set display name
         </button>
-      ) : (
-        <div className="flex items-center gap-2">
-          {editing ? (
-            <>
-              <input
-                value={nameInput}
-                onChange={e => setNameInput(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && saveDisplayName()}
-                className="text-sm px-2 py-1 rounded-md bg-white/10 text-white placeholder:text-white/60 border border-white/10"
-                placeholder="Display name"
-                autoFocus
-              />
-              <button onClick={saveDisplayName} className="text-sm px-3 py-1.5 rounded-md bg-green-600 text-white hover:bg-green-500 transition-colors">Save</button>
-              <button onClick={() => setEditing(false)} className="text-sm px-3 py-1.5 rounded-md transition-colors duration-150 text-white/90 hover:bg-white/10 border border-white/10">Cancel</button>
-            </>
-          ) : (
-            <>
-              <button onClick={() => setEditing(true)} className="text-sm px-3 py-1.5 rounded-md transition-colors duration-150 text-white/90 hover:bg-white/10">Set name</button>
-              <button onClick={signOut} className="text-sm px-3 py-1.5 rounded-md transition-colors duration-150 text-white/90 hover:bg-white/10 border border-white/10">Sign out</button>
-            </>
-          )}
+      )}
+
+      {/* Display name editor modal */}
+      {editing && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setEditing(false)}>
+          <div className="bg-white dark:bg-slate-800 rounded-lg p-6 shadow-xl max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold mb-4">Set Display Name</h3>
+            <input
+              value={nameInput}
+              onChange={e => setNameInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && saveDisplayName()}
+              className="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+              placeholder="Your name"
+              autoFocus
+            />
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={saveDisplayName}
+                className="flex-1 px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-500 transition-colors"
+              >
+                Save
+              </button>
+              <button
+                onClick={() => setEditing(false)}
+                className="flex-1 px-4 py-2 rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
