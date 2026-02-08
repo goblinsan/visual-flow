@@ -11,6 +11,10 @@ migrations_dir = "migrations"
 
 # Environment configuration
 [env.production]
+routes = [
+  { pattern = "vizail.com/api/*", zone_name = "vizail.com" }
+]
+
 [env.production.vars]
 ENVIRONMENT = "production"
 # Cloudflare Access JWT verification — fill in from Zero Trust dashboard
