@@ -45,7 +45,7 @@ export function useProposals(options: UseProposalsOptions): UseProposalsResult {
   const [error, setError] = useState<string | null>(null);
 
   const refreshProposals = useCallback(async () => {
-    if (!enabled) return;
+    if (!enabled || !canvasId) return;
 
     setLoading(true);
     setError(null);

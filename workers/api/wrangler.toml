@@ -14,9 +14,9 @@ database_id = "313e76a2-8864-495d-abe2-5cbc6e419847"
 ENVIRONMENT = "production"
 # Cloudflare Access JWT verification — fill in from Zero Trust dashboard
 # Team domain: Zero Trust → Settings → Custom Pages → Team domain
-CF_ACCESS_TEAM_DOMAIN = "REPLACE_WITH_YOUR_TEAM.cloudflareaccess.com"
+CF_ACCESS_TEAM_DOMAIN = "47sunset.cloudflareaccess.com"
 # Application Audience (AUD): Zero Trust → Access → Applications → your app → Overview → Application Audience tag
-CF_ACCESS_AUD = "REPLACE_WITH_YOUR_AUD_TAG"
+CF_ACCESS_AUD = "e83c13035aac3a535129fd3e4dfb62962f86d6a1cde5738f2a5b46ca781d3d39"
 
 [[env.production.d1_databases]]
 binding = "DB"

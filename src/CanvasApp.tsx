@@ -27,6 +27,7 @@ import { useRealtimeCanvas } from './collaboration';
 import { CursorOverlay } from './components/CursorOverlay';
 import { SelectionOverlay } from './components/SelectionOverlay';
 import { useProposals } from './hooks/useProposals';
+import { useAuth } from './hooks/useAuth';
 import { HeaderToolbar } from './components/canvas/HeaderToolbar';
 import { LeftToolbar } from './components/canvas/LeftToolbar';
 import { AttributesSidebar } from './components/canvas/AttributesSidebar';
@@ -843,6 +844,15 @@ export default function CanvasApp() {
   const skipNormalizationRef = useRef(false);
   const appVersion = import.meta.env.VITE_APP_VERSION ?? '0.0.0';
 
+  const { isAuthenticated } = useAuth();
+
+  // Toast notification for save feedback
+  const [toast, setToast] = useState<{ message: string; type: 'info' | 'success' | 'warning' } | null>(null);
+  const showToast = useCallback((message: string, type: 'info' | 'success' | 'warning' = 'info') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3500);
+  }, []);
+
   // Phase 4: Agent Proposals
   // Persist canvas ID per design name so it survives re-renders / remounts
   const canvasIdStorageKey = `vizail_canvas_id_${currentDesignName ?? '__default__'}`;
@@ -968,32 +978,82 @@ export default function CanvasApp() {
       logger.info('File action templates: opening template browser');
     }
     if (action === 'save') {
-      if (currentDesignName) {
-        // Save to existing name
-        saveNamedDesign(currentDesignName, spec);
-        logger.info(`Saved design: ${currentDesignName}`);
-      } else {
-        // No current name, prompt for one (like Save As)
+      const designName = currentDesignName || (() => {
         const name = window.prompt("Save: Enter a name for this design", "Untitled Design");
         if (name && name.trim()) {
-          saveNamedDesign(name.trim(), spec);
           setCurrentDesignNameState(name.trim());
           setCurrentDesignName(name.trim());
-          logger.info(`Saved new design: ${name.trim()}`);
+          return name.trim();
         }
+        return null;
+      })();
+      if (!designName) return;
+
+      // Always save to localStorage as a backup
+      saveNamedDesign(designName, spec);
+
+      if (isAuthenticated) {
+        // Cloud save for authenticated users
+        (async () => {
+          try {
+            const { apiClient } = await import('./api/client');
+            if (currentCanvasId) {
+              const result = await apiClient.updateCanvas(currentCanvasId, { name: designName, spec });
+              if (result.error) {
+                showToast(`Cloud save failed: ${result.error}. Saved locally.`, 'warning');
+              } else {
+                showToast('Saved to cloud', 'success');
+              }
+            } else {
+              // Create a new canvas in the cloud
+              const result = await apiClient.createCanvas(designName, spec);
+              if (result.data) {
+                setCurrentCanvasId(result.data.id);
+                showToast('Saved to cloud', 'success');
+              } else {
+                showToast(`Cloud save failed: ${result.error}. Saved locally.`, 'warning');
+              }
+            }
+          } catch {
+            showToast('Cloud save failed. Saved locally.', 'warning');
+          }
+        })();
+      } else {
+        showToast('Saved locally. Sign in to save to the cloud.', 'warning');
       }
+      logger.info(`Saved design: ${designName}`);
     }
     if (action === 'saveAs') {
       const defaultName = currentDesignName ? `${currentDesignName} (copy)` : "Untitled Design";
       const name = window.prompt("Save As: Enter a name for this design", defaultName);
       if (name && name.trim()) {
-        saveNamedDesign(name.trim(), spec);
-        setCurrentDesignNameState(name.trim());
-        setCurrentDesignName(name.trim());
-        logger.info(`Saved design as: ${name.trim()}`);
+        const designName = name.trim();
+        saveNamedDesign(designName, spec);
+        setCurrentDesignNameState(designName);
+        setCurrentDesignName(designName);
+
+        if (isAuthenticated) {
+          (async () => {
+            try {
+              const { apiClient } = await import('./api/client');
+              const result = await apiClient.createCanvas(designName, spec);
+              if (result.data) {
+                setCurrentCanvasId(result.data.id);
+                showToast('Saved to cloud', 'success');
+              } else {
+                showToast(`Cloud save failed: ${result.error}. Saved locally.`, 'warning');
+              }
+            } catch {
+              showToast('Cloud save failed. Saved locally.', 'warning');
+            }
+          })();
+        } else {
+          showToast('Saved locally. Sign in to save to the cloud.', 'warning');
+        }
+        logger.info(`Saved design as: ${designName}`);
       }
     }
-  }, [spec, currentDesignName]);
+  }, [spec, currentDesignName, currentCanvasId, isAuthenticated, showToast, setCurrentCanvasId]);
 
   // Load a saved design
   const loadDesign = useCallback((design: SavedDesign) => {
@@ -1001,6 +1061,10 @@ export default function CanvasApp() {
     setCurrentDesignNameState(design.name);
     setCurrentDesignName(design.name);
     setSelection([]);
+    // Clear cloud canvas ID — loaded design may have a different one stored per name
+    // (the canvasIdStorageKey will be re-read via the useEffect above)
+    setSelectedProposalId(null);
+    setViewingProposedSpec(false);
     setOpenDialogOpen(false);
     // Only fit to content in local mode (not collaborative)
     if (!isCollaborative) {
@@ -1016,6 +1080,13 @@ export default function CanvasApp() {
       const newSpec = template.build();
       setSpec(newSpec);
       setSelection([]);
+      // Clear canvas ID — this is a brand new design, not yet saved to cloud
+      setCurrentCanvasId(null);
+      setCurrentDesignNameState(null);
+      setCurrentDesignName(null);
+      // Reset proposal state
+      setSelectedProposalId(null);
+      setViewingProposedSpec(false);
       // Only fit to content in local mode (not collaborative)
       if (!isCollaborative) {
         setTimeout(() => setFitToContentKey(k => k + 1), 50);
@@ -1023,7 +1094,7 @@ export default function CanvasApp() {
       logger.info(`Applied template: ${template.name}`);
     }
     setNewDialogOpen(false);
-  }, [setSpec, setSelection, isCollaborative]);
+  }, [setSpec, setSelection, isCollaborative, setCurrentCanvasId]);
 
   // Dialog action callbacks
   const handleStartCollaborativeSession = useCallback(() => {
@@ -1550,6 +1621,17 @@ export default function CanvasApp() {
           </aside>
         )}
       </div>
+
+      {/* Toast notification */}
+      {toast && (
+        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-lg shadow-lg text-sm font-medium transition-all animate-in fade-in slide-in-from-bottom-2 ${
+          toast.type === 'success' ? 'bg-green-600 text-white' :
+          toast.type === 'warning' ? 'bg-amber-500 text-white' :
+          'bg-gray-800 text-white'
+        }`}>
+          {toast.message}
+        </div>
+      )}
     </div>
   );
 }
