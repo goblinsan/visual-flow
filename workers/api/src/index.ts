@@ -87,6 +87,29 @@ export default {
       });
     }
 
+    // Debug endpoint - shows request headers to diagnose auth issues
+    if (url.pathname === '/api/debug' && request.method === 'GET') {
+      const headers: Record<string, string> = {};
+      request.headers.forEach((value, key) => {
+        headers[key] = value;
+      });
+      return new Response(JSON.stringify({
+        url: request.url,
+        method: request.method,
+        headers,
+        cf: request.cf ? {
+          country: request.cf.country,
+          colo: request.cf.colo,
+        } : null,
+        environment: env.ENVIRONMENT || 'not set',
+      }, null, 2), {
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders,
+        },
+      });
+    }
+
     // Route handling
     const path = url.pathname;
     const method = request.method;
