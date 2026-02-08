@@ -20,6 +20,7 @@ export interface HeaderToolbarProps {
   lastError: string | null;
   reconnect: () => void;
   setShareDialogOpen: (open: boolean) => void;
+  setExportDialogOpen: (open: boolean) => void;
   tool: string;
 }
 
@@ -39,6 +40,7 @@ export function HeaderToolbar({
   lastError,
   reconnect,
   setShareDialogOpen,
+  setExportDialogOpen,
   tool,
 }: HeaderToolbarProps) {
   return (
@@ -83,6 +85,17 @@ export function HeaderToolbar({
                     {shortcut && <span className="text-[10px] text-gray-400 font-mono">{shortcut}</span>}
                   </button>
                 ))}
+                <div className="border-t border-gray-200 my-1.5" />
+                <button
+                  onClick={() => { setExportDialogOpen(true); setFileOpen(false); }}
+                  className="w-full flex items-center justify-between px-3 py-2 text-sm rounded-md hover:bg-gray-100 transition-colors duration-100"
+                >
+                  <span className="flex items-center gap-2.5">
+                    <i className="fa-solid fa-download text-gray-500 w-4" />
+                    Export…
+                  </span>
+                  <span className="text-[10px] text-gray-400 font-mono">⇧⌘E</span>
+                </button>
               </div>
             )}
           </div>

@@ -4,6 +4,7 @@ import type { LayoutSpec } from "../../layout-schema";
 import type { SavedDesign } from "../../utils/persistence";
 import { getSavedDesigns } from "../../utils/persistence";
 import { COMPONENT_LIBRARY, ICON_LIBRARY } from "../../library";
+import { ExportDialog } from "../ExportDialog";
 
 const COMPONENT_CATEGORIES = [
   { key: "all", label: "All" },
@@ -44,6 +45,11 @@ export interface DialogManagerProps {
   setOpenDialogOpen: (open: boolean) => void;
   templateBrowserOpen: boolean;
   setTemplateBrowserOpen: (open: boolean) => void;
+  exportDialogOpen: boolean;
+  setExportDialogOpen: (open: boolean) => void;
+  
+  // Current spec for export
+  currentSpec: LayoutSpec;
   
   // Collaboration state
   isCollaborative: boolean;
@@ -281,6 +287,9 @@ export function DialogManager({
   onLeaveCollaborativeSession,
   onCopyShareLink,
   templates,
+  exportDialogOpen,
+  setExportDialogOpen,
+  currentSpec,
 }: DialogManagerProps): JSX.Element {
   return (
     <>
@@ -522,6 +531,13 @@ export function DialogManager({
           }}
         />
       </Modal>
+
+      {/* Export Dialog */}
+      <ExportDialog
+        isOpen={exportDialogOpen}
+        onClose={() => setExportDialogOpen(false)}
+        spec={currentSpec}
+      />
     </>
   );
 }

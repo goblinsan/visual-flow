@@ -764,6 +764,8 @@ export default function CanvasApp() {
     setShareDialogOpen,
     templateBrowserOpen,
     setTemplateBrowserOpen,
+    exportDialogOpen,
+    setExportDialogOpen,
   } = useDialogState();
   
   const {
@@ -1182,6 +1184,7 @@ export default function CanvasApp() {
         lastError={lastError}
         reconnect={reconnect}
         setShareDialogOpen={setShareDialogOpen}
+        setExportDialogOpen={setExportDialogOpen}
         tool={tool}
       />
       {/* Dialogs */}
@@ -1217,6 +1220,9 @@ export default function CanvasApp() {
         onLeaveCollaborativeSession={handleLeaveCollaborativeSession}
         onCopyShareLink={handleCopyShareLink}
         templates={TEMPLATES}
+        exportDialogOpen={exportDialogOpen}
+        setExportDialogOpen={setExportDialogOpen}
+        currentSpec={spec}
       />
       {/* Body layout */}
       <div className="flex flex-1 min-h-0">
