@@ -85,13 +85,12 @@ ${indentLines(jsx, 2)}
 function generateClassComponent(
   root: LayoutNode,
   name: string,
-  typescript: boolean,
+  _typescript: boolean,
   comments: boolean
 ): string {
-  const baseClass = typescript ? 'React.Component' : 'React.Component';
   const jsx = nodeToJSX(root, 0, comments);
   
-  return `export class ${name} extends ${baseClass} {
+  return `export class ${name} extends React.Component {
   render() {
     return (
 ${indentLines(jsx, 3)}
