@@ -69,7 +69,6 @@ export function SignIn() {
     );
   }
 
-  const displayLabel = user.display_name || user.email || 'User';
   const firstName = getFirstName();
 
   return (
