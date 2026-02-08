@@ -29,6 +29,8 @@ export async function generateAgentToken(
   canvasId: string,
   request: Request
 ): Promise<Response> {
+  console.log('[generateAgentToken] START', { userId: user.id, canvasId, hasEnv: !!env, hasDB: !!env?.DB });
+  
   // Check canvas access (owner only for token generation)
   const access = await checkCanvasAccess(env, user.id, canvasId, 'owner');
   if (!access.allowed) {
