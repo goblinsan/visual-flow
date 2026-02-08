@@ -7,6 +7,7 @@ compatibility_date = "2024-01-01"
 binding = "DB"
 database_name = "vizail-db"
 database_id = "313e76a2-8864-495d-abe2-5cbc6e419847"
+migrations_dir = "migrations"
 
 # Environment configuration
 [env.production]
@@ -22,6 +23,7 @@ CF_ACCESS_AUD = "e83c13035aac3a535129fd3e4dfb62962f86d6a1cde5738f2a5b46ca781d3d3
 binding = "DB"
 database_name = "vizail-db"
 database_id = "313e76a2-8864-495d-abe2-5cbc6e419847"
+migrations_dir = "migrations"
 
 [env.staging]
 vars = { ENVIRONMENT = "staging" }
@@ -30,3 +32,4 @@ vars = { ENVIRONMENT = "staging" }
 binding = "DB"
 database_name = "vizail-db"
 database_id = "313e76a2-8864-495d-abe2-5cbc6e419847"
+migrations_dir = "migrations"
