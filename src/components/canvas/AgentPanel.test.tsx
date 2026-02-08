@@ -13,6 +13,17 @@ vi.mock('../../api/client', () => ({
   },
 }));
 
+// Mock the useAuth hook
+vi.mock('../../hooks/useAuth', () => ({
+  useAuth: vi.fn(() => ({
+    user: { id: 'test-user', email: 'test@example.com', authenticated: true },
+    loading: false,
+    isAuthenticated: true,
+    refresh: vi.fn(),
+    setDisplayName: vi.fn(),
+  })),
+}));
+
 describe('AgentPanel', () => {
   const mockSpec: LayoutSpec = {
     root: {

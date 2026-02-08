@@ -11,6 +11,7 @@ export interface DialogState {
   openDialogOpen: boolean;
   shareDialogOpen: boolean;
   templateBrowserOpen: boolean;
+  exportDialogOpen: boolean;
 }
 
 export interface UseDialogStateReturn extends DialogState {
@@ -24,6 +25,7 @@ export interface UseDialogStateReturn extends DialogState {
   setOpenDialogOpen: React.Dispatch<React.SetStateAction<boolean>>;
   setShareDialogOpen: React.Dispatch<React.SetStateAction<boolean>>;
   setTemplateBrowserOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  setExportDialogOpen: React.Dispatch<React.SetStateAction<boolean>>;
   closeAllDialogs: () => void;
 }
 
@@ -41,6 +43,7 @@ export function useDialogState(): UseDialogStateReturn {
   const [openDialogOpen, setOpenDialogOpen] = useState(false);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [templateBrowserOpen, setTemplateBrowserOpen] = useState(false);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
 
   const closeAllDialogs = useCallback(() => {
     setHelpOpen(false);
@@ -53,6 +56,7 @@ export function useDialogState(): UseDialogStateReturn {
     setOpenDialogOpen(false);
     setShareDialogOpen(false);
     setTemplateBrowserOpen(false);
+    setExportDialogOpen(false);
   }, []);
 
   return {
@@ -76,6 +80,8 @@ export function useDialogState(): UseDialogStateReturn {
     setShareDialogOpen,
     templateBrowserOpen,
     setTemplateBrowserOpen,
+    exportDialogOpen,
+    setExportDialogOpen,
     closeAllDialogs,
   };
 }
