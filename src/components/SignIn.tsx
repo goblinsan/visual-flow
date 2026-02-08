@@ -22,13 +22,15 @@ export function SignIn() {
   }, [user]);
 
   const signIn = () => {
-    const origin = window.location.origin;
-    window.location.href = `${origin}/_cf_access/sign_in?redirect_url=${encodeURIComponent(window.location.href)}`;
+    // Navigate to /api/auth/signin — CF Access protects /api/* and will
+    // intercept this request with the GitHub login flow. After auth,
+    // the Worker redirects back to the current page.
+    window.location.href = `/api/auth/signin?redirect=${encodeURIComponent(window.location.href)}`;
   };
 
   const signOut = () => {
-    const origin = window.location.origin;
-    window.location.href = `${origin}/cdn-cgi/access/logout?redirect=${encodeURIComponent(window.location.href)}`;
+    // Clear the CF Access session cookie via the Cloudflare logout endpoint
+    window.location.href = `/cdn-cgi/access/logout`;
   };
 
   const saveDisplayName = async () => {

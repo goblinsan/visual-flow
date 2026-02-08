@@ -114,6 +114,54 @@ export default {
     const path = url.pathname;
     const method = request.method;
 
+    // --- Auth signin redirect ---
+    // This endpoint is protected by CF Access at infrastructure level.
+    // When a user navigates here, CF Access intercepts with the GitHub login.
+    // After authentication, CF forwards the request here and we redirect
+    // back to the app. The CF_AppSession cookie is now set, so subsequent
+    // /api calls include the authenticated user's email header.
+    if (path === '/api/auth/signin' && method === 'GET') {
+      const redirectParam = url.searchParams.get('redirect') || '/';
+      // Validate redirect URL to prevent open-redirect attacks
+      try {
+        const target = new URL(redirectParam, url.origin);
+        if (target.origin !== url.origin) {
+          return errorResponse('Invalid redirect URL', 400, env, origin);
+        }
+        return new Response(null, {
+          status: 302,
+          headers: { Location: target.toString(), ...corsHeaders },
+        });
+      } catch {
+        return new Response(null, {
+          status: 302,
+          headers: { Location: '/', ...corsHeaders },
+        });
+      }
+    }
+
+    // --- Auth signout redirect ---
+    if (path === '/api/auth/signout' && method === 'GET') {
+      const redirectParam = url.searchParams.get('redirect') || '/';
+      try {
+        const target = new URL(redirectParam, url.origin);
+        if (target.origin !== url.origin) {
+          return errorResponse('Invalid redirect URL', 400, env, origin);
+        }
+        // Clear the CF Access session by redirecting through the logout endpoint
+        const logoutUrl = `${url.origin}/cdn-cgi/access/logout`;
+        return new Response(null, {
+          status: 302,
+          headers: { Location: logoutUrl, ...corsHeaders },
+        });
+      } catch {
+        return new Response(null, {
+          status: 302,
+          headers: { Location: `${url.origin}/cdn-cgi/access/logout`, ...corsHeaders },
+        });
+      }
+    }
+
     // Public endpoints - allow unauthenticated access
     // Whoami returns null for guests, user info for authenticated users
     if (path === '/api/whoami' && method === 'GET') {
