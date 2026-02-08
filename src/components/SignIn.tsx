@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { apiClient } from '../api/client';
 
-type UserInfo = { id: string; email: string; display_name?: string | null };
+type UserInfo = { id: string | null; email: string | null; display_name?: string | null; authenticated?: boolean };
 
 export function SignIn() {
   const [user, setUser] = useState<UserInfo | null>(null);
@@ -13,13 +13,18 @@ export function SignIn() {
   // the correct base URL and auth headers for both dev and production).
   useEffect(() => {
     apiClient.whoami().then(({ data }) => {
-      if (data?.id) setUser(data);
+      if (data) setUser(data);
     }).finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
     if (user?.display_name) setNameInput(user.display_name);
   }, [user]);
+
+  const signIn = () => {
+    const origin = window.location.origin;
+    window.location.href = `${origin}/_cf_access/sign_in?redirect_url=${encodeURIComponent(window.location.href)}`;
+  };
 
   const signOut = () => {
     const origin = window.location.origin;
@@ -39,18 +44,21 @@ export function SignIn() {
   // Still loading — show nothing to avoid flash
   if (loading) return null;
 
-  // Not authenticated.
-  // In dev mode the ApiClient sends X-User-Email automatically so this
-  // branch only appears in production when CF Access isn't configured.
-  if (!user) {
+  // Not authenticated - show sign in button
+  if (!user || !user.authenticated || !user.id) {
     return (
       <div className="flex items-center gap-2">
-        <span className="text-xs text-white/60">Not signed in</span>
+        <button
+          onClick={signIn}
+          className="text-sm px-3 py-1.5 rounded-md transition-colors duration-150 text-white bg-blue-600 hover:bg-blue-500"
+        >
+          Sign in
+        </button>
       </div>
     );
   }
 
-  const displayLabel = user.display_name || user.email;
+  const displayLabel = user.display_name || user.email || 'User';
 
   return (
     <div className="flex items-center gap-3">
@@ -90,7 +98,10 @@ export function SignIn() {
               <button onClick={() => setEditing(false)} className="text-sm px-3 py-1.5 rounded-md transition-colors duration-150 text-white/90 hover:bg-white/10 border border-white/10">Cancel</button>
             </>
           ) : (
-            <button onClick={() => setEditing(true)} className="text-sm px-3 py-1.5 rounded-md transition-colors duration-150 text-white/90 hover:bg-white/10">Set name</button>
+            <>
+              <button onClick={() => setEditing(true)} className="text-sm px-3 py-1.5 rounded-md transition-colors duration-150 text-white/90 hover:bg-white/10">Set name</button>
+              <button onClick={signOut} className="text-sm px-3 py-1.5 rounded-md transition-colors duration-150 text-white/90 hover:bg-white/10 border border-white/10">Sign out</button>
+            </>
           )}
         </div>
       )}
