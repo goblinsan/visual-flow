@@ -4,7 +4,7 @@
  * Security: CORS lockdown, rate limiting, token hashing, scope enforcement
  */
 
-import { authenticateUser } from './auth';
+import { authenticateRequest, authenticateUser } from './auth';
 import type { Env } from './types';
 import { errorResponse, jsonResponse } from './utils';
 import { getCorsHeaders } from './cors';
@@ -24,6 +24,10 @@ import {
 import {
   generateAgentToken,
   revokeAgentToken,
+  connectAgent,
+  createLinkCode,
+  exchangeLinkCode,
+  listAgentTokens,
 } from './routes/agents';
 import {
   listBranches,
@@ -45,6 +49,7 @@ const CANVAS_MEMBERS_ROUTE = new RegExp('^/api/canvases/([^/]+)/members$');
 const CANVAS_MEMBER_ROUTE = new RegExp('^/api/canvases/([^/]+)/members/([^/]+)$');
 const CANVAS_AGENT_TOKEN_ROUTE = new RegExp('^/api/canvases/([^/]+)/agent-token$');
 const CANVAS_AGENT_TOKEN_DELETE_ROUTE = new RegExp('^/api/canvases/([^/]+)/agent-token/([^/]+)$');
+const CANVAS_AGENT_TOKENS_ROUTE = new RegExp('^/api/canvases/([^/]+)/agent-tokens$');
 const CANVAS_BRANCHES_ROUTE = new RegExp('^/api/canvases/([^/]+)/branches$');
 const BRANCH_ID_ROUTE = new RegExp('^/api/branches/([^/]+)$');
 const CANVAS_PROPOSALS_ROUTE = new RegExp('^/api/canvases/([^/]+)/proposals$');
@@ -85,6 +90,10 @@ export default {
           ...corsHeaders,
         },
       });
+    }
+
+    if (url.pathname === '/api/agent/link-code/exchange' && request.method === 'POST') {
+      return await exchangeLinkCode(env, request);
     }
 
     // Debug endpoint - shows request headers to diagnose auth issues
@@ -173,8 +182,8 @@ export default {
     }
 
     // All other endpoints require authentication
-    const user = await authenticateUser(request, env);
-    if (!user) {
+    const authResult = await authenticateRequest(request, env);
+    if (!authResult) {
       return new Response(JSON.stringify({
         error: 'Unauthorized - authenticate via Cloudflare Access or provide Authorization: Bearer vz_agent_... token'
       }), {
@@ -185,6 +194,7 @@ export default {
         },
       });
     }
+    const { user } = authResult;
 
     // Protected user endpoints (require auth)
 
@@ -215,13 +225,21 @@ export default {
     }
 
     try {
+      if (path === '/api/agent/connect' && method === 'POST') {
+        return await connectAgent(user, env, request, authResult);
+      }
+
+      if (path === '/api/agent/link-code' && method === 'POST') {
+        return await createLinkCode(user, env, request, authResult);
+      }
+
       // Canvas routes
       if (path === '/api/canvases' && method === 'GET') {
-        return await listCanvases(user, env);
+        return await listCanvases(user, env, authResult);
       }
       
       if (path === '/api/canvases' && method === 'POST') {
-        return await createCanvas(user, env, request);
+        return await createCanvas(user, env, request, authResult);
       }
 
       const canvasMatch = path.match(CANVAS_ID_ROUTE);
@@ -229,15 +247,15 @@ export default {
         const canvasId = canvasMatch[1];
         
         if (method === 'GET') {
-          return await getCanvas(user, env, canvasId);
+          return await getCanvas(user, env, canvasId, authResult);
         }
         
         if (method === 'PUT') {
-          return await updateCanvas(user, env, canvasId, request);
+          return await updateCanvas(user, env, canvasId, request, authResult);
         }
         
         if (method === 'DELETE') {
-          return await deleteCanvas(user, env, canvasId);
+          return await deleteCanvas(user, env, canvasId, authResult);
         }
       }
 
@@ -247,11 +265,11 @@ export default {
         const canvasId = membersMatch[1];
         
         if (method === 'GET') {
-          return await listMembers(user, env, canvasId);
+          return await listMembers(user, env, canvasId, authResult);
         }
         
         if (method === 'POST') {
-          return await addMember(user, env, canvasId, request);
+          return await addMember(user, env, canvasId, request, authResult);
         }
       }
 
@@ -260,7 +278,7 @@ export default {
         const [, canvasId, userId] = memberMatch;
         
         if (method === 'DELETE') {
-          return await removeMember(user, env, canvasId, userId);
+          return await removeMember(user, env, canvasId, userId, authResult);
         }
       }
 
@@ -270,7 +288,16 @@ export default {
         const canvasId = agentTokenMatch[1];
         
         if (method === 'POST') {
-          return await generateAgentToken(user, env, canvasId, request);
+          return await generateAgentToken(user, env, canvasId, request, authResult);
+        }
+      }
+
+      const agentTokensMatch = path.match(CANVAS_AGENT_TOKENS_ROUTE);
+      if (agentTokensMatch) {
+        const canvasId = agentTokensMatch[1];
+
+        if (method === 'GET') {
+          return await listAgentTokens(user, env, canvasId, authResult);
         }
       }
 
@@ -279,7 +306,7 @@ export default {
         const [, canvasId, agentId] = agentTokenDeleteMatch;
         
         if (method === 'DELETE') {
-          return await revokeAgentToken(user, env, canvasId, agentId);
+          return await revokeAgentToken(user, env, canvasId, agentId, authResult);
         }
       }
 
@@ -289,72 +316,72 @@ export default {
         const canvasId = branchesMatch[1];
         
         if (method === 'GET') {
-          return await listBranches(user, env, canvasId);
-        }
-        
-        if (method === 'POST') {
-          return await createBranch(user, env, canvasId, request);
-        }
+        return await listBranches(user, env, canvasId, authResult);
       }
+      
+      if (method === 'POST') {
+        return await createBranch(user, env, canvasId, request, authResult);
+      }
+    }
 
-      const branchMatch = path.match(BRANCH_ID_ROUTE);
-      if (branchMatch) {
-        const branchId = branchMatch[1];
-        
-        if (method === 'GET') {
-          return await getBranch(user, env, branchId);
-        }
-        
-        if (method === 'DELETE') {
-          return await deleteBranch(user, env, branchId);
-        }
+    const branchMatch = path.match(BRANCH_ID_ROUTE);
+    if (branchMatch) {
+      const branchId = branchMatch[1];
+      
+      if (method === 'GET') {
+        return await getBranch(user, env, branchId, authResult);
       }
+      
+      if (method === 'DELETE') {
+        return await deleteBranch(user, env, branchId, authResult);
+      }
+    }
 
       // Proposal routes
       const canvasProposalsMatch = path.match(CANVAS_PROPOSALS_ROUTE);
-      if (canvasProposalsMatch) {
-        const canvasId = canvasProposalsMatch[1];
-        
-        if (method === 'GET') {
-          return await listProposals(user, env, canvasId);
-        }
+    if (canvasProposalsMatch) {
+      const canvasId = canvasProposalsMatch[1];
+      
+      if (method === 'GET') {
+        return await listProposals(user, env, canvasId, authResult);
       }
+    }
 
-      const branchProposalsMatch = path.match(BRANCH_PROPOSALS_ROUTE);
-      if (branchProposalsMatch) {
-        const branchId = branchProposalsMatch[1];
-        
-        if (method === 'POST') {
-          return await createProposal(user, env, branchId, request);
-        }
+    const branchProposalsMatch = path.match(BRANCH_PROPOSALS_ROUTE);
+    if (branchProposalsMatch) {
+      const branchId = branchProposalsMatch[1];
+      
+      if (method === 'POST') {
+        return await createProposal(user, env, branchId, request, authResult);
       }
+    }
 
       const proposalMatch = path.match(PROPOSAL_ID_ROUTE);
-      if (proposalMatch) {
-        const proposalId = proposalMatch[1];
-        
-        if (method === 'GET') {
-          return await getProposal(user, env, proposalId);
-        }
+    if (proposalMatch) {
+      const proposalId = proposalMatch[1];
+      
+      if (method === 'GET') {
+        return await getProposal(user, env, proposalId, authResult);
       }
+    }
 
       const approveMatch = path.match(PROPOSAL_APPROVE_ROUTE);
-      if (approveMatch) {
-        const proposalId = approveMatch[1];
-        
-        if (method === 'POST') {
-          return await approveProposal(user, env, proposalId);
-        }
+    if (approveMatch) {
+      const proposalId = approveMatch[1];
+      
+      if (method === 'POST') {
+        return await approveProposal(user, env, proposalId, authResult);
       }
+    }
 
-      const rejectMatch = path.match(PROPOSAL_REJECT_ROUTE);
-      if (rejectMatch) {
-        const proposalId = rejectMatch[1];
-        
-        if (method === 'POST') {
-          return await rejectProposal(user, env, proposalId, request);
-        }
+    const rejectMatch = path.match(PROPOSAL_REJECT_ROUTE);
+    if (rejectMatch) {
+      const proposalId = rejectMatch[1];
+      
+      if (method === 'POST') {
+        return await rejectProposal(user, env, proposalId, request, authResult);
       }
+    }
 
       return errorResponse('Not found', 404);
     } catch (error) {

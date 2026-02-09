@@ -6,9 +6,13 @@
 import type { LayoutSpec } from '../layout-schema';
 import type {
   AgentToken,
+  AgentTokenSummary,
+  AgentLinkCode,
   AgentBranch,
   AgentProposal,
   AgentScope,
+  AgentConnectResponse,
+  AgentConfigTemplate,
   ProposalOperation,
 } from '../types/agent';
 
@@ -63,6 +67,70 @@ function mapProposal(raw: Record<string, unknown>): AgentProposal {
     createdAt: (raw.created_at ?? raw.createdAt ?? 0) as number,
     reviewedAt: (raw.reviewed_at ?? raw.reviewedAt) as number | undefined,
     reviewedBy: (raw.reviewed_by ?? raw.reviewedBy) as string | undefined,
+  };
+}
+
+function mapAgentToken(raw: Record<string, unknown>): AgentToken {
+  return {
+    token: (raw.token ?? '') as string,
+    agentId: (raw.agent_id ?? raw.agentId ?? '') as string,
+    ownerId: (raw.owner_id ?? raw.ownerId ?? '') as string,
+    canvasId: (raw.canvas_id ?? raw.canvasId ?? '') as string,
+    scope: (raw.scope as AgentScope) ?? 'read',
+    expiresAt: (raw.expires_at ?? raw.expiresAt ?? 0) as number,
+    createdAt: (raw.created_at ?? raw.createdAt ?? 0) as number,
+  };
+}
+
+function mapAgentTokenSummary(raw: Record<string, unknown>): AgentTokenSummary {
+  const lastUsedAt = Object.prototype.hasOwnProperty.call(raw, 'last_used_at')
+    ? raw.last_used_at
+    : raw.lastUsedAt;
+
+  return {
+    id: (raw.id ?? '') as string,
+    canvasId: (raw.canvas_id ?? raw.canvasId ?? '') as string,
+    agentId: (raw.agent_id ?? raw.agentId ?? '') as string,
+    scope: (raw.scope as AgentScope) ?? 'read',
+    expiresAt: (raw.expires_at ?? raw.expiresAt ?? 0) as number,
+    createdAt: (raw.created_at ?? raw.createdAt ?? 0) as number,
+    lastUsedAt: lastUsedAt as number | null | undefined,
+  };
+}
+
+function mapAgentLinkCode(raw: Record<string, unknown>): AgentLinkCode {
+  return {
+    id: (raw.id ?? '') as string,
+    canvasId: (raw.canvas_id ?? raw.canvasId ?? '') as string,
+    agentId: (raw.agent_id ?? raw.agentId ?? '') as string,
+    scope: (raw.scope as AgentScope) ?? 'read',
+    code: (raw.code ?? '') as string,
+    expiresAt: (raw.expires_at ?? raw.expiresAt ?? 0) as number,
+    createdAt: (raw.created_at ?? raw.createdAt ?? 0) as number,
+  };
+}
+
+function mapAgentConfigTemplate(raw?: Record<string, unknown>): AgentConfigTemplate {
+  return {
+    filename: (raw?.filename ?? '') as string,
+    content: (raw?.content ?? {}) as Record<string, unknown>,
+  };
+}
+
+function mapAgentConnectResponse(raw: Record<string, unknown>): AgentConnectResponse {
+  const configs = (raw.configs ?? {}) as Record<string, unknown>;
+  const tokenRaw = (raw.token ?? {}) as Record<string, unknown>;
+
+  return {
+    token: mapAgentToken(tokenRaw),
+    apiUrl: (raw.api_url ?? raw.apiUrl ?? '') as string,
+    canvasId: (raw.canvas_id ?? raw.canvasId ?? '') as string,
+    configs: {
+      mcpJson: mapAgentConfigTemplate((configs.mcp_json ?? configs.mcpJson) as Record<string, unknown>),
+      cursor: mapAgentConfigTemplate(configs.cursor as Record<string, unknown>),
+      vscode: mapAgentConfigTemplate(configs.vscode as Record<string, unknown>),
+      claudeDesktop: mapAgentConfigTemplate((configs.claude_desktop ?? configs.claudeDesktop) as Record<string, unknown>),
+    },
   };
 }
 
@@ -179,10 +247,12 @@ export class ApiClient {
     agentId: string,
     scope: AgentScope
   ): Promise<{ data?: AgentToken; error?: string }> {
-    return this.request<AgentToken>(`/canvases/${canvasId}/agent-token`, {
+    const result = await this.request<Record<string, unknown>>(`/canvases/${canvasId}/agent-token`, {
       method: 'POST',
       body: JSON.stringify({ agentId, scope }),
     });
+    if (result.error) return { error: result.error };
+    return { data: result.data ? mapAgentToken(result.data) : undefined };
   }
 
   async revokeAgentToken(
@@ -192,6 +262,38 @@ export class ApiClient {
     return this.request<{ success: boolean }>(`/canvases/${canvasId}/agent-token/${agentId}`, {
       method: 'DELETE',
     });
+  }
+
+  async listAgentTokens(
+    canvasId: string
+  ): Promise<{ data?: AgentTokenSummary[]; error?: string }> {
+    const result = await this.request<Record<string, unknown>[]>(`/canvases/${canvasId}/agent-tokens`, { method: 'GET' });
+    if (result.error) return { error: result.error };
+    return { data: (result.data || []).map(mapAgentTokenSummary) };
+  }
+
+  async connectAgent(
+    canvasId: string,
+    options: { agentId?: string; scope?: AgentScope; client?: string } = {}
+  ): Promise<{ data?: AgentConnectResponse; error?: string }> {
+    const result = await this.request<Record<string, unknown>>('/agent/connect', {
+      method: 'POST',
+      body: JSON.stringify({ canvasId, ...options }),
+    });
+    if (result.error) return { error: result.error };
+    return { data: result.data ? mapAgentConnectResponse(result.data) : undefined };
+  }
+
+  async createLinkCode(
+    canvasId: string,
+    options: { agentId?: string; scope?: AgentScope; client?: string } = {}
+  ): Promise<{ data?: AgentLinkCode; error?: string }> {
+    const result = await this.request<Record<string, unknown>>('/agent/link-code', {
+      method: 'POST',
+      body: JSON.stringify({ canvasId, ...options }),
+    });
+    if (result.error) return { error: result.error };
+    return { data: result.data ? mapAgentLinkCode(result.data) : undefined };
   }
 
   // Branch methods

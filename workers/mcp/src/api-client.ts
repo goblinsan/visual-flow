@@ -10,10 +10,13 @@ export class VizailApiClient {
   ) {}
 
   private get headers(): Record<string, string> {
-    return {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${this.agentToken}`,
     };
+    if (this.agentToken) {
+      headers.Authorization = `Bearer ${this.agentToken}`;
+    }
+    return headers;
   }
 
   private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -29,6 +32,10 @@ export class VizailApiClient {
     }
 
     return response.json() as Promise<T>;
+  }
+
+  async getDiscovery() {
+    return this.request<Record<string, unknown>>('/agent/discover', { method: 'GET' });
   }
 
   // --- Canvas ---

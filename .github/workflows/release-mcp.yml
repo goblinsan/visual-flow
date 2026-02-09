@@ -1,0 +1,52 @@
+name: release-mcp
+
+on:
+  push:
+    tags:
+      - "mcp-v*"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: "https://registry.npmjs.org"
+          cache: "npm"
+          cache-dependency-path: workers/mcp/package-lock.json
+
+      - name: Install dependencies
+        working-directory: workers/mcp
+        run: npm ci
+
+      - name: Build package
+        working-directory: workers/mcp
+        run: npm run build
+
+      - name: Verify tag matches package version
+        working-directory: workers/mcp
+        run: |
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          EXPECTED_TAG="mcp-v${PACKAGE_VERSION}"
+          if [ "${GITHUB_REF_NAME}" != "${EXPECTED_TAG}" ]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match package version ${PACKAGE_VERSION}."
+            echo "Expected tag: ${EXPECTED_TAG}"
+            exit 1
+          fi
+
+      - name: Publish to npm
+        working-directory: workers/mcp
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true

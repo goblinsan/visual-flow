@@ -40,6 +40,15 @@ Cloudflare Worker providing REST API for canvas persistence and sharing.
 - `POST /api/canvases/:id/members` - Add a member (invite)
 - `DELETE /api/canvases/:id/members/:userId` - Remove a member (owner only)
 
+### Agent Operations
+
+- `POST /api/agent/connect` - Generate an agent token plus MCP config templates (owner only)
+- `POST /api/agent/link-code` - Create a one-time link code (owner only)
+- `POST /api/agent/link-code/exchange` - Exchange a link code for a token + templates (public)
+- `POST /api/canvases/:id/agent-token` - Generate an agent token (owner only)
+- `GET /api/canvases/:id/agent-tokens` - List agent token metadata (owner only)
+- `DELETE /api/canvases/:id/agent-token/:agentId` - Revoke an agent token (owner only)
+
 ### Health Check
 
 - `GET /health` or `GET /api/health` - Health check endpoint
@@ -97,6 +106,17 @@ Tables:
 - **read**: Read-only access to canvas data
 - **propose**: Can create proposals (requires human approval)
 - **trusted-propose**: Can auto-approve certain proposals
+- **Scope enforcement**: direct canvas/membership mutations require `trusted-propose`
+- **Token management**: agent tokens cannot create or revoke other agent tokens
+
+## Link Codes (Extensions)
+
+For extension installs, generate a short-lived link code and exchange it for a token:
+
+- `POST /api/agent/link-code` (owner only) → returns a one-time code (10 min TTL)
+- `POST /api/agent/link-code/exchange` (public) → returns token + MCP templates
+
+Recommended default scope is `propose`. Use `read` for review-only assistants.
 
 ## CORS
 

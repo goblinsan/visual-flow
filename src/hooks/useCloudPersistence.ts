@@ -68,7 +68,9 @@ export function useCloudPersistence(
           setLastError(null);
         } else {
           // Fallback to localStorage
-          console.warn('Failed to load from cloud, using localStorage:', error);
+          if (import.meta.env.DEV) {
+            console.warn('Failed to load from cloud, using localStorage:', error);
+          }
           const local = loadDesignSpec<LayoutSpec>();
           if (local) setSpec(local);
           setLastError(error || 'Failed to load from cloud');
@@ -116,7 +118,9 @@ export function useCloudPersistence(
           });
 
           if (error) {
-            console.error('Cloud save failed:', error);
+            if (import.meta.env.DEV) {
+              console.error('Cloud save failed:', error);
+            }
             // Fallback to localStorage
             saveDesignSpec(nextSpec);
             setLastError(error);
@@ -135,14 +139,18 @@ export function useCloudPersistence(
             setLastError(null);
             saveDesignSpec(nextSpec);
           } else {
-            console.error('Canvas creation failed:', error);
+            if (import.meta.env.DEV) {
+              console.error('Canvas creation failed:', error);
+            }
             saveDesignSpec(nextSpec);
             setLastError(error || 'Failed to create canvas');
           }
         }
       } catch (err) {
         const error = err instanceof Error ? err.message : 'Unknown error';
-        console.error('Unexpected save error:', error);
+        if (import.meta.env.DEV) {
+          console.error('Unexpected save error:', error);
+        }
         saveDesignSpec(nextSpec);
         setLastError(error);
       } finally {
