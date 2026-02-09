@@ -47,6 +47,26 @@ Authorization: Bearer vz_agent_{uuid}_{uuid}
 - Tokens expire after 365 days (suitable for long-running automation)
 - Tokens can be manually revoked at any time
 - Scope is enforced on every operation
+- Agent tokens cannot create or revoke other agent tokens
+- Link codes allow short-lived, single-use token exchange for extensions
+
+**Recommended defaults:**
+- Use `read` scope for review-only or audit assistants
+- Use `propose` scope for design change assistants (default)
+- Reserve `trusted-propose` for tightly controlled automation
+
+### Link Codes (Device/Extension Flow)
+
+For extension installs, a short-lived link code can be generated and exchanged for a token:
+
+- Link codes expire after 10 minutes and are single-use
+- The exchange endpoint is public but only accepts valid, unconsumed codes
+- The exchange response returns a full token + MCP config templates
+
+**Best practices:**
+- Treat link codes as secrets while they are valid
+- Avoid sharing codes in public channels or logs
+- If a code leaks, wait for expiry and generate a new one
 
 ## CORS (Cross-Origin Resource Sharing)
 
@@ -178,6 +198,15 @@ if (!scopeCheck.allowed) {
 - Verified on **every** request that modifies data
 - Canvas ID is validated to ensure token is for the correct canvas
 - Human users (authenticated via Cloudflare Access) have unlimited scope
+- Direct canvas/membership mutations require `trusted-propose`
+- Approve/reject proposal operations require `trusted-propose`
+- Agent tokens cannot manage agent tokens (generate/revoke)
+
+### Token Storage Guidance
+
+- Store tokens in encrypted secrets managers or local keychains
+- Do **not** commit tokens to Git or paste them into shared docs
+- Rotate tokens whenever access changes or a token is shared outside the team
 
 ## WebSocket Authentication
 
@@ -290,7 +319,7 @@ CREATE INDEX idx_agent_tokens_hash ON agent_tokens(token_hash);
 ```http
 POST /api/canvases/{id}/agent-token
 Content-Type: application/json
-Authorization: {CF-Access or existing token}
+Authorization: {CF-Access (human user only)}
 
 {
   "agentId": "my-automation-agent",
@@ -315,7 +344,7 @@ Response (plaintext token shown only once):
 
 ```http
 DELETE /api/canvases/{canvasId}/agent-token/{agentId}
-Authorization: {CF-Access or owner token}
+Authorization: {CF-Access (human user only)}
 ```
 
 Response:

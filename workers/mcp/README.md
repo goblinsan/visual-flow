@@ -39,7 +39,28 @@ curl -X POST http://localhost:62587/api/canvases/YOUR_CANVAS_ID/agent-token \
   -d '{"agentId": "my-agent", "scope": "propose"}'
 ```
 
-This returns a token like `vz_agent_xxx_yyy` (valid for 24 hours).
+This returns a token like `vz_agent_xxx_yyy` (valid for 365 days).
+
+#### Alternative: Link Code (Extensions)
+
+For extensions or device flows, use a one-time link code:
+
+```bash
+curl -X POST http://localhost:62587/api/agent/link-code \
+  -H "Content-Type: application/json" \
+  -H "CF-Access-Authenticated-User-Email: owner@email.com" \
+  -d '{"canvasId": "YOUR_CANVAS_ID", "scope": "propose"}'
+```
+
+Exchange it for a token:
+
+```bash
+curl -X POST http://localhost:62587/api/agent/link-code/exchange \
+  -H "Content-Type: application/json" \
+  -d '{"code": "ABCD1234"}'
+```
+
+Link codes expire after 10 minutes and are single-use.
 
 ### 2. Configure MCP Client
 
@@ -181,6 +202,18 @@ The server supports both environment variables and CLI arguments:
 | `read` | Read canvas, list proposals |
 | `propose` | Read + create branches + submit proposals |
 | `trusted-propose` | All of propose (reserved for future auto-approve) |
+
+## Security Tips
+
+- Store tokens like passwords and avoid committing them to Git
+- Use the lowest scope required for the task
+- Rotate tokens if they are shared outside your team
+
+## Compatibility Checks
+
+On startup, the MCP server calls the public discovery endpoint and warns if the API
+version or required capabilities are missing. This does not block startup, but it
+helps catch drift between the server and the API.
 
 ## Development
 

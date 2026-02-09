@@ -30,6 +30,24 @@ export const generateAgentTokenSchema = z.object({
   scope: z.enum(['read', 'propose', 'trusted-propose']),
 });
 
+export const connectAgentSchema = z.object({
+  canvasId: z.string().min(1).max(255),
+  agentId: z.string().min(1).max(255).optional(),
+  scope: z.enum(['read', 'propose', 'trusted-propose']).optional(),
+  client: z.string().min(1).max(64).optional(),
+});
+
+export const createLinkCodeSchema = z.object({
+  canvasId: z.string().min(1).max(255),
+  agentId: z.string().min(1).max(255).optional(),
+  scope: z.enum(['read', 'propose', 'trusted-propose']).optional(),
+  client: z.string().min(1).max(64).optional(),
+});
+
+export const exchangeLinkCodeSchema = z.object({
+  code: z.string().min(4).max(32),
+});
+
 // Branch validation schemas
 export const createBranchSchema = z.object({
   agentId: z.string().min(1).max(255),
@@ -58,7 +76,8 @@ export async function validateRequestBody<T>(
   schema: z.ZodSchema<T>
 ): Promise<{ success: true; data: T } | { success: false; error: string }> {
   try {
-    const body = await request.json();
+    const raw = await request.text();
+    const body = raw.trim().length === 0 ? {} : JSON.parse(raw);
     const result = schema.safeParse(body);
     
     if (!result.success) {

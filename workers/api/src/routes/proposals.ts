@@ -4,7 +4,7 @@
 
 import type { Env, User } from '../types';
 import { generateId, jsonResponse, errorResponse } from '../utils';
-import { checkCanvasAccess, authenticateRequest, checkAgentScope } from '../auth';
+import { checkCanvasAccess, checkAgentScope, type AuthResult } from '../auth';
 import { validateRequestBody, createProposalSchema, rejectProposalSchema } from '../validation';
 
 interface ProposalOperation {
@@ -80,12 +80,18 @@ function applyOperationsToSpec(
 export async function listProposals(
   user: User,
   env: Env,
-  canvasId: string
+  canvasId: string,
+  authResult?: AuthResult
 ): Promise<Response> {
   // Check canvas access
   const access = await checkCanvasAccess(env, user.id, canvasId);
   if (!access.allowed) {
     return errorResponse('Canvas not found', 404);
+  }
+
+  const scope = checkAgentScope(authResult ?? null, 'read', canvasId);
+  if (!scope.allowed) {
+    return errorResponse(scope.error || 'Insufficient scope', 403);
   }
 
   try {
@@ -120,7 +126,8 @@ export async function createProposal(
   user: User,
   env: Env,
   branchId: string,
-  request: Request
+  request: Request,
+  authResult?: AuthResult
 ): Promise<Response> {
   try {
     // Get branch to check canvas access
@@ -133,30 +140,23 @@ export async function createProposal(
       return errorResponse('Branch not found', 404);
     }
 
+    const scope = checkAgentScope(authResult ?? null, 'propose', branch.canvas_id);
+    if (!scope.allowed) {
+      return errorResponse(scope.error || 'Insufficient scope', 403);
+    }
+
     // Check canvas access
     const access = await checkCanvasAccess(env, user.id, branch.canvas_id, 'editor');
     if (!access.allowed) {
       return errorResponse('Canvas not found or insufficient permissions', 404);
     }
 
-    const body = await request.json() as {
-      title: string;
-      description: string;
-      operations: ProposalOperation[];
-      rationale: string;
-      assumptions: string[];
-      confidence: number;
-    };
-
-    const { title, description, operations, rationale, assumptions, confidence } = body;
-
-    if (!title || !description || !operations || !rationale || assumptions === undefined || confidence === undefined) {
-      return errorResponse('Missing required fields', 400);
+    const validation = await validateRequestBody(request, createProposalSchema);
+    if (!validation.success) {
+      return errorResponse(validation.error, 400);
     }
 
-    if (confidence < 0 || confidence > 1) {
-      return errorResponse('Confidence must be between 0 and 1', 400);
-    }
+    const { title, description, operations, rationale, assumptions, confidence } = validation.data;
 
     const now = Date.now();
     const proposalId = generateId();
@@ -215,7 +215,8 @@ export async function createProposal(
 export async function getProposal(
   user: User,
   env: Env,
-  proposalId: string
+  proposalId: string,
+  authResult?: AuthResult
 ): Promise<Response> {
   try {
     const proposal = await env.DB
@@ -225,6 +226,11 @@ export async function getProposal(
 
     if (!proposal) {
       return errorResponse('Proposal not found', 404);
+    }
+
+    const scope = checkAgentScope(authResult ?? null, 'read', proposal.canvas_id);
+    if (!scope.allowed) {
+      return errorResponse(scope.error || 'Insufficient scope', 403);
     }
 
     // Check canvas access
@@ -254,7 +260,8 @@ export async function getProposal(
 export async function approveProposal(
   user: User,
   env: Env,
-  proposalId: string
+  proposalId: string,
+  authResult?: AuthResult
 ): Promise<Response> {
   try {
     const proposal = await env.DB
@@ -264,6 +271,11 @@ export async function approveProposal(
 
     if (!proposal) {
       return errorResponse('Proposal not found', 404);
+    }
+
+    const scope = checkAgentScope(authResult ?? null, 'trusted-propose', proposal.canvas_id);
+    if (!scope.allowed) {
+      return errorResponse(scope.error || 'Insufficient scope', 403);
     }
 
     // Check canvas access (owner or editor)
@@ -334,7 +346,8 @@ export async function rejectProposal(
   user: User,
   env: Env,
   proposalId: string,
-  request: Request
+  request: Request,
+  authResult?: AuthResult
 ): Promise<Response> {
   try {
     const proposal = await env.DB
@@ -346,6 +359,11 @@ export async function rejectProposal(
       return errorResponse('Proposal not found', 404);
     }
 
+    const scope = checkAgentScope(authResult ?? null, 'trusted-propose', proposal.canvas_id);
+    if (!scope.allowed) {
+      return errorResponse(scope.error || 'Insufficient scope', 403);
+    }
+
     // Check canvas access (owner or editor)
     const access = await checkCanvasAccess(env, user.id, proposal.canvas_id, 'editor');
     if (!access.allowed) {
@@ -354,6 +372,11 @@ export async function rejectProposal(
 
     if (proposal.status !== 'pending') {
       return errorResponse('Only pending proposals can be rejected', 400);
+    }
+
+    const validation = await validateRequestBody(request, rejectProposalSchema);
+    if (!validation.success) {
+      return errorResponse(validation.error, 400);
     }
 
     const now = Date.now();

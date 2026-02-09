@@ -83,10 +83,14 @@ describe('useTransformManager', () => {
       useTransformManager(trRef, mkSpec(), setSpec, ['a'], findNode)
     );
 
-    result.current.onTransform();
+    act(() => {
+      result.current.onTransform();
+    });
     const firstSession = result.current.transformSession;
     
-    result.current.onTransform();
+    act(() => {
+      result.current.onTransform();
+    });
     const secondSession = result.current.transformSession;
 
     expect(firstSession).toBe(secondSession);

@@ -9,7 +9,9 @@ vi.mock('../../api/client', () => ({
   apiClient: {
     createCanvas: vi.fn(),
     listBranches: vi.fn().mockResolvedValue({ data: [] }),
-    generateAgentToken: vi.fn(),
+    connectAgent: vi.fn(),
+    createLinkCode: vi.fn(),
+    listAgentTokens: vi.fn().mockResolvedValue({ data: [] }),
   },
 }));
 

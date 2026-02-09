@@ -20,6 +20,8 @@ The canvas uses a tree of typed nodes:
 - **text**: Text label with font properties
 - **line**: Straight line between two points [x1,y1,x2,y2]
 - **curve**: Bezier curve with control points and tension
+- **draw**: Freehand path with points
+- **polygon**: Closed multi-point shape
 - **image**: Image from a URL with optional sizing
 - **stack/grid/box**: Layout containers
 

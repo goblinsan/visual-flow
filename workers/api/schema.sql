@@ -39,3 +39,60 @@ CREATE TABLE IF NOT EXISTS memberships (
 CREATE INDEX IF NOT EXISTS idx_canvases_owner ON canvases(owner_id);
 CREATE INDEX IF NOT EXISTS idx_memberships_canvas ON memberships(canvas_id);
 CREATE INDEX IF NOT EXISTS idx_memberships_user ON memberships(user_id);
+
+-- Agent tokens
+CREATE TABLE IF NOT EXISTS agent_tokens (
+  id TEXT PRIMARY KEY,
+  canvas_id TEXT NOT NULL,
+  agent_id TEXT NOT NULL,
+  token TEXT NOT NULL,
+  token_hash TEXT,
+  scope TEXT NOT NULL,
+  expires_at INTEGER NOT NULL,
+  created_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_agent_tokens_hash ON agent_tokens(token_hash);
+
+-- Agent branches
+CREATE TABLE IF NOT EXISTS agent_branches (
+  id TEXT PRIMARY KEY,
+  canvas_id TEXT NOT NULL,
+  agent_id TEXT NOT NULL,
+  base_version INTEGER NOT NULL,
+  status TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+
+-- Agent proposals
+CREATE TABLE IF NOT EXISTS agent_proposals (
+  id TEXT PRIMARY KEY,
+  branch_id TEXT NOT NULL,
+  canvas_id TEXT NOT NULL,
+  agent_id TEXT NOT NULL,
+  status TEXT NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT NOT NULL,
+  operations TEXT NOT NULL, -- JSON
+  rationale TEXT NOT NULL,
+  assumptions TEXT NOT NULL, -- JSON
+  confidence REAL NOT NULL,
+  created_at INTEGER NOT NULL,
+  reviewed_at INTEGER,
+  reviewed_by TEXT
+);
+
+-- Agent link codes
+CREATE TABLE IF NOT EXISTS agent_link_codes (
+  id TEXT PRIMARY KEY,
+  canvas_id TEXT NOT NULL,
+  agent_id TEXT NOT NULL,
+  scope TEXT NOT NULL,
+  code_hash TEXT NOT NULL,
+  expires_at INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  consumed_at INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_agent_link_codes_hash ON agent_link_codes(code_hash);
+CREATE INDEX IF NOT EXISTS idx_agent_link_codes_canvas ON agent_link_codes(canvas_id);

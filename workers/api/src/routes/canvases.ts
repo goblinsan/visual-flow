@@ -5,18 +5,9 @@
 import type { Env, User, Canvas } from '../types';
 import type { LayoutSpec } from '../../src/layout-schema';
 import { generateId, jsonResponse, errorResponse } from '../utils';
-import { checkCanvasAccess } from '../auth';
+import { checkCanvasAccess, checkAgentScope, type AuthResult } from '../auth';
 import { checkCanvasQuota } from '../quota';
-
-interface CreateCanvasBody {
-  name: string;
-  spec: LayoutSpec;
-}
-
-interface UpdateCanvasBody {
-  name?: string;
-  spec?: LayoutSpec;
-}
+import { validateRequestBody, createCanvasSchema, updateCanvasSchema } from '../validation';
 
 function isLayoutSpec(value: unknown): value is LayoutSpec {
   return (
@@ -28,26 +19,6 @@ function isLayoutSpec(value: unknown): value is LayoutSpec {
   );
 }
 
-function isCreateCanvasBody(value: unknown): value is CreateCanvasBody {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    typeof (value as { name?: unknown }).name === 'string' &&
-    isLayoutSpec((value as { spec?: unknown }).spec)
-  );
-}
-
-function isUpdateCanvasBody(value: unknown): value is UpdateCanvasBody {
-  if (typeof value !== 'object' || value === null) return false;
-  const { name, spec } = value as { name?: unknown; spec?: unknown };
-  const hasName = name !== undefined;
-  const hasSpec = spec !== undefined;
-  if (!hasName && !hasSpec) return false;
-  const nameValid = !hasName || typeof name === 'string';
-  const specValid = !hasSpec || isLayoutSpec(spec);
-  return nameValid && specValid;
-}
-
 function normalizeSpec(value: string | LayoutSpec): LayoutSpec {
   return typeof value === 'string' ? (JSON.parse(value) as LayoutSpec) : value;
 }
@@ -56,7 +27,16 @@ function normalizeSpec(value: string | LayoutSpec): LayoutSpec {
  * GET /api/canvases
  * List all canvases where user is a member
  */
-export async function listCanvases(user: User, env: Env): Promise<Response> {
+export async function listCanvases(
+  user: User,
+  env: Env,
+  authResult?: AuthResult
+): Promise<Response> {
+  const scope = checkAgentScope(authResult ?? null, 'read');
+  if (!scope.allowed) {
+    return errorResponse(scope.error || 'Insufficient scope', 403);
+  }
+
   try {
     const result = await env.DB
       .prepare(`
@@ -85,21 +65,34 @@ export async function listCanvases(user: User, env: Env): Promise<Response> {
  * POST /api/canvases
  * Create a new canvas
  */
-export async function createCanvas(user: User, env: Env, request: Request): Promise<Response> {
+export async function createCanvas(
+  user: User,
+  env: Env,
+  request: Request,
+  authResult?: AuthResult
+): Promise<Response> {
+  const scope = checkAgentScope(authResult ?? null, 'trusted-propose');
+  if (!scope.allowed) {
+    return errorResponse(scope.error || 'Insufficient scope', 403);
+  }
+
   // Check quota before creating
   const quota = await checkCanvasQuota(env, user.id);
   if (!quota.allowed) {
     return errorResponse(quota.error || 'Canvas quota exceeded', 403);
   }
 
+  const validation = await validateRequestBody(request, createCanvasSchema);
+  if (!validation.success) {
+    return errorResponse(validation.error, 400);
+  }
+
+  const { name, spec } = validation.data;
+  if (!isLayoutSpec(spec)) {
+    return errorResponse('Invalid spec: missing root node', 400);
+  }
+
   try {
-    const body = await request.json();
-    if (!isCreateCanvasBody(body)) {
-      return errorResponse('Missing required fields: name, spec');
-    }
-
-    const { name, spec } = body;
-
     const now = Date.now();
     const canvasId = generateId();
     const membershipId = generateId();
@@ -141,7 +134,17 @@ export async function createCanvas(user: User, env: Env, request: Request): Prom
  * GET /api/canvases/:id
  * Get a specific canvas
  */
-export async function getCanvas(user: User, env: Env, canvasId: string): Promise<Response> {
+export async function getCanvas(
+  user: User,
+  env: Env,
+  canvasId: string,
+  authResult?: AuthResult
+): Promise<Response> {
+  const scope = checkAgentScope(authResult ?? null, 'read', canvasId);
+  if (!scope.allowed) {
+    return errorResponse(scope.error || 'Insufficient scope', 403);
+  }
+
   try {
     // Check access
     const access = await checkCanvasAccess(env, user.id, canvasId);
@@ -177,8 +180,14 @@ export async function updateCanvas(
   user: User,
   env: Env,
   canvasId: string,
-  request: Request
+  request: Request,
+  authResult?: AuthResult
 ): Promise<Response> {
+  const scope = checkAgentScope(authResult ?? null, 'trusted-propose', canvasId);
+  if (!scope.allowed) {
+    return errorResponse(scope.error || 'Insufficient scope', 403);
+  }
+
   try {
     // Check editor or owner access
     const access = await checkCanvasAccess(env, user.id, canvasId, 'editor');
@@ -186,13 +195,15 @@ export async function updateCanvas(
       return errorResponse('Access denied - editor or owner role required', 403);
     }
 
-    const body = await request.json();
-    
-    if (!isUpdateCanvasBody(body)) {
-      return errorResponse('At least one field required: name or spec');
+    const validation = await validateRequestBody(request, updateCanvasSchema);
+    if (!validation.success) {
+      return errorResponse(validation.error, 400);
     }
 
-    const { name, spec } = body;
+    const { name, spec } = validation.data;
+    if (spec !== undefined && !isLayoutSpec(spec)) {
+      return errorResponse('Invalid spec: missing root node', 400);
+    }
 
     const updates: string[] = [];
     const values: Array<string | number> = [];
@@ -241,7 +252,17 @@ export async function updateCanvas(
  * DELETE /api/canvases/:id
  * Delete a canvas
  */
-export async function deleteCanvas(user: User, env: Env, canvasId: string): Promise<Response> {
+export async function deleteCanvas(
+  user: User,
+  env: Env,
+  canvasId: string,
+  authResult?: AuthResult
+): Promise<Response> {
+  const scope = checkAgentScope(authResult ?? null, 'trusted-propose', canvasId);
+  if (!scope.allowed) {
+    return errorResponse(scope.error || 'Insufficient scope', 403);
+  }
+
   try {
     // Check owner access
     const access = await checkCanvasAccess(env, user.id, canvasId, 'owner');

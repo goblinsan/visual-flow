@@ -197,6 +197,63 @@ describe('ApiClient', () => {
       }));
     });
 
+    it('should connect agent and return templates', async () => {
+      const mockConnect = {
+        token: {
+          token: 'test-token-456',
+          agent_id: 'assistant',
+          owner_id: 'user1',
+          canvas_id: 'canvas1',
+          scope: 'propose',
+          expires_at: 999,
+          created_at: 111,
+        },
+        api_url: 'http://localhost:62587/api',
+        canvas_id: 'canvas1',
+        configs: {
+          mcp_json: { filename: 'mcp.json', content: { mcpServers: {} } },
+          cursor: { filename: '.cursor/mcp.json', content: { mcpServers: {} } },
+          vscode: { filename: '.vscode/mcp.json', content: { servers: {} } },
+          claude_desktop: { filename: 'claude_desktop_config.json', content: { mcpServers: {} } },
+        },
+      };
+
+      fetchMock.mockResolvedValueOnce(mockJsonResponse(mockConnect));
+
+      const result = await client.connectAgent('canvas1', { agentId: 'assistant', scope: 'propose' });
+
+      expect(result.data?.token.token).toBe('test-token-456');
+      expect(result.data?.apiUrl).toBe('http://localhost:62587/api');
+      expect(result.data?.configs.mcpJson.filename).toBe('mcp.json');
+      expect(fetchMock).toHaveBeenCalledWith('/api/agent/connect', expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ canvasId: 'canvas1', agentId: 'assistant', scope: 'propose' }),
+      }));
+    });
+
+    it('should create a link code', async () => {
+      const mockLinkCode = {
+        id: 'link-1',
+        canvas_id: 'canvas1',
+        agent_id: 'assistant',
+        scope: 'propose',
+        code: 'ABCD1234',
+        expires_at: 123,
+        created_at: 45,
+      };
+
+      fetchMock.mockResolvedValueOnce(mockJsonResponse(mockLinkCode));
+
+      const result = await client.createLinkCode('canvas1', { agentId: 'assistant', scope: 'propose' });
+
+      expect(result.data?.code).toBe('ABCD1234');
+      expect(result.data?.expiresAt).toBe(123);
+      expect(fetchMock).toHaveBeenCalledWith('/api/agent/link-code', expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ canvasId: 'canvas1', agentId: 'assistant', scope: 'propose' }),
+      }));
+    });
+
     it('should revoke agent token', async () => {
       fetchMock.mockResolvedValueOnce(mockJsonResponse({ success: true }));
 
@@ -205,6 +262,30 @@ describe('ApiClient', () => {
       expect(result.data).toEqual({ success: true });
       expect(fetchMock).toHaveBeenCalledWith('/api/canvases/canvas1/agent-token/my-agent', expect.objectContaining({
         method: 'DELETE',
+      }));
+    });
+
+    it('should list agent tokens', async () => {
+      const mockTokens = [
+        {
+          id: 'token-1',
+          canvas_id: 'canvas1',
+          agent_id: 'assistant',
+          scope: 'propose',
+          expires_at: 999,
+          created_at: 111,
+          last_used_at: null,
+        },
+      ];
+
+      fetchMock.mockResolvedValueOnce(mockJsonResponse(mockTokens));
+
+      const result = await client.listAgentTokens('canvas1');
+
+      expect(result.data?.[0]?.agentId).toBe('assistant');
+      expect(result.data?.[0]?.lastUsedAt).toBeNull();
+      expect(fetchMock).toHaveBeenCalledWith('/api/canvases/canvas1/agent-tokens', expect.objectContaining({
+        method: 'GET',
       }));
     });
   });

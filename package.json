@@ -11,6 +11,7 @@
     "build-storybook": "echo 'Storybook build disabled for now'",
     "test": "vitest run",
     "test:watch": "vitest",
+    "verify:openapi": "node scripts/verify-openapi-coverage.cjs",
     "lint": "eslint . --ext .ts,.tsx",
     "lint:strict": "STRICT_TYPES=1 eslint . --ext .ts,.tsx"
   },

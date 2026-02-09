@@ -4,8 +4,9 @@
 
 import type { Env, User } from '../types';
 import { generateId, jsonResponse, errorResponse } from '../utils';
-import { checkCanvasAccess } from '../auth';
+import { checkCanvasAccess, checkAgentScope, type AuthResult } from '../auth';
 import { checkBranchQuota } from '../quota';
+import { validateRequestBody, createBranchSchema } from '../validation';
 
 interface AgentBranch {
   id: string;
@@ -23,12 +24,18 @@ interface AgentBranch {
 export async function listBranches(
   user: User,
   env: Env,
-  canvasId: string
+  canvasId: string,
+  authResult?: AuthResult
 ): Promise<Response> {
   // Check canvas access
   const access = await checkCanvasAccess(env, user.id, canvasId);
   if (!access.allowed) {
     return errorResponse('Canvas not found', 404);
+  }
+
+  const scope = checkAgentScope(authResult ?? null, 'read', canvasId);
+  if (!scope.allowed) {
+    return errorResponse(scope.error || 'Insufficient scope', 403);
   }
 
   try {
@@ -56,12 +63,18 @@ export async function createBranch(
   user: User,
   env: Env,
   canvasId: string,
-  request: Request
+  request: Request,
+  authResult?: AuthResult
 ): Promise<Response> {
   // Check canvas access (editors can create branches)
   const access = await checkCanvasAccess(env, user.id, canvasId, 'editor');
   if (!access.allowed) {
     return errorResponse('Canvas not found or insufficient permissions', 404);
+  }
+
+  const scope = checkAgentScope(authResult ?? null, 'propose', canvasId);
+  if (!scope.allowed) {
+    return errorResponse(scope.error || 'Insufficient scope', 403);
   }
 
   // Check quota before creating branch
@@ -70,14 +83,13 @@ export async function createBranch(
     return errorResponse(quota.error || 'Branch quota exceeded', 403);
   }
 
+  const validation = await validateRequestBody(request, createBranchSchema);
+  if (!validation.success) {
+    return errorResponse(validation.error, 400);
+  }
+
   try {
-    const body = await request.json() as { agentId: string; baseVersion: number };
-    const { agentId, baseVersion } = body;
-
-    if (!agentId || baseVersion === undefined) {
-      return errorResponse('Missing required fields: agentId, baseVersion', 400);
-    }
-
+    const { agentId, baseVersion } = validation.data;
     const now = Date.now();
     const branchId = generateId();
 
@@ -112,7 +124,8 @@ export async function createBranch(
 export async function getBranch(
   user: User,
   env: Env,
-  branchId: string
+  branchId: string,
+  authResult?: AuthResult
 ): Promise<Response> {
   try {
     const branch = await env.DB
@@ -122,6 +135,11 @@ export async function getBranch(
 
     if (!branch) {
       return errorResponse('Branch not found', 404);
+    }
+
+    const scope = checkAgentScope(authResult ?? null, 'read', branch.canvas_id);
+    if (!scope.allowed) {
+      return errorResponse(scope.error || 'Insufficient scope', 403);
     }
 
     // Check canvas access
@@ -144,7 +162,8 @@ export async function getBranch(
 export async function deleteBranch(
   user: User,
   env: Env,
-  branchId: string
+  branchId: string,
+  authResult?: AuthResult
 ): Promise<Response> {
   try {
     // Get branch to check canvas access
@@ -155,6 +174,11 @@ export async function deleteBranch(
 
     if (!branch) {
       return errorResponse('Branch not found', 404);
+    }
+
+    const scope = checkAgentScope(authResult ?? null, 'propose', branch.canvas_id);
+    if (!scope.allowed) {
+      return errorResponse(scope.error || 'Insufficient scope', 403);
     }
 
     // Check canvas access (owner or editor)

@@ -50,6 +50,8 @@ describe('useCloudPersistence', () => {
   beforeEach(() => {
     localStorageMock.clear();
     vi.clearAllMocks();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
     // Mock navigator.onLine
     Object.defineProperty(navigator, 'onLine', {
       writable: true,

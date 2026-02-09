@@ -36,6 +36,43 @@ export interface AgentToken {
   createdAt: number;
 }
 
+export interface AgentTokenSummary {
+  id: string;
+  canvasId: string;
+  agentId: string;
+  scope: AgentScope;
+  expiresAt: number;
+  createdAt: number;
+  lastUsedAt?: number | null;
+}
+
+export interface AgentLinkCode {
+  id: string;
+  canvasId: string;
+  agentId: string;
+  scope: AgentScope;
+  code: string;
+  expiresAt: number;
+  createdAt: number;
+}
+
+export interface AgentConfigTemplate {
+  filename: string;
+  content: Record<string, unknown>;
+}
+
+export interface AgentConnectResponse {
+  token: AgentToken;
+  apiUrl: string;
+  canvasId: string;
+  configs: {
+    mcpJson: AgentConfigTemplate;
+    cursor: AgentConfigTemplate;
+    vscode: AgentConfigTemplate;
+    claudeDesktop: AgentConfigTemplate;
+  };
+}
+
 /**
  * Agent branch for isolated work
  */
