@@ -35,12 +35,18 @@ import { RESOURCE_DEFINITIONS, handleResourceRead } from './resources.js';
 
 // Get package version
 // For built code, package.json is one level up from dist/
-const packageJsonPath = join(__dirname, '../package.json');
-const packageJson = JSON.parse(
-  readFileSync(packageJsonPath, 'utf-8')
-);
-const SERVER_VERSION = packageJson.version;
+let SERVER_VERSION = '0.1.0'; // Fallback version
 const MCP_PROTOCOL_VERSION = '2024-11-05';
+
+try {
+  const packageJsonPath = join(__dirname, '../package.json');
+  const packageJson = JSON.parse(
+    readFileSync(packageJsonPath, 'utf-8')
+  );
+  SERVER_VERSION = packageJson.version;
+} catch (error) {
+  console.error('⚠️  Warning: Could not read package.json version, using fallback', error instanceof Error ? error.message : error);
+}
 
 // Parse CLI arguments
 function parseArgs() {
