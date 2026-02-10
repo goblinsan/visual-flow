@@ -1,0 +1,55 @@
+{
+  "name": "io.github.goblinsan/vizail-mcp-server",
+  "description": "MCP server for Vizail Canvas — allows any AI agent to interact with canvas designs through reading specs, submitting proposals, and collaborative editing",
+  "version": "0.1.0",
+  "homepage": "https://github.com/goblinsan/visual-flow/tree/main/workers/mcp",
+  "license": "MIT",
+  "author": "Vizail Contributors",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/goblinsan/visual-flow.git",
+    "directory": "workers/mcp"
+  },
+  "packages": [
+    {
+      "type": "npm",
+      "name": "vizail-mcp-server",
+      "version": "0.1.0"
+    }
+  ],
+  "capabilities": {
+    "resources": {
+      "list": true,
+      "get": true
+    },
+    "tools": {
+      "list": true,
+      "call": true
+    },
+    "prompts": {
+      "list": false,
+      "get": false
+    }
+  },
+  "features": [
+    "Read canvas designs and node specifications",
+    "Submit design proposals with branch-based workflow",
+    "Check proposal approval status",
+    "List all proposals for a canvas",
+    "Access built-in documentation for node types and workflows"
+  ],
+  "tags": [
+    "canvas",
+    "design",
+    "collaboration",
+    "visual-editor",
+    "ai-agent",
+    "design-tools",
+    "creative"
+  ],
+  "documentation": {
+    "quickstart": "https://github.com/goblinsan/visual-flow/blob/main/workers/mcp/README.md#quick-setup-under-2-minutes",
+    "api": "https://github.com/goblinsan/visual-flow/blob/main/workers/mcp/README.md",
+    "examples": "https://github.com/goblinsan/visual-flow/blob/main/workers/mcp/README.md#3-start-using"
+  }
+}
