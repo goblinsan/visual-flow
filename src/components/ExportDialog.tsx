@@ -10,8 +10,9 @@ import type { LayoutSpec } from '../layout-schema';
 import { exportToJSON } from '../export/canonicalExport';
 import { exportToReact } from '../export/reactExporter';
 import { extractDesignTokens, exportToStyleDictionary, exportToCSS } from '../export/designTokens';
+import { exportLayoutToRobloxLua } from '../roblox/exportLayout';
 
-export type ExportFormat = 'json' | 'react' | 'tokens-json' | 'tokens-css';
+export type ExportFormat = 'json' | 'react' | 'tokens-json' | 'tokens-css' | 'roblox-lua';
 
 export interface ExportDialogProps {
   isOpen: boolean;
@@ -53,7 +54,10 @@ export function ExportDialog({ isOpen, onClose, spec }: ExportDialogProps) {
           const tokens = extractDesignTokens(spec, { semantic: true, deduplicate: true });
           return exportToCSS(tokens);
         }
-        
+
+        case 'roblox-lua':
+          return exportLayoutToRobloxLua(spec);
+
         default:
           return '';
       }
@@ -74,11 +78,23 @@ export function ExportDialog({ isOpen, onClose, spec }: ExportDialogProps) {
   };
 
   const handleDownload = () => {
-    const extension = format === 'react' ? 'tsx' : 
-                     format === 'tokens-css' ? 'css' : 'json';
-    const filename = format === 'react' ? `${componentName}.${extension}` :
-                    format === 'tokens-css' ? 'design-tokens.css' :
-                    format === 'tokens-json' ? 'design-tokens.json' : 'design.json';
+    const extensionMap: Record<ExportFormat, string> = {
+      'react': 'tsx',
+      'tokens-css': 'css',
+      'tokens-json': 'json',
+      'json': 'json',
+      'roblox-lua': 'lua',
+    };
+    const filenameMap: Record<ExportFormat, string> = {
+      'react': `${componentName}.tsx`,
+      'tokens-css': 'design-tokens.css',
+      'tokens-json': 'design-tokens.json',
+      'json': 'design.json',
+      'roblox-lua': 'design.roblox.lua',
+    };
+    const extension = extensionMap[format];
+    const filename = filenameMap[format];
+    void extension; // suppress unused var warning
     
     const blob = new Blob([exportCode], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
@@ -99,6 +115,8 @@ export function ExportDialog({ isOpen, onClose, spec }: ExportDialogProps) {
         return 'Design Tokens (JSON)';
       case 'tokens-css':
         return 'Design Tokens (CSS)';
+      case 'roblox-lua':
+        return 'Roblox LocalScript (Lua)';
       default:
         return fmt;
     }
@@ -114,6 +132,8 @@ export function ExportDialog({ isOpen, onClose, spec }: ExportDialogProps) {
         return 'Design tokens in style-dictionary format';
       case 'tokens-css':
         return 'Design tokens as CSS custom properties';
+      case 'roblox-lua':
+        return 'Ready-to-use LocalScript for Roblox Studio (StarterPlayerScripts)';
       default:
         return '';
     }
@@ -154,7 +174,7 @@ export function ExportDialog({ isOpen, onClose, spec }: ExportDialogProps) {
             Export Format
           </label>
           <div className="space-y-2">
-            {(['json', 'react', 'tokens-json', 'tokens-css'] as ExportFormat[]).map((fmt) => (
+            {(['json', 'react', 'tokens-json', 'tokens-css', 'roblox-lua'] as ExportFormat[]).map((fmt) => (
               <label
                 key={fmt}
                 className={`flex items-start p-3 border rounded cursor-pointer transition ${
