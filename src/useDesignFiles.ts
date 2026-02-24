@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { RootSpec } from "./dsl";
 import { buildInventoryAdvanced } from "./samples/inventoryAdvanced";
+import { robloxHud } from "./samples/robloxHud";
 
 type StoredFile = { id: string; name: string; spec: RootSpec };
 
@@ -63,6 +64,15 @@ export function useDesignFiles() {
     setActiveId(id);
   };
 
+  const createFromRobloxSample = () => {
+    const id = uuid();
+    const name = `Roblox HUD ${new Date().toLocaleString()}`;
+    const entry: StoredFile = { id, name, spec: robloxHud };
+    const next = [entry, ...files];
+    setFiles(next);
+    setActiveId(id);
+  };
+
   const saveActive = (spec: RootSpec) => {
     if (!active) return;
     const next = files.map((f) => (f.id === active.id ? { ...f, spec } : f));
@@ -104,6 +114,7 @@ export function useDesignFiles() {
     saveActive,
     saveAs,
     createFromSample,
+    createFromRobloxSample,
     importFromJsonText,
     exportActiveJson,
   } as const;

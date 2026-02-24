@@ -6,11 +6,13 @@ export function Sidebar({
   activeId,
   onSelect,
   onCreateSample,
+  onCreateRobloxSample,
 }: {
   files: FileEntry[];
   activeId?: string | null;
   onSelect: (id: string) => void;
   onCreateSample: () => void;
+  onCreateRobloxSample: () => void;
 }) {
   return (
     <div className="p-3 space-y-3">
@@ -27,8 +29,9 @@ export function Sidebar({
           ))
         )}
       </div>
-      <div className="pt-2 border-t border-slate-800/60">
+      <div className="pt-2 border-t border-slate-800/60 space-y-2">
         <button className="w-full px-2 py-1 rounded border border-slate-700 bg-slate-800" onClick={onCreateSample}>New from Sample</button>
+        <button className="w-full px-2 py-1 rounded border border-[--color-brand] bg-[--color-brand]/20 text-[--color-brand]" onClick={onCreateRobloxSample}>🎮 New Roblox HUD</button>
       </div>
     </div>
   );

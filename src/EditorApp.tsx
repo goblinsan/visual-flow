@@ -17,6 +17,7 @@ export default function EditorApp() {
     saveActive,
     saveAs,
     createFromSample,
+    createFromRobloxSample,
     importFromJsonText,
     exportActiveJson,
   } = useDesignFiles();
@@ -148,6 +149,7 @@ export default function EditorApp() {
               activeId={activeId}
               onSelect={selectFile}
               onCreateSample={createFromSample}
+              onCreateRobloxSample={createFromRobloxSample}
             />
           </div>
           {/* Canvas */}
