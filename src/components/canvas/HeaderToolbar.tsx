@@ -3,6 +3,7 @@ import type { ConnectionStatus, UserAwareness } from '../../collaboration/types'
 import { ConnectionStatusIndicator } from '../ConnectionStatusIndicator';
 import { ActiveUsersList } from '../ActiveUsersList';
 import SignIn from '../SignIn';
+import { usePlan } from '../../hooks/usePlan';
 
 export interface HeaderToolbarProps {
   headerRef: RefObject<HTMLDivElement | null>;
@@ -21,6 +22,7 @@ export interface HeaderToolbarProps {
   reconnect: () => void;
   setShareDialogOpen: (open: boolean) => void;
   setExportDialogOpen: (open: boolean) => void;
+  setBillingOpen: (open: boolean) => void;
   tool: string;
 }
 
@@ -41,8 +43,10 @@ export function HeaderToolbar({
   reconnect,
   setShareDialogOpen,
   setExportDialogOpen,
+  setBillingOpen,
   tool,
 }: HeaderToolbarProps) {
+  const { plan } = usePlan();
   return (
     <header ref={headerRef} className="flex items-center justify-between border-b border-blue-900/30 bg-gradient-to-r from-blue-950 via-blue-900 to-cyan-700 shadow-lg select-none" style={{ padding: '20px' }}>
       <div className="flex items-center gap-8">
@@ -149,6 +153,24 @@ export function HeaderToolbar({
         <div className="flex items-center">
           <SignIn />
         </div>
+        {/* Pro upgrade / billing button */}
+        {plan === 'free' ? (
+          <button
+            onClick={() => setBillingOpen(true)}
+            className="flex items-center gap-1.5 text-xs font-medium text-amber-200 bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/40 px-3 py-1.5 rounded-lg transition-all"
+          >
+            <i className="fa-solid fa-bolt text-amber-300" />
+            Upgrade
+          </button>
+        ) : (
+          <button
+            onClick={() => setBillingOpen(true)}
+            className="flex items-center gap-1.5 text-xs font-medium text-cyan-200 bg-cyan-600/20 hover:bg-cyan-600/30 border border-cyan-500/40 px-3 py-1.5 rounded-lg transition-all"
+          >
+            <i className="fa-solid fa-bolt text-cyan-300" />
+            Pro
+          </button>
+        )}
         {/* Share button */}
         <button
           onClick={() => setShareDialogOpen(true)}

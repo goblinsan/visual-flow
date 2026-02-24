@@ -12,6 +12,8 @@ export interface DialogState {
   shareDialogOpen: boolean;
   templateBrowserOpen: boolean;
   exportDialogOpen: boolean;
+  billingOpen: boolean;
+  pricingOpen: boolean;
 }
 
 export interface UseDialogStateReturn extends DialogState {
@@ -26,6 +28,8 @@ export interface UseDialogStateReturn extends DialogState {
   setShareDialogOpen: React.Dispatch<React.SetStateAction<boolean>>;
   setTemplateBrowserOpen: React.Dispatch<React.SetStateAction<boolean>>;
   setExportDialogOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  setBillingOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  setPricingOpen: React.Dispatch<React.SetStateAction<boolean>>;
   closeAllDialogs: () => void;
 }
 
@@ -44,6 +48,8 @@ export function useDialogState(): UseDialogStateReturn {
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [templateBrowserOpen, setTemplateBrowserOpen] = useState(false);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [billingOpen, setBillingOpen] = useState(false);
+  const [pricingOpen, setPricingOpen] = useState(false);
 
   const closeAllDialogs = useCallback(() => {
     setHelpOpen(false);
@@ -57,6 +63,8 @@ export function useDialogState(): UseDialogStateReturn {
     setShareDialogOpen(false);
     setTemplateBrowserOpen(false);
     setExportDialogOpen(false);
+    setBillingOpen(false);
+    setPricingOpen(false);
   }, []);
 
   return {
@@ -82,6 +90,10 @@ export function useDialogState(): UseDialogStateReturn {
     setTemplateBrowserOpen,
     exportDialogOpen,
     setExportDialogOpen,
+    billingOpen,
+    setBillingOpen,
+    pricingOpen,
+    setPricingOpen,
     closeAllDialogs,
   };
 }

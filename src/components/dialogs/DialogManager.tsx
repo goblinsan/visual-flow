@@ -5,6 +5,9 @@ import type { SavedDesign } from "../../utils/persistence";
 import { getSavedDesigns } from "../../utils/persistence";
 import { COMPONENT_LIBRARY, ICON_LIBRARY } from "../../library";
 import { ExportDialog } from "../ExportDialog";
+import { PricingModal } from "../PricingModal";
+import { BillingStatusPage } from "../BillingStatusPage";
+import { usePlan } from "../../hooks/usePlan";
 
 const COMPONENT_CATEGORIES = [
   { key: "all", label: "All" },
@@ -48,6 +51,10 @@ export interface DialogManagerProps {
   setTemplateBrowserOpen: (open: boolean) => void;
   exportDialogOpen: boolean;
   setExportDialogOpen: (open: boolean) => void;
+  billingOpen: boolean;
+  setBillingOpen: (open: boolean) => void;
+  pricingOpen: boolean;
+  setPricingOpen: (open: boolean) => void;
   
   // Current spec for export
   currentSpec: LayoutSpec;
@@ -290,8 +297,14 @@ export function DialogManager({
   templates,
   exportDialogOpen,
   setExportDialogOpen,
+  billingOpen,
+  setBillingOpen,
+  pricingOpen,
+  setPricingOpen,
   currentSpec,
 }: DialogManagerProps): JSX.Element {
+  const { plan, refresh: refreshPlan } = usePlan();
+
   return (
     <>
       {/* Share / Collaboration Dialog */}
@@ -538,6 +551,22 @@ export function DialogManager({
         isOpen={exportDialogOpen}
         onClose={() => setExportDialogOpen(false)}
         spec={currentSpec}
+        onUpgradeClick={() => { setExportDialogOpen(false); setPricingOpen(true); }}
+      />
+
+      {/* Billing Status Page */}
+      <BillingStatusPage
+        isOpen={billingOpen}
+        onClose={() => setBillingOpen(false)}
+        onUpgradeClick={() => { setBillingOpen(false); setPricingOpen(true); }}
+      />
+
+      {/* Pricing / Upgrade Modal */}
+      <PricingModal
+        isOpen={pricingOpen}
+        onClose={() => setPricingOpen(false)}
+        currentPlan={plan}
+        onUpgradeStarted={() => { void refreshPlan(); }}
       />
     </>
   );

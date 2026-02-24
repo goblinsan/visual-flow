@@ -771,6 +771,10 @@ export default function CanvasApp() {
     setTemplateBrowserOpen,
     exportDialogOpen,
     setExportDialogOpen,
+    billingOpen,
+    setBillingOpen,
+    pricingOpen,
+    setPricingOpen,
   } = useDialogState();
   
   const {
@@ -1201,6 +1205,7 @@ export default function CanvasApp() {
         reconnect={reconnect}
         setShareDialogOpen={setShareDialogOpen}
         setExportDialogOpen={setExportDialogOpen}
+        setBillingOpen={setBillingOpen}
         tool={tool}
       />
       {/* Dialogs */}
@@ -1238,6 +1243,10 @@ export default function CanvasApp() {
         templates={TEMPLATES}
         exportDialogOpen={exportDialogOpen}
         setExportDialogOpen={setExportDialogOpen}
+        billingOpen={billingOpen}
+        setBillingOpen={setBillingOpen}
+        pricingOpen={pricingOpen}
+        setPricingOpen={setPricingOpen}
         currentSpec={spec}
       />
       {/* Body layout */}
