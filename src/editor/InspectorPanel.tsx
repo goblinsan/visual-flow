@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import type { RootSpec, NodeSpec, GridNode, StackNode, BoxNode, TextNode } from "../dsl.ts";
+import type { DesignMode } from "../roblox/ChooseModeModal";
 
 type NodeWithChildren = Extract<NodeSpec, { type: "grid" | "stack" | "box" }>;
 const hasChildren = (node: NodeSpec): node is NodeWithChildren => node.type === "grid" || node.type === "stack" || node.type === "box";
@@ -34,7 +35,39 @@ function setNodeAtPath(root: NodeSpec, path: string, updater: (n: NodeSpec) => N
   return replaceAt(root, parts);
 }
 
-export function InspectorPanel({ spec, setSpec, selectedPath }: { spec: RootSpec; setSpec: (s: RootSpec) => void; selectedPath?: string }) {
+/**
+ * Snap a spacing value to the nearest integer DSL unit.
+ * In Roblox mode all UDim offsets must be whole units (1 unit = 4 px).
+ * (#144 drag/resize constraints, #145 spacing controls)
+ */
+function snapToIntegerUnit(value: number): number {
+  return Math.round(value);
+}
+
+/**
+ * UDim hint shown in Roblox mode alongside spacing inputs (#145).
+ * Displays the pixel equivalent: 1 DSL unit = 4 px → UDim.new(0, px).
+ */
+function UDimHint({ units }: { units: number }) {
+  const px = units * 4;
+  return (
+    <span className="text-[10px] text-[--color-brand]/70 ml-1">= UDim.new(0, {px})</span>
+  );
+}
+
+export function InspectorPanel({
+  spec,
+  setSpec,
+  selectedPath,
+  mode,
+}: {
+  spec: RootSpec;
+  setSpec: (s: RootSpec) => void;
+  selectedPath?: string;
+  mode?: DesignMode;
+}) {
+  const isRoblox = mode === "roblox";
+
   const inspector = useMemo(() => {
     if (!selectedPath) return null;
     const node = getNodeAtPath(spec.body, selectedPath);
@@ -47,6 +80,25 @@ export function InspectorPanel({ spec, setSpec, selectedPath }: { spec: RootSpec
       });
       setSpec({ ...spec, body });
     };
+
+    /** Spacing number input with optional UDim2 hint (#144, #145) */
+    const SpacingInput = ({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) => (
+      <label className="block text-sm">{label}{isRoblox && <UDimHint units={value} />}
+        <input
+          type="number"
+          min={0}
+          max={isRoblox ? 32 : 12}
+          step={1}
+          className="mt-1 w-full rounded bg-slate-800 border border-slate-700 p-1"
+          value={value}
+          onChange={(e) => {
+            const raw = Number(e.target.value);
+            onChange(isRoblox ? snapToIntegerUnit(raw) : raw);
+          }}
+        />
+        {isRoblox && <span className="text-[10px] text-slate-500">Snaps to integer units (1 unit = 4 px)</span>}
+      </label>
+    );
 
     const common = (
       <div className="space-y-2">
@@ -65,12 +117,8 @@ export function InspectorPanel({ spec, setSpec, selectedPath }: { spec: RootSpec
           <label className="block text-sm">Columns
             <input type="number" min={1} max={12} className="mt-1 w-full rounded bg-slate-800 border border-slate-700 p-1" value={g.columns} onChange={(e) => update({ columns: Number(e.target.value) })} />
           </label>
-          <label className="block text-sm">Gap
-            <input type="number" min={0} max={12} className="mt-1 w-full rounded bg-slate-800 border border-slate-700 p-1" value={g.gap ?? 0} onChange={(e) => update({ gap: Number(e.target.value) })} />
-          </label>
-          <label className="block text-sm">Padding
-            <input type="number" min={0} max={12} className="mt-1 w-full rounded bg-slate-800 border border-slate-700 p-1" value={g.padding ?? 0} onChange={(e) => update({ padding: Number(e.target.value) })} />
-          </label>
+          <SpacingInput label="Gap" value={g.gap ?? 0} onChange={(v) => update({ gap: v })} />
+          <SpacingInput label="Padding" value={g.padding ?? 0} onChange={(v) => update({ padding: v })} />
         </div>
       );
     }
@@ -86,12 +134,8 @@ export function InspectorPanel({ spec, setSpec, selectedPath }: { spec: RootSpec
               <option value="horizontal">horizontal</option>
             </select>
           </label>
-          <label className="block text-sm">Gap
-            <input type="number" min={0} max={12} className="mt-1 w-full rounded bg-slate-800 border border-slate-700 p-1" value={s.gap ?? 0} onChange={(e) => update({ gap: Number(e.target.value) })} />
-          </label>
-          <label className="block text-sm">Padding
-            <input type="number" min={0} max={12} className="mt-1 w-full rounded bg-slate-800 border border-slate-700 p-1" value={s.padding ?? 0} onChange={(e) => update({ padding: Number(e.target.value) })} />
-          </label>
+          <SpacingInput label="Gap" value={s.gap ?? 0} onChange={(v) => update({ gap: v })} />
+          <SpacingInput label="Padding" value={s.padding ?? 0} onChange={(v) => update({ padding: v })} />
           <label className="block text-sm">Align
             <select className="mt-1 w-full rounded bg-slate-800 border border-slate-700 p-1" value={s.align ?? "start"} onChange={(e) => update({ align: e.target.value as StackNode["align"] })}>
               <option value="start">start</option>
@@ -117,12 +161,8 @@ export function InspectorPanel({ spec, setSpec, selectedPath }: { spec: RootSpec
       return (
         <div className="space-y-3">
           {common}
-          <label className="block text-sm">Padding
-            <input type="number" min={0} max={12} className="mt-1 w-full rounded bg-slate-800 border border-slate-700 p-1" value={b.padding ?? 0} onChange={(e) => update({ padding: Number(e.target.value) })} />
-          </label>
-          <label className="block text-sm">Gap
-            <input type="number" min={0} max={12} className="mt-1 w-full rounded bg-slate-800 border border-slate-700 p-1" value={b.gap ?? 0} onChange={(e) => update({ gap: Number(e.target.value) })} />
-          </label>
+          <SpacingInput label="Padding" value={b.padding ?? 0} onChange={(v) => update({ padding: v })} />
+          <SpacingInput label="Gap" value={b.gap ?? 0} onChange={(v) => update({ gap: v })} />
           <label className="block text-sm">Variant
             <select className="mt-1 w-full rounded bg-slate-800 border border-slate-700 p-1" value={b.variant ?? "card"} onChange={(e) => update({ variant: e.target.value as BoxNode["variant"] })}>
               <option value="card">card</option>
@@ -168,6 +208,10 @@ export function InspectorPanel({ spec, setSpec, selectedPath }: { spec: RootSpec
       return (
         <div className="space-y-3">
           {common}
+          <label className="block text-sm">Value (0–100)
+            <input type="number" min={0} max={100} className="mt-1 w-full rounded bg-slate-800 border border-slate-700 p-1" value={node.value ?? 0} onChange={(e) => update({ value: Math.max(0, Math.min(100, Number(e.target.value))) })} />
+            {isRoblox && <span className="text-[10px] text-[--color-brand]/70">= UDim2 X scale {((node.value ?? 0) / 100).toFixed(2)}</span>}
+          </label>
           <label className="block text-sm">Label
             <input className="mt-1 w-full rounded bg-slate-800 border border-slate-700 p-1" value={node.label ?? ""} onChange={(e) => update({ label: e.target.value })} />
           </label>
@@ -179,11 +223,17 @@ export function InspectorPanel({ spec, setSpec, selectedPath }: { spec: RootSpec
     }
 
     return common;
-  }, [spec, selectedPath, setSpec]);
+  // SpacingInput is defined inside the memo callback to close over `isRoblox`;
+  // adding it to deps would recreate it on every render unnecessarily.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spec, selectedPath, setSpec, isRoblox]);
 
   return (
     <div className="p-3">
-      <div className="text-sm font-semibold mb-2">Inspector</div>
+      <div className="text-sm font-semibold mb-2 flex items-center gap-2">
+        Inspector
+        {isRoblox && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[--color-brand]/20 text-[--color-brand]">Roblox</span>}
+      </div>
       {selectedPath ? inspector : <div className="text-xs opacity-70">Select any element to edit its props.</div>}
     </div>
   );

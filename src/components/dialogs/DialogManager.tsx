@@ -15,6 +15,7 @@ const COMPONENT_CATEGORIES = [
   { key: "feedback", label: "Feedback" },
   { key: "data-display", label: "Data" },
   { key: "layout", label: "Layout" },
+  { key: "roblox", label: "Roblox" },
 ] as const;
 
 const TEMPLATE_CATEGORIES = [

@@ -33,6 +33,8 @@ import { LeftToolbar } from './components/canvas/LeftToolbar';
 import { AttributesSidebar } from './components/canvas/AttributesSidebar';
 import { AgentPanel } from './components/canvas/AgentPanel';
 import { ToolSettingsBar } from './components/canvas/ToolSettingsBar';
+import { ChooseModeModal } from './roblox/ChooseModeModal';
+import type { DesignMode } from './roblox/ChooseModeModal';
 
 /** Get room ID from URL query param ?room=xxx */
 function getRoomIdFromURL(): string | null {
@@ -610,7 +612,7 @@ const TEMPLATES: { id: string; name: string; icon: string; description: string; 
           { id: "quickbar-panel", type: "rect", position: { x: 720, y: 970 }, size: { width: 480, height: 80 }, fill: "#1e1b2e", stroke: "#6b5ca5", strokeWidth: 2, radius: 12, opacity: 0.9 },
           ...Array.from({ length: 6 }, (_, i) => {
             const x = 740 + i * 75;
-            const items = ["⚔️", "🛡️", "🧪", "📜", "🔥", "💎"];
+            const items = ["Sword", "Shield", "Potion", "Scroll", "Fire", "Gem"];
             const keybinds = ["1", "2", "3", "4", "5", "6"];
             return [
               {
@@ -628,9 +630,9 @@ const TEMPLATES: { id: string; name: string; icon: string; description: string; 
                 id: `qitem-${i}`,
                 type: "text" as const,
                 text: items[i],
-                variant: "h3" as const,
-                position: { x: x + 15, y: 995 },
-                size: { width: 30, height: 28 },
+                variant: "caption" as const,
+                position: { x: x + 5, y: 1000 },
+                size: { width: 50, height: 24 },
                 color: "#ffffff",
                 align: "center" as const
               },
@@ -647,10 +649,10 @@ const TEMPLATES: { id: string; name: string; icon: string; description: string; 
           }).flat(),
           // Bottom-right: Currency and resources
           { id: "resources-panel", type: "rect", position: { x: 1520, y: 970 }, size: { width: 370, height: 80 }, fill: "#1e1b2e", stroke: "#6b5ca5", strokeWidth: 2, radius: 12, opacity: 0.9 },
-          { id: "gold-icon", type: "text", text: "💰", variant: "h3", position: { x: 1550, y: 990 }, size: { width: 30, height: 28 }, color: "#fbbf24" },
-          { id: "gold-amount", type: "text", text: "12,450", variant: "h3", position: { x: 1590, y: 995 }, size: { width: 120, height: 24 }, color: "#fbbf24" },
-          { id: "gem-icon", type: "text", text: "💎", variant: "h3", position: { x: 1730, y: 990 }, size: { width: 30, height: 28 }, color: "#a855f7" },
-          { id: "gem-amount", type: "text", text: "87", variant: "h3", position: { x: 1770, y: 995 }, size: { width: 80, height: 24 }, color: "#a855f7" },
+          { id: "gold-icon", type: "text", text: "Gold", variant: "body", position: { x: 1550, y: 990 }, size: { width: 40, height: 28 }, color: "#fbbf24" },
+          { id: "gold-amount", type: "text", text: "12,450", variant: "h3", position: { x: 1600, y: 995 }, size: { width: 120, height: 24 }, color: "#fbbf24" },
+          { id: "gem-icon", type: "text", text: "Gems", variant: "body", position: { x: 1730, y: 990 }, size: { width: 40, height: 28 }, color: "#a855f7" },
+          { id: "gem-amount", type: "text", text: "87", variant: "h3", position: { x: 1780, y: 995 }, size: { width: 80, height: 24 }, color: "#a855f7" },
         ],
       }
     }),
@@ -658,6 +660,9 @@ const TEMPLATES: { id: string; name: string; icon: string; description: string; 
 ];
 
 export default function CanvasApp() {
+  // Design mode (#142): null = not chosen yet, shown as modal on first load
+  const [designMode, setDesignMode] = useState<DesignMode | null>(null);
+
   // Collaboration state
   const [roomId, setRoomId] = useState<string | null>(getRoomIdFromURL);
   const userId = useMemo(() => getUserId(), []);
@@ -1098,6 +1103,15 @@ export default function CanvasApp() {
     setNewDialogOpen(false);
   }, [setSpec, setSelection, isCollaborative, setCurrentCanvasId]);
 
+  // Handle Choose Design Mode selection (#142)
+  const onChooseMode = useCallback((chosen: DesignMode) => {
+    setDesignMode(chosen);
+    if (chosen === 'roblox') {
+      applyTemplate('game-ui-hud');
+    }
+    logger.info(`Design mode selected: ${chosen}`);
+  }, [applyTemplate]);
+
   // Dialog action callbacks
   const handleStartCollaborativeSession = useCallback(() => {
     const newRoomId = generateRoomId();
@@ -1167,6 +1181,8 @@ export default function CanvasApp() {
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-gray-100 text-gray-900 flex flex-col">
+      {/* Choose Design Mode modal (#142) — shown until user picks a mode */}
+      {designMode === null && <ChooseModeModal onSelect={onChooseMode} />}
       {/* Header */}
       <HeaderToolbar
         headerRef={headerRef}
