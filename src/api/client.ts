@@ -236,6 +236,25 @@ export class ApiClient {
     });
   }
 
+  // Billing / subscription
+  async getSubscription(): Promise<{ data?: { plan: string; status: string; current_period_end?: number | null; cancel_at_period_end?: boolean }; error?: string }> {
+    return this.request<{ plan: string; status: string; current_period_end?: number | null; cancel_at_period_end?: boolean }>('/billing/subscription', { method: 'GET' });
+  }
+
+  async createCheckoutSession(priceId: string, successUrl: string, cancelUrl: string): Promise<{ data?: { checkout_url: string }; error?: string }> {
+    return this.request<{ checkout_url: string }>('/billing/checkout', {
+      method: 'POST',
+      body: JSON.stringify({ price_id: priceId, success_url: successUrl, cancel_url: cancelUrl }),
+    });
+  }
+
+  async createPortalSession(returnUrl: string): Promise<{ data?: { portal_url: string }; error?: string }> {
+    return this.request<{ portal_url: string }>('/billing/portal', {
+      method: 'POST',
+      body: JSON.stringify({ return_url: returnUrl }),
+    });
+  }
+
   // Health check
   async health(): Promise<{ data?: { status: string; timestamp: number }; error?: string }> {
     return this.request<{ status: string; timestamp: number }>('/health', { method: 'GET' });

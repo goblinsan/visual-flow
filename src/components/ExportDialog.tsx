@@ -1,7 +1,8 @@
 /**
  * Export Dialog Component
  * 
- * Provides UI for exporting designs in various formats
+ * Provides UI for exporting designs in various formats.
+ * Free users have export format restrictions and daily export limits.
  */
 
 import { useState, useMemo } from 'react';
@@ -11,6 +12,8 @@ import { exportToJSON } from '../export/canonicalExport';
 import { exportToReact } from '../export/reactExporter';
 import { extractDesignTokens, exportToStyleDictionary, exportToCSS } from '../export/designTokens';
 import { exportLayoutToRobloxLua } from '../roblox/exportLayout';
+import { usePlan } from '../hooks/usePlan';
+import { canExportFormat, getMaxExportsPerDay } from '../monetization/featureFlags';
 
 export type ExportFormat = 'json' | 'react' | 'tokens-json' | 'tokens-css' | 'roblox-lua';
 
@@ -18,13 +21,54 @@ export interface ExportDialogProps {
   isOpen: boolean;
   onClose: () => void;
   spec: LayoutSpec;
+  /** Called when user clicks the upgrade CTA on a locked format */
+  onUpgradeClick?: () => void;
 }
 
-export function ExportDialog({ isOpen, onClose, spec }: ExportDialogProps) {
+/** localStorage key that tracks daily export count */
+const EXPORT_COUNT_KEY = 'vizail_export_count';
+
+interface ExportCountRecord {
+  date: string; // YYYY-MM-DD
+  count: number;
+}
+
+function getTodayKey(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function getExportCount(): ExportCountRecord {
+  try {
+    const raw = localStorage.getItem(EXPORT_COUNT_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as ExportCountRecord;
+      if (parsed.date === getTodayKey()) return parsed;
+    }
+  } catch {
+    // ignore
+  }
+  return { date: getTodayKey(), count: 0 };
+}
+
+function incrementExportCount(): void {
+  const rec = getExportCount();
+  localStorage.setItem(EXPORT_COUNT_KEY, JSON.stringify({ date: rec.date, count: rec.count + 1 }));
+}
+
+export function ExportDialog({ isOpen, onClose, spec, onUpgradeClick }: ExportDialogProps) {
   const [format, setFormat] = useState<ExportFormat>('json');
   const [componentName, setComponentName] = useState('DesignComponent');
   const [includeComments, setIncludeComments] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [exportLimitHit, setExportLimitHit] = useState(false);
+
+  const { plan } = usePlan();
+  const maxExports = getMaxExportsPerDay(plan);
+
+  const isFormatLocked = (fmt: ExportFormat) => !canExportFormat(plan, fmt);
+
+  const todayCount = getExportCount().count;
+  const dailyLimitReached = maxExports !== null && todayCount >= maxExports;
 
   // Generate export code based on selected format
   const exportCode = useMemo(() => {
@@ -68,9 +112,11 @@ export function ExportDialog({ isOpen, onClose, spec }: ExportDialogProps) {
   }, [format, spec, componentName, includeComments]);
 
   const handleCopy = async () => {
+    if (dailyLimitReached) { setExportLimitHit(true); return; }
     try {
       await navigator.clipboard.writeText(exportCode);
       setCopied(true);
+      incrementExportCount();
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
       console.error('Failed to copy:', error);
@@ -78,6 +124,7 @@ export function ExportDialog({ isOpen, onClose, spec }: ExportDialogProps) {
   };
 
   const handleDownload = () => {
+    if (dailyLimitReached) { setExportLimitHit(true); return; }
     const extensionMap: Record<ExportFormat, string> = {
       'react': 'tsx',
       'tokens-css': 'css',
@@ -103,6 +150,7 @@ export function ExportDialog({ isOpen, onClose, spec }: ExportDialogProps) {
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
+    incrementExportCount();
   };
 
   const getFormatLabel = (fmt: ExportFormat): string => {
@@ -154,13 +202,15 @@ export function ExportDialog({ isOpen, onClose, spec }: ExportDialogProps) {
           </button>
           <button
             onClick={handleCopy}
-            className="px-4 py-2 rounded-lg text-xs font-medium transition-colors bg-gray-600 text-white hover:bg-gray-700"
+            disabled={isFormatLocked(format) || dailyLimitReached}
+            className="px-4 py-2 rounded-lg text-xs font-medium transition-colors bg-gray-600 text-white hover:bg-gray-700 disabled:opacity-50"
           >
             {copied ? '✓ Copied!' : 'Copy to Clipboard'}
           </button>
           <button
             onClick={handleDownload}
-            className="px-4 py-2 rounded-lg text-xs font-medium transition-colors bg-blue-600 text-white hover:bg-blue-700"
+            disabled={isFormatLocked(format) || dailyLimitReached}
+            className="px-4 py-2 rounded-lg text-xs font-medium transition-colors bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
           >
             Download File
           </button>
@@ -168,19 +218,45 @@ export function ExportDialog({ isOpen, onClose, spec }: ExportDialogProps) {
       }
     >
       <div className="space-y-4">
+        {/* Daily export limit banner */}
+        {dailyLimitReached && (
+          <div className="flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800">
+            <i className="fa-solid fa-lock mt-0.5 text-amber-500" />
+            <div>
+              <strong>Daily export limit reached.</strong> Free users can export up to {maxExports} times per day.{' '}
+              {onUpgradeClick && (
+                <button onClick={onUpgradeClick} className="underline font-semibold text-amber-900 hover:text-amber-700">
+                  Upgrade to Pro
+                </button>
+              )}{' '}
+              for unlimited exports.
+            </div>
+          </div>
+        )}
+        {/* Limit was hit during this session but component hasn't re-rendered dailyLimitReached yet */}
+        {exportLimitHit && (
+          <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-xs text-red-700">
+            Export limit reached for today. Please try again tomorrow or upgrade to Pro.
+          </div>
+        )}
+
         {/* Format Selection */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Export Format
           </label>
           <div className="space-y-2">
-            {(['json', 'react', 'tokens-json', 'tokens-css', 'roblox-lua'] as ExportFormat[]).map((fmt) => (
-              <label
-                key={fmt}
-                className={`flex items-start p-3 border rounded cursor-pointer transition ${
-                  format === fmt
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-gray-300 hover:border-gray-400'
+            {(['json', 'react', 'tokens-json', 'tokens-css', 'roblox-lua'] as ExportFormat[]).map((fmt) => {
+              const locked = isFormatLocked(fmt);
+              return (
+                <label
+                  key={fmt}
+                  className={`flex items-start p-3 border rounded transition ${
+                    locked
+                      ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-70'
+                      : format === fmt
+                      ? 'border-blue-500 bg-blue-50 cursor-pointer'
+                      : 'border-gray-300 hover:border-gray-400 cursor-pointer'
                 }`}
               >
                 <input
@@ -188,15 +264,33 @@ export function ExportDialog({ isOpen, onClose, spec }: ExportDialogProps) {
                   name="format"
                   value={fmt}
                   checked={format === fmt}
-                  onChange={(e) => setFormat(e.target.value as ExportFormat)}
+                  disabled={locked}
+                  onChange={(e) => { if (!locked) setFormat(e.target.value as ExportFormat); }}
                   className="mt-1 mr-3"
                 />
-                <div>
-                  <div className="font-medium text-gray-900">{getFormatLabel(fmt)}</div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-gray-900">{getFormatLabel(fmt)}</span>
+                    {locked && (
+                      <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">
+                        <i className="fa-solid fa-lock text-[8px]" /> Pro
+                      </span>
+                    )}
+                  </div>
                   <div className="text-sm text-gray-500">{getFormatDescription(fmt)}</div>
+                  {locked && onUpgradeClick && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.preventDefault(); onUpgradeClick(); }}
+                      className="mt-1 text-xs text-cyan-700 underline hover:text-cyan-900"
+                    >
+                      Upgrade to unlock
+                    </button>
+                  )}
                 </div>
               </label>
-            ))}
+              );
+            })}
           </div>
         </div>
 
