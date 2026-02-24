@@ -27,9 +27,26 @@ import {
   ListResourcesRequestSchema,
   ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
+import { readFileSync } from 'fs';
+import { join, dirname } from 'path';
 import { VizailApiClient } from './api-client.js';
 import { TOOL_DEFINITIONS, handleToolCall } from './tools.js';
 import { RESOURCE_DEFINITIONS, handleResourceRead } from './resources.js';
+
+// Get package version
+// For built code, package.json is one level up from dist/
+let SERVER_VERSION = '0.1.0'; // Fallback version
+const MCP_PROTOCOL_VERSION = '2024-11-05';
+
+try {
+  const packageJsonPath = join(__dirname, '../package.json');
+  const packageJson = JSON.parse(
+    readFileSync(packageJsonPath, 'utf-8')
+  );
+  SERVER_VERSION = packageJson.version;
+} catch (error) {
+  console.error('⚠️  Warning: Could not read package.json version, using fallback', error instanceof Error ? error.message : error);
+}
 
 // Parse CLI arguments
 function parseArgs() {
@@ -77,10 +94,11 @@ if (CANVAS_ID) {
 
 const apiClient = new VizailApiClient(API_URL, AGENT_TOKEN);
 
+// Server configuration with version and capabilities
 const server = new Server(
   {
-    name: 'vizail-canvas',
-    version: '1.0.0',
+    name: 'vizail-mcp-server',
+    version: SERVER_VERSION,
   },
   {
     capabilities: {
@@ -89,6 +107,11 @@ const server = new Server(
     },
   }
 );
+
+// Log server information
+console.error(`🚀 Vizail MCP Server v${SERVER_VERSION}`);
+console.error(`📡 MCP Protocol: ${MCP_PROTOCOL_VERSION}`);
+console.error(`🔗 API URL: ${API_URL}`);
 
 // --- Tool handlers ---
 
@@ -115,7 +138,9 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => ({
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error('Vizail MCP server running on stdio');
+  console.error('✅ Vizail MCP server running on stdio');
+  console.error(`📚 Available tools: ${TOOL_DEFINITIONS.length}`);
+  console.error(`📄 Available resources: ${RESOURCE_DEFINITIONS.length}`);
 }
 
 main().catch((error) => {
