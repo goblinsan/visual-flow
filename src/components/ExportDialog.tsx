@@ -27,6 +27,10 @@ export function ExportDialog({ isOpen, onClose, spec }: ExportDialogProps) {
 
   // Generate export code based on selected format
   const exportCode = useMemo(() => {
+    if (!spec?.root) {
+      return '// No design loaded';
+    }
+
     try {
       switch (format) {
         case 'json':

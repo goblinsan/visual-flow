@@ -94,6 +94,9 @@ if (CANVAS_ID) {
 
 const apiClient = new VizailApiClient(API_URL, AGENT_TOKEN);
 
+const EXPECTED_API_VERSION = '1.0.0';
+const REQUIRED_CAPABILITIES = ['canvas-read', 'agent-branches', 'proposals'];
+
 // Server configuration with version and capabilities
 const server = new Server(
   {
@@ -135,7 +138,31 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => ({
 
 // --- Start ---
 
+async function checkApiCompatibility() {
+  try {
+    const discovery = await apiClient.getDiscovery();
+    const apiVersion = discovery['x-vizail-version'];
+    const capabilities = discovery['x-vizail-capabilities'];
+
+    if (apiVersion && apiVersion !== EXPECTED_API_VERSION) {
+      console.error(`⚠️  API version mismatch: expected ${EXPECTED_API_VERSION}, got ${apiVersion}`);
+    }
+
+    if (Array.isArray(capabilities)) {
+      const missing = REQUIRED_CAPABILITIES.filter((cap) => !capabilities.includes(cap));
+      if (missing.length) {
+        console.error(`⚠️  API missing capabilities: ${missing.join(', ')}`);
+      }
+    } else {
+      console.error('⚠️  API capabilities not found in discovery response.');
+    }
+  } catch (error) {
+    console.error(`⚠️  API compatibility check failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
 async function main() {
+  await checkApiCompatibility();
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error('✅ Vizail MCP server running on stdio');

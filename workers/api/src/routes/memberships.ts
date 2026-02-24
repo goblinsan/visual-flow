@@ -4,14 +4,25 @@
 
 import type { Env, User, Membership } from '../types';
 import { generateId, jsonResponse, errorResponse } from '../utils';
-import { checkCanvasAccess } from '../auth';
+import { checkCanvasAccess, checkAgentScope, type AuthResult } from '../auth';
 import { checkMemberQuota } from '../quota';
+import { validateRequestBody, addMemberSchema } from '../validation';
 
 /**
  * GET /api/canvases/:id/members
  * List members of a canvas
  */
-export async function listMembers(user: User, env: Env, canvasId: string): Promise<Response> {
+export async function listMembers(
+  user: User,
+  env: Env,
+  canvasId: string,
+  authResult?: AuthResult
+): Promise<Response> {
+  const scope = checkAgentScope(authResult ?? null, 'read', canvasId);
+  if (!scope.allowed) {
+    return errorResponse(scope.error || 'Insufficient scope', 403);
+  }
+
   try {
     // Check access to canvas
     const access = await checkCanvasAccess(env, user.id, canvasId);
@@ -45,8 +56,14 @@ export async function addMember(
   user: User,
   env: Env,
   canvasId: string,
-  request: Request
+  request: Request,
+  authResult?: AuthResult
 ): Promise<Response> {
+  const scope = checkAgentScope(authResult ?? null, 'trusted-propose', canvasId);
+  if (!scope.allowed) {
+    return errorResponse(scope.error || 'Insufficient scope', 403);
+  }
+
   // Check quota before adding member
   const quota = await checkMemberQuota(env, canvasId);
   if (!quota.allowed) {
@@ -60,33 +77,30 @@ export async function addMember(
       return errorResponse('Access denied - editor or owner role required', 403);
     }
 
-    const body = await request.json() as { email: string; role: 'editor' | 'viewer' };
-    
-    if (!body.email || !body.role) {
-      return errorResponse('Missing required fields: email, role');
+    const validation = await validateRequestBody(request, addMemberSchema);
+    if (!validation.success) {
+      return errorResponse(validation.error, 400);
     }
 
-    if (!['editor', 'viewer'].includes(body.role)) {
-      return errorResponse('Invalid role - must be editor or viewer');
-    }
+    const { email, role } = validation.data;
 
     // Get or create the invited user
     const now = Date.now();
     let invitedUser = await env.DB
       .prepare('SELECT * FROM users WHERE email = ?')
-      .bind(body.email)
+      .bind(email)
       .first<User>();
 
     if (!invitedUser) {
       // Create placeholder user (will be filled in when they first access)
       // Phase 1: Use email as ID for simplicity (will migrate to UUIDs in Phase 2)
-      const userIdFromEmail = body.email;
+      const userIdFromEmail = email;
       await env.DB
         .prepare('INSERT INTO users (id, email, created_at, updated_at) VALUES (?, ?, ?, ?)')
-        .bind(userIdFromEmail, body.email, now, now)
+        .bind(userIdFromEmail, email, now, now)
         .run();
       
-      invitedUser = { id: userIdFromEmail, email: body.email, created_at: now, updated_at: now };
+      invitedUser = { id: userIdFromEmail, email, created_at: now, updated_at: now };
     }
 
     // Check if membership already exists
@@ -106,14 +120,14 @@ export async function addMember(
         INSERT INTO memberships (id, canvas_id, user_id, role, invited_by, created_at)
         VALUES (?, ?, ?, ?, ?, ?)
       `)
-      .bind(membershipId, canvasId, invitedUser.id, body.role, user.id, now)
+      .bind(membershipId, canvasId, invitedUser.id, role, user.id, now)
       .run();
 
     const membership: Membership = {
       id: membershipId,
       canvas_id: canvasId,
       user_id: invitedUser.id,
-      role: body.role,
+      role,
       invited_by: user.id,
       created_at: now,
     };
@@ -133,8 +147,14 @@ export async function removeMember(
   user: User,
   env: Env,
   canvasId: string,
-  targetUserId: string
+  targetUserId: string,
+  authResult?: AuthResult
 ): Promise<Response> {
+  const scope = checkAgentScope(authResult ?? null, 'trusted-propose', canvasId);
+  if (!scope.allowed) {
+    return errorResponse(scope.error || 'Insufficient scope', 403);
+  }
+
   try {
     // Check owner access (only owners can remove members)
     const access = await checkCanvasAccess(env, user.id, canvasId, 'owner');

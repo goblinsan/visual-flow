@@ -11,6 +11,7 @@
     "build-storybook": "echo 'Storybook build disabled for now'",
     "test": "vitest run",
     "test:watch": "vitest",
+    "verify:openapi": "node scripts/verify-openapi-coverage.cjs",
     "lint": "eslint . --ext .ts,.tsx",
     "lint:strict": "STRICT_TYPES=1 eslint . --ext .ts,.tsx"
   },
@@ -26,7 +27,8 @@
     "react-konva": "^19.0.10",
     "y-protocols": "^1.0.7",
     "y-websocket": "^3.0.0",
-    "yjs": "^13.6.29"
+    "yjs": "^13.6.29",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@eslint/js": "^9.33.0",

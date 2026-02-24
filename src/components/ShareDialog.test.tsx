@@ -29,12 +29,19 @@ describe('ShareDialog', () => {
     vi.clearAllMocks();
   });
 
-  it('should render dialog with canvas name', () => {
+  const renderDialog = async (props = defaultProps) => {
+    render(<ShareDialog {...props} />);
+    await waitFor(() => {
+      expect(apiClientModule.apiClient.listMembers).toHaveBeenCalled();
+    });
+  };
+
+  it('should render dialog with canvas name', async () => {
     vi.mocked(apiClientModule.apiClient.listMembers).mockResolvedValueOnce({
       data: [],
     });
 
-    render(<ShareDialog {...defaultProps} />);
+    await renderDialog();
 
     expect(screen.getByText(/Share "Test Canvas"/)).toBeInTheDocument();
   });
@@ -63,7 +70,7 @@ describe('ShareDialog', () => {
       data: mockMembers,
     });
 
-    render(<ShareDialog {...defaultProps} />);
+    await renderDialog();
 
     await waitFor(() => {
       expect(screen.getByText('owner@example.com')).toBeInTheDocument();
@@ -89,7 +96,7 @@ describe('ShareDialog', () => {
       data: newMember,
     });
 
-    render(<ShareDialog {...defaultProps} />);
+    await renderDialog();
 
     // Fill in email
     const emailInput = screen.getByPlaceholderText('Email address');
@@ -117,7 +124,7 @@ describe('ShareDialog', () => {
       data: [],
     });
 
-    render(<ShareDialog {...defaultProps} />);
+    await renderDialog();
 
     const roleSelect = screen.getByRole('combobox');
     expect(roleSelect).toBeInTheDocument();
@@ -126,12 +133,12 @@ describe('ShareDialog', () => {
     expect((roleSelect as HTMLSelectElement).value).toBe('viewer');
   });
 
-  it('should not show invite form for viewers', () => {
+  it('should not show invite form for viewers', async () => {
     vi.mocked(apiClientModule.apiClient.listMembers).mockResolvedValueOnce({
       data: [],
     });
 
-    render(<ShareDialog {...defaultProps} userRole="viewer" />);
+    await renderDialog({ ...defaultProps, userRole: 'viewer' });
 
     expect(screen.queryByPlaceholderText('Email address')).not.toBeInTheDocument();
     expect(screen.getByText(/You can only view this canvas/)).toBeInTheDocument();
@@ -165,7 +172,7 @@ describe('ShareDialog', () => {
       data: { success: true },
     });
 
-    render(<ShareDialog {...defaultProps} />);
+    await renderDialog();
 
     await waitFor(() => {
       expect(screen.getByText('editor@example.com')).toBeInTheDocument();
@@ -185,12 +192,12 @@ describe('ShareDialog', () => {
     });
   });
 
-  it('should call onClose when close button is clicked', () => {
+  it('should call onClose when close button is clicked', async () => {
     vi.mocked(apiClientModule.apiClient.listMembers).mockResolvedValueOnce({
       data: [],
     });
 
-    render(<ShareDialog {...defaultProps} />);
+    await renderDialog();
 
     const closeButton = screen.getByText('Close');
     fireEvent.click(closeButton);
@@ -207,7 +214,7 @@ describe('ShareDialog', () => {
       error: 'User already has access',
     });
 
-    render(<ShareDialog {...defaultProps} />);
+    await renderDialog();
 
     const emailInput = screen.getByPlaceholderText('Email address');
     fireEvent.change(emailInput, { target: { value: 'existing@example.com' } });
