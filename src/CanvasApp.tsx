@@ -36,6 +36,80 @@ import { ToolSettingsBar } from './components/canvas/ToolSettingsBar';
 import { ChooseModeModal } from './roblox/ChooseModeModal';
 import type { DesignMode } from './roblox/ChooseModeModal';
 
+// ---------------------------------------------------------------------------
+// Roblox Component Palette (#143)
+// Shown in the sidebar when the user has selected Roblox UI mode.
+// ---------------------------------------------------------------------------
+type PaletteEntry = { label: string; abbr: string; build: (id: string) => LayoutNode };
+
+const ROBLOX_PALETTE: PaletteEntry[] = [
+  {
+    label: "TextLabel",
+    abbr: "T",
+    build: (id) => ({ id, type: "text", text: "Label", variant: "body", position: { x: 40, y: 40 }, size: { width: 200, height: 28 } }),
+  },
+  {
+    label: "Heading",
+    abbr: "H",
+    build: (id) => ({ id, type: "text", text: "Heading", variant: "h2", position: { x: 40, y: 40 }, size: { width: 300, height: 36 } }),
+  },
+  {
+    label: "Frame",
+    abbr: "Fr",
+    build: (id) => ({ id, type: "rect", fill: "#1e293b", stroke: "#334155", strokeWidth: 1, radius: 8, position: { x: 40, y: 40 }, size: { width: 240, height: 120 } }),
+  },
+  {
+    label: "VStack",
+    abbr: "VS",
+    build: (id) => ({ id, type: "stack", direction: "column", gap: 8, position: { x: 40, y: 40 }, size: { width: 240, height: 200 }, children: [] }),
+  },
+  {
+    label: "HStack",
+    abbr: "HS",
+    build: (id) => ({ id, type: "stack", direction: "row", gap: 8, position: { x: 40, y: 40 }, size: { width: 400, height: 60 }, children: [] }),
+  },
+  {
+    label: "Grid 3-col",
+    abbr: "Gr",
+    build: (id) => ({ id, type: "grid", columns: 3, gap: 8, position: { x: 40, y: 40 }, size: { width: 360, height: 240 }, children: [] }),
+  },
+  {
+    label: "ImageLabel",
+    abbr: "Img",
+    build: (id) => ({ id, type: "image", src: "rbxassetid://0", position: { x: 40, y: 40 }, size: { width: 100, height: 100 } }),
+  },
+  {
+    label: "Icon",
+    abbr: "Ic",
+    build: (id) => ({ id, type: "rect", fill: "#334155", radius: 6, position: { x: 40, y: 40 }, size: { width: 40, height: 40 } }),
+  },
+  {
+    label: "Badge",
+    abbr: "Bg",
+    build: (id) => ({ id, type: "rect", fill: "#ef4444", radius: 10, position: { x: 40, y: 40 }, size: { width: 28, height: 20 } }),
+  },
+  {
+    label: "ProgressBar",
+    abbr: "Pb",
+    build: (id) => ({
+      id,
+      type: "group" as const,
+      position: { x: 40, y: 40 },
+      size: { width: 200, height: 20 },
+      children: [
+        { id: `${id}-bg`, type: "rect" as const, fill: "#4a4563", radius: 10, position: { x: 0, y: 0 }, size: { width: 200, height: 20 } },
+        { id: `${id}-fill`, type: "rect" as const, fill: "#22c55e", radius: 10, position: { x: 0, y: 0 }, size: { width: 100, height: 20 } },
+      ],
+    }),
+  },
+];
+
+let _paletteCounter = 0;
+function genId(prefix: string): string {
+  _paletteCounter += 1;
+  return `${prefix}-${_paletteCounter}-${Math.random().toString(36).slice(2, 6)}`;
+}
+
 /** Get room ID from URL query param ?room=xxx */
 function getRoomIdFromURL(): string | null {
   if (typeof window === 'undefined') return null;
@@ -1112,6 +1186,18 @@ export default function CanvasApp() {
     logger.info(`Design mode selected: ${chosen}`);
   }, [applyTemplate]);
 
+  // Insert a palette node from the Roblox component palette (#143)
+  const insertPaletteNode = useCallback((entry: PaletteEntry) => {
+    const id = genId(entry.abbr.toLowerCase());
+    const node = entry.build(id);
+    setSpec(prev => ({
+      ...prev,
+      root: { ...prev.root, children: [...prev.root.children, node] },
+    }));
+    setSelection([id]);
+    logger.info(`Roblox palette: inserted ${entry.label}`);
+  }, [setSpec, setSelection]);
+
   // Dialog action callbacks
   const handleStartCollaborativeSession = useCallback(() => {
     const newRoomId = generateRoomId();
@@ -1579,6 +1665,26 @@ export default function CanvasApp() {
                 </>
               )}
             </div>
+            {/* Roblox component palette (#143) — visible only in Roblox mode */}
+            {designMode === 'roblox' && panelMode === 'attributes' && (
+              <div className="border-b border-gray-200 px-4 pt-3 pb-2">
+                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Roblox Components</p>
+                <div className="grid grid-cols-2 gap-1">
+                  {ROBLOX_PALETTE.map((entry) => (
+                    <button
+                      key={entry.label}
+                      onClick={() => insertPaletteNode(entry)}
+                      className="flex items-center gap-1.5 px-2 py-1.5 rounded border border-gray-200 bg-gray-50 hover:bg-teal-50 hover:border-teal-300 text-left transition-colors"
+                      aria-label={`Add ${entry.label}`}
+                      title={`Add ${entry.label}`}
+                    >
+                      <span className="w-5 h-5 flex items-center justify-center rounded bg-teal-100 text-teal-700 text-[9px] font-bold flex-shrink-0" aria-hidden="true">{entry.abbr}</span>
+                      <span className="text-[10px] text-gray-700 truncate">{entry.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="p-4 text-xs text-gray-600 space-y-4 overflow-auto flex-1">
               {panelMode === 'attributes' && (
                 <AttributesSidebar
