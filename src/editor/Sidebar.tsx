@@ -1,18 +1,79 @@
 
+import type { NodeSpec, StackNode, GridNode, BoxNode, TextNode, IconNode, ImageNode, BadgeNode, ProgressNode } from "../dsl";
+import type { DesignMode } from "../roblox/ChooseModeModal";
+
 export type FileEntry = { id: string; name: string };
+
+/** Roblox UI component palette entries (#143) */
+const ROBLOX_COMPONENTS: { label: string; emoji: string; node: NodeSpec }[] = [
+  {
+    label: "TextLabel",
+    emoji: "T",
+    node: { type: "text", text: "Label", variant: "body" } satisfies TextNode,
+  },
+  {
+    label: "Heading",
+    emoji: "H",
+    node: { type: "text", text: "Heading", variant: "h2" } satisfies TextNode,
+  },
+  {
+    label: "Frame (card)",
+    emoji: "▢",
+    node: { type: "box", variant: "card", padding: 3, children: [] } satisfies BoxNode,
+  },
+  {
+    label: "VStack",
+    emoji: "↕",
+    node: { type: "stack", direction: "vertical", gap: 2, children: [] } satisfies StackNode,
+  },
+  {
+    label: "HStack",
+    emoji: "↔",
+    node: { type: "stack", direction: "horizontal", gap: 2, children: [] } satisfies StackNode,
+  },
+  {
+    label: "Grid 3-col",
+    emoji: "⊞",
+    node: { type: "grid", columns: 3, gap: 2, children: [] } satisfies GridNode,
+  },
+  {
+    label: "ImageLabel",
+    emoji: "🖼",
+    node: { type: "image", src: "rbxassetid://0", alt: "image" } satisfies ImageNode,
+  },
+  {
+    label: "Icon",
+    emoji: "★",
+    node: { type: "icon", emoji: "⭐", label: "icon" } satisfies IconNode,
+  },
+  {
+    label: "Badge",
+    emoji: "●",
+    node: { type: "badge", text: "1" } satisfies BadgeNode,
+  },
+  {
+    label: "ProgressBar",
+    emoji: "▬",
+    node: { type: "progress", value: 50, label: "Progress" } satisfies ProgressNode,
+  },
+];
 
 export function Sidebar({
   files,
   activeId,
+  mode,
   onSelect,
   onCreateSample,
   onCreateRobloxSample,
+  onInsertNode,
 }: {
   files: FileEntry[];
   activeId?: string | null;
+  mode?: DesignMode;
   onSelect: (id: string) => void;
   onCreateSample: () => void;
   onCreateRobloxSample: () => void;
+  onInsertNode?: (node: NodeSpec) => void;
 }) {
   return (
     <div className="p-3 space-y-3">
@@ -33,6 +94,28 @@ export function Sidebar({
         <button className="w-full px-2 py-1 rounded border border-slate-700 bg-slate-800" onClick={onCreateSample}>New from Sample</button>
         <button className="w-full px-2 py-1 rounded border border-[--color-brand] bg-[--color-brand]/20 text-[--color-brand]" onClick={onCreateRobloxSample}>🎮 New Roblox HUD</button>
       </div>
+
+      {/* Roblox component palette (#143) */}
+      {mode === "roblox" && onInsertNode && (
+        <div className="pt-2 border-t border-slate-800/60">
+          <div className="text-xs font-semibold text-[--color-brand] mb-2 flex items-center gap-1">
+            <span>🎮</span> Roblox Components
+          </div>
+          <div className="grid grid-cols-2 gap-1">
+            {ROBLOX_COMPONENTS.map((c) => (
+              <button
+                key={c.label}
+                className="flex items-center gap-1 px-2 py-1 rounded border border-slate-700/60 bg-slate-800/60 hover:bg-slate-800 text-left"
+                onClick={() => onInsertNode(c.node)}
+                title={`Insert ${c.label}`}
+              >
+                <span className="text-xs w-4 text-center opacity-70">{c.emoji}</span>
+                <span className="text-[10px] truncate">{c.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

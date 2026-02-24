@@ -7,6 +7,8 @@ import { Sidebar } from "./editor/Sidebar.tsx";
 import type { NodeSpec, RootSpec } from "./dsl";
 import { useDesignFiles } from "./useDesignFiles.ts";
 import { exportRobloxLua } from "./roblox/export.ts";
+import { ChooseModeModal } from "./roblox/ChooseModeModal.tsx";
+import type { DesignMode } from "./roblox/ChooseModeModal.tsx";
 
 export default function EditorApp() {
   const {
@@ -21,6 +23,11 @@ export default function EditorApp() {
     importFromJsonText,
     exportActiveJson,
   } = useDesignFiles();
+
+  // Design mode: 'general' or 'roblox' (#142)
+  const [mode, setMode] = useState<DesignMode | null>(null);
+  // Show ChooseModeModal when no mode has been chosen yet and no file is active
+  const showModeModal = mode === null && !activeId;
 
   // Local working copy of the active spec
   const [spec, setSpec] = useState<RootSpec | null>(active?.spec ?? null);
@@ -121,16 +128,58 @@ export default function EditorApp() {
     exportActiveJson();
   };
 
+  /** Insert a new node at the end of the root body's children (#143 component palette) */
+  const onInsertNode = useCallback(
+    (node: NodeSpec) => {
+      if (!spec) return;
+      const body = spec.body;
+      type NodeWithChildren = Extract<NodeSpec, { type: "grid" | "stack" | "box" }>;
+      const hasChildren = (n: NodeSpec): n is NodeWithChildren =>
+        n.type === "grid" || n.type === "stack" || n.type === "box";
+      if (hasChildren(body)) {
+        setSpec({ ...spec, body: { ...(body as NodeWithChildren), children: [...body.children, node] } });
+      }
+    },
+    [spec]
+  );
+
+  /** Handle mode selection from the ChooseModeModal (#142) */
+  const onChooseMode = (chosen: DesignMode) => {
+    setMode(chosen);
+    if (chosen === "roblox") {
+      createFromRobloxSample();
+    } else {
+      createFromSample();
+    }
+  };
+
   return (
     <div className="min-h-screen bg-dark-gradient text-slate-100">
+      {/* Choose Design Mode modal (#142) */}
+      {showModeModal && <ChooseModeModal onSelect={onChooseMode} />}
+
       <div className="w-full">
         {/* Toolbar */}
         <div className="flex items-center justify-between px-4 py-2 border-b border-slate-800/70 bg-slate-950/40 sticky top-0 z-10">
           <div className="flex items-center gap-3">
             <div className="text-sm opacity-80">Vizail editor</div>
+            {mode && (
+              <span className={`text-[10px] px-1.5 py-0.5 rounded ${mode === "roblox" ? "bg-[--color-brand]/20 text-[--color-brand]" : "bg-slate-700 text-slate-300"}`}>
+                {mode === "roblox" ? "🎮 Roblox UI" : "🖥️ General UI"}
+              </span>
+            )}
             <div className="text-xs opacity-60">{active ? active.name : "No file selected"}</div>
           </div>
           <div className="flex items-center gap-2">
+            {mode && (
+              <button
+                className="px-2 py-1 rounded border border-slate-700 bg-slate-800 text-xs"
+                onClick={() => setMode(null)}
+                title="Switch design mode"
+              >
+                Switch Mode
+              </button>
+            )}
             <button className="px-3 py-1 rounded border border-slate-600 bg-slate-800" onClick={() => setEditing((v) => !v)}>{editing ? "Preview" : "Edit"}</button>
             <button className="px-3 py-1 rounded border border-slate-600 bg-slate-800" onClick={onSave} disabled={!spec || !activeId}>Save</button>
             <button className="px-3 py-1 rounded border border-slate-600 bg-slate-800" onClick={onSaveAs} disabled={!spec}>Save As</button>
@@ -147,9 +196,11 @@ export default function EditorApp() {
             <Sidebar
               files={files}
               activeId={activeId}
+              mode={mode ?? undefined}
               onSelect={selectFile}
               onCreateSample={createFromSample}
               onCreateRobloxSample={createFromRobloxSample}
+              onInsertNode={spec ? onInsertNode : undefined}
             />
           </div>
           {/* Canvas */}
@@ -170,7 +221,7 @@ export default function EditorApp() {
           {/* Inspector */}
           <div className="border-l border-slate-800/70 bg-slate-950/30 overflow-auto">
             {spec ? (
-              <InspectorPanel spec={spec} setSpec={setSpec} selectedPath={selectedPath} />
+              <InspectorPanel spec={spec} setSpec={setSpec} selectedPath={selectedPath} mode={mode ?? undefined} />
             ) : (
               <div className="p-3 text-xs opacity-70">No design loaded.</div>
             )}
