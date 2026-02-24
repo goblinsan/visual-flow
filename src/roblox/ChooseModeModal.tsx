@@ -1,7 +1,7 @@
 /**
  * ChooseModeModal (#142)
  *
- * Shown on first load (when no design file is active) to let the user pick
+ * Shown on first load (when no design mode has been chosen) to let the user pick
  * between General UI editing and Roblox UI editing.
  */
 
@@ -9,7 +9,6 @@ export type DesignMode = "general" | "roblox";
 
 type ModeCard = {
   mode: DesignMode;
-  icon: string;
   title: string;
   description: string;
   cta: string;
@@ -18,14 +17,12 @@ type ModeCard = {
 const MODES: ModeCard[] = [
   {
     mode: "general",
-    icon: "🖥️",
     title: "General UI",
     description: "Design layouts for web, mobile or any platform using the flexible DSL canvas.",
     cta: "Start with blank canvas",
   },
   {
     mode: "roblox",
-    icon: "🎮",
     title: "Roblox UI",
     description: "Design in-game HUDs, inventory screens and menus. Export as a ready-to-use Roblox LocalScript.",
     cta: "Start with Roblox HUD",
@@ -49,7 +46,6 @@ export function ChooseModeModal({
               className="text-left rounded-xl border border-slate-700/60 bg-slate-800/60 hover:border-[--color-brand] hover:bg-slate-800 transition-colors p-5 focus:outline-none focus:ring-2 focus:ring-[--color-brand]"
               onClick={() => onSelect(m.mode)}
             >
-              <div className="text-3xl mb-3">{m.icon}</div>
               <div className="font-semibold text-slate-100 mb-1">{m.title}</div>
               <p className="text-xs text-slate-400 mb-4 leading-relaxed">{m.description}</p>
               <span className="inline-block text-xs px-2 py-1 rounded border border-[--color-brand] text-[--color-brand]">

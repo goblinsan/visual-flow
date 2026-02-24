@@ -27,7 +27,7 @@ export const robloxHud: RootSpec = {
             gap: 4,
             align: "center",
             children: [
-              { type: "icon", emoji: "🧙", label: "Player Avatar" },
+              { type: "icon", label: "Player Avatar" },
               {
                 type: "stack",
                 direction: "vertical",
@@ -74,14 +74,14 @@ export const robloxHud: RootSpec = {
             columns: 6,
             gap: 3,
             children: [
-              { type: "box", id: "slot-1", variant: "card", padding: 2, children: [{ type: "text", text: "⚔️", variant: "h3", align: "center" }] },
-              { type: "box", id: "slot-2", variant: "card", padding: 2, children: [{ type: "text", text: "🛡️", variant: "h3", align: "center" }] },
-              { type: "box", id: "slot-3", variant: "card", padding: 2, children: [{ type: "text", text: "🧪", variant: "h3", align: "center" }, { type: "badge", text: "12", position: "top-right" }] },
-              { type: "box", id: "slot-4", variant: "card", padding: 2, children: [{ type: "text", text: "🪖", variant: "h3", align: "center" }] },
-              { type: "box", id: "slot-5", variant: "card", padding: 2, children: [{ type: "text", text: "🔥", variant: "h3", align: "center" }, { type: "badge", text: "3", position: "top-right" }] },
-              { type: "box", id: "slot-6", variant: "card", padding: 2, children: [{ type: "text", text: "🧙", variant: "h3", align: "center" }] },
-              { type: "box", id: "slot-7", variant: "card", padding: 2, children: [{ type: "text", text: "🐲", variant: "h3", align: "center" }] },
-              { type: "box", id: "slot-8", variant: "card", padding: 2, children: [{ type: "text", text: "🌿", variant: "h3", align: "center" }, { type: "badge", text: "5", position: "top-right" }] },
+              { type: "box", id: "slot-1", variant: "card", padding: 2, children: [{ type: "text", text: "Sword", variant: "caption", align: "center" }] },
+              { type: "box", id: "slot-2", variant: "card", padding: 2, children: [{ type: "text", text: "Shield", variant: "caption", align: "center" }] },
+              { type: "box", id: "slot-3", variant: "card", padding: 2, children: [{ type: "text", text: "Potion", variant: "caption", align: "center" }, { type: "badge", text: "12", position: "top-right" }] },
+              { type: "box", id: "slot-4", variant: "card", padding: 2, children: [{ type: "text", text: "Helmet", variant: "caption", align: "center" }] },
+              { type: "box", id: "slot-5", variant: "card", padding: 2, children: [{ type: "text", text: "Fire", variant: "caption", align: "center" }, { type: "badge", text: "3", position: "top-right" }] },
+              { type: "box", id: "slot-6", variant: "card", padding: 2, children: [{ type: "text", text: "Wizard", variant: "caption", align: "center" }] },
+              { type: "box", id: "slot-7", variant: "card", padding: 2, children: [{ type: "text", text: "Dragon", variant: "caption", align: "center" }] },
+              { type: "box", id: "slot-8", variant: "card", padding: 2, children: [{ type: "text", text: "Herb", variant: "caption", align: "center" }, { type: "badge", text: "5", position: "top-right" }] },
               { type: "box", id: "slot-9", variant: "plain", padding: 2, children: [] },
               { type: "box", id: "slot-10", variant: "plain", padding: 2, children: [] },
               { type: "box", id: "slot-11", variant: "plain", padding: 2, children: [] },
@@ -103,7 +103,7 @@ export const robloxHud: RootSpec = {
             padding: 3,
             gap: 2,
             children: [
-              { type: "text", text: "💰 Gold", variant: "caption" },
+              { type: "text", text: "Gold", variant: "caption" },
               { type: "text", text: "1,200", variant: "h3" },
             ],
           },
@@ -113,7 +113,7 @@ export const robloxHud: RootSpec = {
             padding: 3,
             gap: 2,
             children: [
-              { type: "text", text: "💎 Gems", variant: "caption" },
+              { type: "text", text: "Gems", variant: "caption" },
               { type: "text", text: "5", variant: "h3" },
             ],
           },
@@ -123,7 +123,7 @@ export const robloxHud: RootSpec = {
             padding: 3,
             gap: 2,
             children: [
-              { type: "text", text: "⚡ Power", variant: "caption" },
+              { type: "text", text: "Power", variant: "caption" },
               { type: "text", text: "200", variant: "h3" },
             ],
           },

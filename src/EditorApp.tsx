@@ -26,8 +26,8 @@ export default function EditorApp() {
 
   // Design mode: 'general' or 'roblox' (#142)
   const [mode, setMode] = useState<DesignMode | null>(null);
-  // Show ChooseModeModal when no mode has been chosen yet and no file is active
-  const showModeModal = mode === null && !activeId;
+  // Show ChooseModeModal whenever no mode has been chosen for this session
+  const showModeModal = mode === null;
 
   // Local working copy of the active spec
   const [spec, setSpec] = useState<RootSpec | null>(active?.spec ?? null);
@@ -165,7 +165,7 @@ export default function EditorApp() {
             <div className="text-sm opacity-80">Vizail editor</div>
             {mode && (
               <span className={`text-[10px] px-1.5 py-0.5 rounded ${mode === "roblox" ? "bg-[--color-brand]/20 text-[--color-brand]" : "bg-slate-700 text-slate-300"}`}>
-                {mode === "roblox" ? "🎮 Roblox UI" : "🖥️ General UI"}
+                {mode === "roblox" ? "Roblox UI" : "General UI"}
               </span>
             )}
             <div className="text-xs opacity-60">{active ? active.name : "No file selected"}</div>
