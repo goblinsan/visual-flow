@@ -221,4 +221,47 @@ helps catch drift between the server and the API.
 cd workers/mcp
 npm install
 npm run dev  # Uses tsx for hot-reload
+npm test    # Run compatibility tests
+npm run build  # Build for distribution
 ```
+
+## Distribution
+
+### npm Publishing
+
+The package is automatically published to npm when a version tag is pushed:
+
+```bash
+cd workers/mcp
+npm version patch  # or minor, major
+git add package.json
+git commit -m "chore(mcp): bump version"
+git tag mcp-v0.1.1
+git push && git push --tags
+```
+
+GitHub Actions will:
+1. Run tests
+2. Build TypeScript
+3. Publish to npm
+4. Create GitHub release
+
+### MCP Registry
+
+The server is listed in the official MCP Registry for discoverability.
+
+To update the registry entry:
+1. Ensure npm package is published
+2. Update `server.json` version
+3. Run `mcp-publisher publish`
+
+See [MCP_REGISTRY_PUBLISHING.md](./MCP_REGISTRY_PUBLISHING.md) for detailed instructions.
+
+## Version Information
+
+The server reports its version on startup:
+- **Server Version**: From package.json (e.g., 0.1.0)
+- **MCP Protocol**: 2024-11-05
+- **Capabilities**: Resources (3), Tools (5)
+
+Version compatibility is tested automatically in CI.

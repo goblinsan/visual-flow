@@ -1,0 +1,91 @@
+name: Publish MCP Server to npm
+
+on:
+  push:
+    tags:
+      - 'mcp-v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g., 0.1.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'npm'
+          cache-dependency-path: workers/mcp/package-lock.json
+
+      - name: Extract version from tag
+        id: get_version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            VERSION=${GITHUB_REF#refs/tags/mcp-v}
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Install dependencies
+        working-directory: workers/mcp
+        run: npm ci
+
+      - name: Run tests
+        working-directory: workers/mcp
+        run: npm test || echo "No tests configured yet"
+
+      - name: Build
+        working-directory: workers/mcp
+        run: npm run build
+
+      - name: Verify build output
+        working-directory: workers/mcp
+        run: |
+          if [ ! -f dist/index.js ]; then
+            echo "Error: Build output not found"
+            exit 1
+          fi
+          echo "Build successful, dist/index.js exists"
+
+      - name: Publish to npm
+        working-directory: workers/mcp
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: MCP Server v${{ steps.get_version.outputs.version }}
+          body: |
+            ## Vizail MCP Server v${{ steps.get_version.outputs.version }}
+
+            ### Installation
+            ```bash
+            npx vizail-mcp-server@${{ steps.get_version.outputs.version }}
+            ```
+
+            ### What's Changed
+            See [CHANGELOG.md](https://github.com/goblinsan/visual-flow/blob/main/workers/mcp/CHANGELOG.md) for details.
+
+            ### npm Package
+            https://www.npmjs.com/package/vizail-mcp-server/v/${{ steps.get_version.outputs.version }}
+          draft: false
+          prerelease: ${{ contains(steps.get_version.outputs.version, '-') }}

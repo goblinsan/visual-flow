@@ -17,3 +17,22 @@ jobs:
       - run: npm test
       - run: npm run verify:openapi
       - run: npm run build-storybook
+  
+  mcp_compatibility:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: 
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: workers/mcp/package-lock.json
+      - name: Install MCP dependencies
+        working-directory: workers/mcp
+        run: npm ci
+      - name: Build MCP server
+        working-directory: workers/mcp
+        run: npm run build
+      - name: Run MCP compatibility tests
+        working-directory: workers/mcp
+        run: npm test
