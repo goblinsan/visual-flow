@@ -16,7 +16,7 @@ interface KulrsPaletteColor {
   id: string;
   hexValue: string;
   name: string | null;
-  sortOrder: number;
+  position: number;
 }
 
 interface KulrsPalette {
@@ -55,6 +55,16 @@ async function fetchKulrsPalettes(
   return json.data;
 }
 
+async function fetchKulrsPaletteById(
+  id: string
+): Promise<KulrsPalette | null> {
+  const res = await fetch(`${KULRS_API}/palettes/${encodeURIComponent(id)}`);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`Kulrs API ${res.status}`);
+  const json: { success: boolean; data: KulrsPalette } = await res.json();
+  return json.data;
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -81,6 +91,9 @@ export function KulrsPalettePanel({
   const [sort, setSort] = useState<SortMode>('recent');
   const [expanded, setExpanded] = useState(false);
   const [applyMode, setApplyMode] = useState<'recent' | 'fill' | 'stroke'>('recent');
+  const [searchId, setSearchId] = useState('');
+  const [searchResult, setSearchResult] = useState<KulrsPalette | null>(null);
+  const [searchNotFound, setSearchNotFound] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -99,6 +112,33 @@ export function KulrsPalettePanel({
   useEffect(() => {
     if (expanded) load();
   }, [expanded, load]);
+
+  const handleSearch = useCallback(async () => {
+    const trimmed = searchId.trim();
+    if (!trimmed) return;
+    setLoading(true);
+    setError(null);
+    setSearchNotFound(false);
+    setSearchResult(null);
+    try {
+      const result = await fetchKulrsPaletteById(trimmed);
+      if (result) {
+        setSearchResult(result);
+      } else {
+        setSearchNotFound(true);
+      }
+    } catch {
+      setError('Could not look up palette');
+    } finally {
+      setLoading(false);
+    }
+  }, [searchId]);
+
+  const clearSearch = () => {
+    setSearchId('');
+    setSearchResult(null);
+    setSearchNotFound(false);
+  };
 
   const handleSwatchClick = (hex: string) => {
     onPickColor(hex);
@@ -165,6 +205,68 @@ export function KulrsPalettePanel({
             </button>
           </div>
 
+          {/* Palette ID search */}
+          <div className="flex gap-1">
+            <input
+              type="text"
+              value={searchId}
+              onChange={(e) => { setSearchId(e.target.value); setSearchNotFound(false); }}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              placeholder="Paste palette ID…"
+              className="flex-1 text-[10px] px-2 py-1 rounded border border-gray-200 bg-white focus:outline-none focus:border-teal-400 placeholder:text-gray-300"
+            />
+            <button
+              type="button"
+              onClick={handleSearch}
+              disabled={loading || !searchId.trim()}
+              className="text-[10px] px-2 py-0.5 rounded bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-40 transition-colors"
+            >
+              <i className="fa-solid fa-magnifying-glass" />
+            </button>
+            {(searchResult || searchNotFound) && (
+              <button
+                type="button"
+                onClick={clearSearch}
+                className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
+                title="Clear search"
+              >
+                <i className="fa-solid fa-xmark" />
+              </button>
+            )}
+          </div>
+
+          {searchNotFound && (
+            <div className="text-[10px] text-amber-600">No palette found with that ID</div>
+          )}
+
+          {/* Search result */}
+          {searchResult && (
+            <div className="border border-teal-200 rounded p-1.5 bg-teal-50/40">
+              <div className="text-[9px] text-teal-700 mb-1 font-semibold">Found palette</div>
+              <div className="flex h-7 rounded overflow-hidden border border-gray-200">
+                {searchResult.colors
+                  .sort((a, b) => a.position - b.position)
+                  .map((color, idx) => (
+                    <button
+                      key={color.id || idx}
+                      type="button"
+                      title={`${color.hexValue}${color.name ? ` (${color.name})` : ''} — click to apply`}
+                      onClick={() => handleSwatchClick(color.hexValue)}
+                      className="flex-1 h-full cursor-pointer hover:opacity-80 active:scale-95 transition-all"
+                      style={{ backgroundColor: color.hexValue }}
+                    />
+                  ))}
+              </div>
+              <div className="flex justify-between text-[9px] text-gray-400 mt-0.5 px-0.5">
+                <span>
+                  {searchResult.colors.length} colors
+                  {searchResult.likesCount > 0 && <> · ❤ {searchResult.likesCount}</>}
+                </span>
+                <span>{new Date(searchResult.createdAt).toLocaleDateString()}</span>
+              </div>
+            </div>
+          )}
+
           {/* Apply-mode selector */}
           <div className="flex gap-1 text-[10px]">
             <span className="text-gray-400 self-center">Click applies to:</span>
@@ -209,7 +311,7 @@ export function KulrsPalettePanel({
                 {/* Color swatches */}
                 <div className="flex h-7 rounded overflow-hidden border border-gray-200 hover:border-gray-300 transition-colors">
                   {palette.colors
-                    .sort((a, b) => a.sortOrder - b.sortOrder)
+                    .sort((a, b) => a.position - b.position)
                     .map((color, idx) => (
                       <button
                         key={color.id || idx}
