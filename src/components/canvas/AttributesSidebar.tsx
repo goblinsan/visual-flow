@@ -8,6 +8,7 @@ import PolygonAttributesPanel from '../PolygonAttributesPanel';
 import TextAttributesPanel from '../TextAttributesPanel';
 import ImageAttributesPanel from '../ImageAttributesPanel';
 import DefaultsPanel from '../DefaultsPanel';
+import { KulrsPalettePanel } from '../KulrsPalettePanel';
 import { FlowAttributesPanel } from '../FlowAttributesPanel';
 import type { RectDefaults } from '../../hooks/usePersistentRectDefaults';
 import type {
@@ -687,6 +688,25 @@ export function AttributesSidebar({
           {selectedIds.length !== 1 && !(tool==='rect' && selectedIds.length===0) && (
             <div className="text-[11px] text-gray-400">{selectedIds.length === 0 ? 'No selection' : 'Multiple selection (attributes coming soon).'}</div>
           )}
+
+          {/* Kulrs Palette Integration */}
+          <KulrsPalettePanel
+            onPickColor={(hex) => pushRecent(hex)}
+            onApplyFill={selectedIds.length === 1 ? (hex) => {
+              setSpec(prev => ({
+                ...prev,
+                root: updateNode(prev.root, selectedIds[0], { fill: hex, fillGradient: undefined })
+              }));
+              pushRecent(hex);
+            } : undefined}
+            onApplyStroke={selectedIds.length === 1 ? (hex) => {
+              setSpec(prev => ({
+                ...prev,
+                root: updateNode(prev.root, selectedIds[0], { stroke: hex })
+              }));
+              pushRecent(hex);
+            } : undefined}
+          />
         </>
       )}
     </>
