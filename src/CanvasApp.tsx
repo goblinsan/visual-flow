@@ -37,7 +37,7 @@ import { ThemePanel } from './components/ThemePanel';
 import { KulrsPalettePanel } from './components/KulrsPalettePanel';
 import { ToolSettingsBar } from './components/canvas/ToolSettingsBar';
 import { ChooseModeModal } from './roblox/ChooseModeModal';
-import type { DesignMode } from './roblox/ChooseModeModal';
+import type { WelcomeAction } from './roblox/ChooseModeModal';
 import { useDesignTheme } from './theme';
 import { bindAndApplyTheme } from './theme';
 
@@ -662,15 +662,59 @@ const TEMPLATES: { id: string; name: string; icon: string; description: string; 
       }
     }),
   },
+  // Presentation deck template
+  {
+    id: 'presentation-deck',
+    name: 'Presentation Deck',
+    icon: 'fa-solid fa-tv',
+    description: 'Clean slide deck for visual storytelling',
+    category: 'presentation',
+    build: () => ({
+      root: {
+        id: "root", type: "frame", size: { width: 1920, height: 1080 }, background: undefined,
+        children: [
+          // Slide background
+          { id: "slide-bg", type: "rect", position: { x: 0, y: 0 }, size: { width: 1920, height: 1080 }, fill: "#ffffff", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1 },
+          // Accent bar at top
+          { id: "accent-bar", type: "rect", position: { x: 0, y: 0 }, size: { width: 1920, height: 8 }, fill: "#3b82f6", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1 },
+          // Title
+          { id: "title", type: "text", text: "Presentation Title", variant: "h1", position: { x: 120, y: 200 }, size: { width: 1000, height: 72 }, color: "#0f172a" },
+          // Subtitle
+          { id: "subtitle", type: "text", text: "A brief tagline or description of the presentation goes here", variant: "h2", position: { x: 120, y: 290 }, size: { width: 900, height: 36 }, color: "#64748b" },
+          // Divider
+          { id: "divider", type: "rect", position: { x: 120, y: 360 }, size: { width: 200, height: 4 }, fill: "#3b82f6", stroke: undefined, strokeWidth: 0, radius: 2, opacity: 1 },
+          // Content area — three columns
+          { id: "col1-box", type: "rect", position: { x: 120, y: 430 }, size: { width: 520, height: 380 }, fill: "#f8fafc", stroke: "#e2e8f0", strokeWidth: 1, radius: 16, opacity: 1 },
+          { id: "col1-icon-bg", type: "rect", position: { x: 160, y: 470 }, size: { width: 56, height: 56 }, fill: "#dbeafe", stroke: undefined, strokeWidth: 0, radius: 12, opacity: 1 },
+          { id: "col1-title", type: "text", text: "First Point", variant: "h2", position: { x: 160, y: 550 }, size: { width: 440, height: 32 }, color: "#0f172a" },
+          { id: "col1-body", type: "text", text: "Explain the first key idea or takeaway for your audience.", variant: "body", position: { x: 160, y: 600 }, size: { width: 440, height: 60 }, color: "#64748b" },
+          { id: "col2-box", type: "rect", position: { x: 700, y: 430 }, size: { width: 520, height: 380 }, fill: "#f8fafc", stroke: "#e2e8f0", strokeWidth: 1, radius: 16, opacity: 1 },
+          { id: "col2-icon-bg", type: "rect", position: { x: 740, y: 470 }, size: { width: 56, height: 56 }, fill: "#f3e8ff", stroke: undefined, strokeWidth: 0, radius: 12, opacity: 1 },
+          { id: "col2-title", type: "text", text: "Second Point", variant: "h2", position: { x: 740, y: 550 }, size: { width: 440, height: 32 }, color: "#0f172a" },
+          { id: "col2-body", type: "text", text: "Elaborate on the second key idea with supporting details.", variant: "body", position: { x: 740, y: 600 }, size: { width: 440, height: 60 }, color: "#64748b" },
+          { id: "col3-box", type: "rect", position: { x: 1280, y: 430 }, size: { width: 520, height: 380 }, fill: "#f8fafc", stroke: "#e2e8f0", strokeWidth: 1, radius: 16, opacity: 1 },
+          { id: "col3-icon-bg", type: "rect", position: { x: 1320, y: 470 }, size: { width: 56, height: 56 }, fill: "#dcfce7", stroke: undefined, strokeWidth: 0, radius: 12, opacity: 1 },
+          { id: "col3-title", type: "text", text: "Third Point", variant: "h2", position: { x: 1320, y: 550 }, size: { width: 440, height: 32 }, color: "#0f172a" },
+          { id: "col3-body", type: "text", text: "Share the third key idea and conclude your argument.", variant: "body", position: { x: 1320, y: 600 }, size: { width: 440, height: 60 }, color: "#64748b" },
+          // Footer
+          { id: "footer-line", type: "rect", position: { x: 120, y: 960 }, size: { width: 1680, height: 1 }, fill: "#e2e8f0", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1 },
+          { id: "footer-name", type: "text", text: "Your Name", variant: "body", position: { x: 120, y: 990 }, size: { width: 200, height: 24 }, color: "#94a3b8" },
+          { id: "footer-date", type: "text", text: "2026", variant: "body", position: { x: 1680, y: 990 }, size: { width: 120, height: 24 }, color: "#94a3b8" },
+          // Page number
+          { id: "page-num", type: "text", text: "01", variant: "h2", position: { x: 1760, y: 200 }, size: { width: 80, height: 36 }, color: "#e2e8f0" },
+        ],
+      }
+    }),
+  },
 ];
 
 export default function CanvasApp() {
   // Design mode (#142): null = not chosen yet, shown as modal on first load
   // Auto-select 'general' when arriving from the Kulrs import flow
-  const [designMode, setDesignMode] = useState<DesignMode | null>(() => {
+  const [designChosen, setDesignChosen] = useState<boolean>(() => {
     const name = getCurrentDesignName();
-    if (name && name.startsWith('Kulrs Import')) return 'general';
-    return null;
+    if (name && name.startsWith('Kulrs Import')) return true;
+    return false;
   });
 
   // Collaboration state
@@ -1171,14 +1215,32 @@ export default function CanvasApp() {
     setNewDialogOpen(false);
   }, [setSpec, setSelection, isCollaborative, setCurrentCanvasId, activeTheme]);
 
-  // Handle Choose Design Mode selection (#142)
-  const onChooseMode = useCallback((chosen: DesignMode) => {
-    setDesignMode(chosen);
-    if (chosen === 'roblox') {
-      applyTemplate('game-ui-hud');
+  // Handle Welcome modal selection (#142)
+  const onWelcomeSelect = useCallback((action: WelcomeAction) => {
+    setDesignChosen(true);
+    switch (action.type) {
+      case 'blank':
+        applyTemplate('blank');
+        break;
+      case 'explore':
+        applyTemplate('blank');
+        // Open the Getting Started guide after a short delay so the canvas loads first
+        setTimeout(() => setGettingStartedOpen(true), 100);
+        break;
+      case 'template': {
+        // Map category to a representative template
+        const categoryTemplateMap: Record<string, string> = {
+          web: 'top-nav',
+          game: 'game-ui-hud',
+          presentation: 'presentation-deck',
+        };
+        const templateId = categoryTemplateMap[action.category] || 'blank';
+        applyTemplate(templateId);
+        break;
+      }
     }
-    logger.info(`Design mode selected: ${chosen}`);
-  }, [applyTemplate]);
+    logger.info(`Welcome action: ${action.type}${action.type === 'template' ? ` (${action.category})` : ''}`);
+  }, [applyTemplate, setGettingStartedOpen]);
 
   // Dialog action callbacks
   const handleStartCollaborativeSession = useCallback(() => {
@@ -1250,7 +1312,7 @@ export default function CanvasApp() {
   return (
     <div className="h-screen w-screen overflow-hidden bg-gray-100 text-gray-900 flex flex-col">
       {/* Choose Design Mode modal (#142) — shown until user picks a mode */}
-      {designMode === null && <ChooseModeModal onSelect={onChooseMode} />}
+      {!designChosen && <ChooseModeModal onSelect={onWelcomeSelect} />}
       {/* Header */}
       <HeaderToolbar
         headerRef={headerRef}

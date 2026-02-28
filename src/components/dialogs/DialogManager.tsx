@@ -26,6 +26,7 @@ const TEMPLATE_CATEGORIES = [
   { key: "mobile", label: "Mobile" },
   { key: "game", label: "Game" },
   { key: "ecommerce", label: "E-Commerce" },
+  { key: "presentation", label: "Presentation" },
   { key: "layout", label: "Layout" },
 ] as const;
 

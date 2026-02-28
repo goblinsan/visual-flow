@@ -3,34 +3,45 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { ChooseModeModal } from "./ChooseModeModal";
 
 describe("ChooseModeModal (#142)", () => {
-  it("renders both mode cards", () => {
+  it("renders all welcome options", () => {
     render(<ChooseModeModal onSelect={() => {}} />);
-    expect(screen.getByText("General UI")).toBeDefined();
-    expect(screen.getByText("Roblox UI")).toBeDefined();
+    expect(screen.getByText("Web Design")).toBeDefined();
+    expect(screen.getByText("Game Design")).toBeDefined();
+    expect(screen.getByText("Presentation")).toBeDefined();
+    expect(screen.getByText("Explore Vizail")).toBeDefined();
+    expect(screen.getByText("Blank Canvas")).toBeDefined();
   });
 
-  it("calls onSelect with 'general' when General UI is clicked", () => {
+  it("calls onSelect with blank action when Blank Canvas is clicked", () => {
     const onSelect = vi.fn();
     render(<ChooseModeModal onSelect={onSelect} />);
-    fireEvent.click(screen.getByText("Start with blank canvas"));
-    expect(onSelect).toHaveBeenCalledWith("general");
+    fireEvent.click(screen.getByText("Blank Canvas"));
+    expect(onSelect).toHaveBeenCalledWith({ type: "blank" });
   });
 
-  it("calls onSelect with 'roblox' when Roblox UI is clicked", () => {
+  it("calls onSelect with explore action when Explore Vizail is clicked", () => {
     const onSelect = vi.fn();
     render(<ChooseModeModal onSelect={onSelect} />);
-    fireEvent.click(screen.getByText("Start with Roblox HUD"));
-    expect(onSelect).toHaveBeenCalledWith("roblox");
+    fireEvent.click(screen.getByText("Explore Vizail"));
+    expect(onSelect).toHaveBeenCalledWith({ type: "explore" });
   });
 
-  it("displays descriptive text for each mode", () => {
-    render(<ChooseModeModal onSelect={() => {}} />);
-    expect(screen.getByText(/in-game HUDs/i)).toBeDefined();
-    expect(screen.getByText(/web, mobile or any platform/i)).toBeDefined();
+  it("calls onSelect with template action when a category is clicked", () => {
+    const onSelect = vi.fn();
+    render(<ChooseModeModal onSelect={onSelect} />);
+    fireEvent.click(screen.getByText("Web Design"));
+    expect(onSelect).toHaveBeenCalledWith({ type: "template", category: "web" });
   });
 
-  it("shows the title 'Choose Design Mode'", () => {
+  it("calls onSelect with game template when Game Design is clicked", () => {
+    const onSelect = vi.fn();
+    render(<ChooseModeModal onSelect={onSelect} />);
+    fireEvent.click(screen.getByText("Game Design"));
+    expect(onSelect).toHaveBeenCalledWith({ type: "template", category: "game" });
+  });
+
+  it("shows the Vizail branding", () => {
     render(<ChooseModeModal onSelect={() => {}} />);
-    expect(screen.getByText("Choose Design Mode")).toBeDefined();
+    expect(screen.getByText(/Design, prototype, and collaborate/)).toBeDefined();
   });
 });
