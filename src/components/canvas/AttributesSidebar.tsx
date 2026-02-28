@@ -727,7 +727,6 @@ export function AttributesSidebar({
             spec={spec}
             setSpec={setSpec}
             onApplyAsTheme={onApplyPaletteAsTheme}
-            hasActiveTheme={!!activeTheme}
           />
 
           {/* Theme Editor Panel */}

@@ -1272,6 +1272,7 @@ export default function CanvasApp() {
         exportDialogOpen={exportDialogOpen}
         setExportDialogOpen={setExportDialogOpen}
         currentSpec={spec}
+        activeTheme={activeTheme}
       />
       {/* Body layout */}
       <div className="flex flex-1 min-h-0">
@@ -1318,8 +1319,6 @@ export default function CanvasApp() {
             snapAnchor={snapAnchor}
             setSnapAnchor={setSnapAnchor}
             selectedCount={selectedIds.length}
-            activeTheme={activeTheme}
-            onPickThemeColor={handlePickThemeColor}
           />
           <div 
             ref={canvasRef} 
@@ -1402,6 +1401,7 @@ export default function CanvasApp() {
                 snapToSpacing={snapToSpacing}
                 gridSize={gridSize}
                 snapAnchor={snapAnchor}
+                activeTheme={activeTheme}
                 />
               );
             })()}

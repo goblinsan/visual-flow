@@ -1,6 +1,83 @@
 import type { LayoutNode, ImageNode, LayoutSpec } from "../../layout-schema";
 import { ICON_LIBRARY, COMPONENT_LIBRARY } from "../../library";
 import { makeId } from "./canvasUtils";
+import type { DesignTheme } from "../../theme/types";
+
+// ─── Component-color-to-theme color mapping ────────────────────────────────
+// Maps common hardcoded component colors to semantic theme tokens so that
+// freshly placed components adopt the active palette.
+const COMPONENT_COLOR_MAP: Record<string, (t: DesignTheme) => string> = {
+  // Primary action fills → accent primary
+  '#3b82f6': (t) => t.colors['color.accent.primary'],
+  '#7c3aed': (t) => t.colors['color.accent.primary'],
+  '#2563eb': (t) => t.colors['color.accent.primary'],
+  '#1d4ed8': (t) => t.colors['color.accent.primary'],
+  // Secondary fills → accent secondary
+  '#06b6d4': (t) => t.colors['color.accent.secondary'],
+  '#059669': (t) => t.colors['color.accent.secondary'],
+  // Light backgrounds → bg secondary
+  '#dbeafe': (t) => t.colors['color.background.secondary'],
+  '#e2e8f0': (t) => t.colors['color.border.primary'],
+  '#f1f5f9': (t) => t.colors['color.background.secondary'],
+  '#f3f4f6': (t) => t.colors['color.background.secondary'],
+  '#f9fafb': (t) => t.colors['color.background.secondary'],
+  // Card/white backgrounds → bg primary
+  '#ffffff': (t) => t.colors['color.background.primary'],
+  // Text on dark → text on accent
+  // Text primary/dark colors → text primary
+  '#111827': (t) => t.colors['color.text.primary'],
+  '#0f172a': (t) => t.colors['color.text.primary'],
+  '#1f2937': (t) => t.colors['color.text.primary'],
+  '#334155': (t) => t.colors['color.text.primary'],
+  '#374151': (t) => t.colors['color.text.secondary'],
+  // Text secondary → text secondary
+  '#64748b': (t) => t.colors['color.text.secondary'],
+  '#6b7280': (t) => t.colors['color.text.secondary'],
+  '#94a3b8': (t) => t.colors['color.text.secondary'],
+  '#9ca3af': (t) => t.colors['color.text.secondary'],
+  // Border colors → border
+  '#cbd5f5': (t) => t.colors['color.border.primary'],
+  '#d1d5db': (t) => t.colors['color.border.primary'],
+  '#e5e7eb': (t) => t.colors['color.border.primary'],
+  // Status colors
+  '#ef4444': (t) => t.colors['color.status.error'],
+  '#22c55e': (t) => t.colors['color.status.success'],
+  '#eab308': (t) => t.colors['color.status.warning'],
+};
+
+function applyThemeToComponentNode(node: LayoutNode, theme: DesignTheme): LayoutNode {
+  const patched: Record<string, unknown> = {};
+  const n = (hex: string) => hex.toLowerCase();
+
+  if ('fill' in node && typeof (node as { fill?: string }).fill === 'string') {
+    const orig = n((node as { fill: string }).fill);
+    const mapper = COMPONENT_COLOR_MAP[orig];
+    if (mapper) patched.fill = mapper(theme);
+  }
+  if ('stroke' in node && typeof (node as { stroke?: string }).stroke === 'string') {
+    const orig = n((node as { stroke: string }).stroke);
+    const mapper = COMPONENT_COLOR_MAP[orig];
+    if (mapper) patched.stroke = mapper(theme);
+  }
+  if ('color' in node && typeof (node as { color?: string }).color === 'string') {
+    const orig = n((node as { color: string }).color);
+    // White text on accent → inverse text color
+    if (orig === '#ffffff') {
+      patched.color = theme.colors['color.text.inverse'];
+    } else {
+      const mapper = COMPONENT_COLOR_MAP[orig];
+      if (mapper) patched.color = mapper(theme);
+    }
+  }
+
+  const hasChildren = 'children' in node && Array.isArray((node as { children?: LayoutNode[] }).children);
+  const children = hasChildren
+    ? (node as { children: LayoutNode[] }).children.map((c) => applyThemeToComponentNode(c, theme))
+    : undefined;
+
+  if (Object.keys(patched).length === 0 && !hasChildren) return node;
+  return { ...node, ...patched, ...(children ? { children } : {}) } as LayoutNode;
+}
 
 /**
  * Update root children with a function
@@ -62,12 +139,18 @@ export function createIcon(
 export function createComponent(
   worldPos: { x: number; y: number },
   rootNode: LayoutNode,
-  selectedComponentId?: string
+  selectedComponentId?: string,
+  activeTheme?: DesignTheme | null,
 ): LayoutNode | null {
   const template = COMPONENT_LIBRARY.find(c => c.id === selectedComponentId) ?? COMPONENT_LIBRARY[0];
   if (!template) return null;
   
-  const groupNode = template.build(worldPos, makeId);
+  let groupNode = template.build(worldPos, makeId);
+
+  // Apply active theme colors to the component
+  if (activeTheme) {
+    groupNode = applyThemeToComponentNode(groupNode, activeTheme);
+  }
   
   // Generate unique name for the component
   const baseName = template.name;

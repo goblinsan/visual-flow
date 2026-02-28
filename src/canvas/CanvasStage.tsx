@@ -91,6 +91,7 @@ interface CanvasStageProps {
   snapToSpacing?: boolean;
   gridSize?: number;
   snapAnchor?: SnapAnchor;
+  activeTheme?: import('../theme/types').DesignTheme | null;
 }
 
 // Infinite dot grid component
@@ -155,7 +156,8 @@ function CanvasStage({
   fitToContentKey, viewportTransition, onViewportChange,
   snapToGrid: propSnapToGrid, snapToObjects: propSnapToObjects,
   snapToSpacing: propSnapToSpacing, gridSize: propGridSize,
-  snapAnchor: propSnapAnchor
+  snapAnchor: propSnapAnchor,
+  activeTheme
 }: CanvasStageProps) {
   // View / interaction state
   const [scale, setScale] = useState(1);
@@ -416,13 +418,13 @@ function CanvasStage({
   }, [selectedIconId, setSelection, setSpec, onToolChange]);
 
   const createComponentAtPosition = useCallback((worldPos: { x: number; y: number }) => {
-    const groupNode = createComponent(worldPos, spec.root, selectedComponentId);
+    const groupNode = createComponent(worldPos, spec.root, selectedComponentId, activeTheme);
     if (!groupNode) return;
     setSpec(prev => appendNodesToRoot(prev, [groupNode]));
     setSelection([groupNode.id]);
     onToolChange?.('select');
     justCreatedShapeRef.current = true;
-  }, [selectedComponentId, setSelection, setSpec, spec.root, onToolChange]);
+  }, [selectedComponentId, setSelection, setSpec, spec.root, onToolChange, activeTheme]);
 
   // Actually insert the image after picker selection
   const handleImageSelected = useCallback((src: string, width: number, height: number) => {

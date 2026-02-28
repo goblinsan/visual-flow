@@ -5,6 +5,7 @@ import type { SavedDesign } from "../../utils/persistence";
 import { getSavedDesigns } from "../../utils/persistence";
 import { COMPONENT_LIBRARY, ICON_LIBRARY } from "../../library";
 import { ExportDialog } from "../ExportDialog";
+import type { DesignTheme } from "../../theme/types";
 
 const COMPONENT_CATEGORIES = [
   { key: "all", label: "All" },
@@ -51,6 +52,9 @@ export interface DialogManagerProps {
   
   // Current spec for export
   currentSpec: LayoutSpec;
+  
+  // Active theme (for themed template/component icons)
+  activeTheme?: DesignTheme | null;
   
   // Collaboration state
   isCollaborative: boolean;
@@ -170,6 +174,7 @@ function ComponentLibraryBrowser({
 function TemplateBrowser({
   templates,
   onSelectTemplate,
+  activeTheme,
 }: {
   templates: Array<{
     id: string;
@@ -180,6 +185,7 @@ function TemplateBrowser({
     build: () => LayoutSpec;
   }>;
   onSelectTemplate: (templateId: string) => void;
+  activeTheme?: DesignTheme | null;
 }) {
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<string>("all");
@@ -227,24 +233,36 @@ function TemplateBrowser({
 
       {/* Templates grid */}
       <div className="grid grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto pr-1">
-        {filtered.map((template) => (
-          <button
-            key={template.id}
-            onClick={() => onSelectTemplate(template.id)}
-            className="flex flex-col items-start p-4 rounded-lg border border-gray-200 bg-white hover:border-blue-400 hover:bg-blue-50 transition-all duration-150 text-left group"
-          >
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white shadow-sm group-hover:scale-105 transition-transform">
-                <i className={`${template.icon} text-lg`} />
+        {filtered.map((template) => {
+          // Use theme accent colors for the icon background when a theme is active
+          const iconBg = activeTheme
+            ? `linear-gradient(135deg, ${activeTheme.colors['color.accent.primary'] ?? '#3b82f6'}, ${activeTheme.colors['color.accent.secondary'] ?? '#06b6d4'})`
+            : undefined;
+          const iconTextColor = activeTheme
+            ? (activeTheme.colors['color.text.inverse'] ?? '#ffffff')
+            : '#ffffff';
+          return (
+            <button
+              key={template.id}
+              onClick={() => onSelectTemplate(template.id)}
+              className="flex flex-col items-start p-4 rounded-lg border border-gray-200 bg-white hover:border-blue-400 hover:bg-blue-50 transition-all duration-150 text-left group"
+            >
+              <div className="flex items-center gap-3 mb-2">
+                <div
+                  className={`w-10 h-10 rounded-lg flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform ${!activeTheme ? 'bg-gradient-to-br from-blue-500 to-cyan-500' : ''}`}
+                  style={activeTheme ? { background: iconBg, color: iconTextColor } : { color: '#ffffff' }}
+                >
+                  <i className={`${template.icon} text-lg`} />
+                </div>
+                <span className="font-medium text-gray-900">{template.name}</span>
               </div>
-              <span className="font-medium text-gray-900">{template.name}</span>
-            </div>
-            <p className="text-xs text-gray-500 leading-relaxed">{template.description}</p>
-            <span className="mt-2 text-[10px] px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">
-              {TEMPLATE_CATEGORIES.find(c => c.key === template.category)?.label || template.category}
-            </span>
-          </button>
-        ))}
+              <p className="text-xs text-gray-500 leading-relaxed">{template.description}</p>
+              <span className="mt-2 text-[10px] px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">
+                {TEMPLATE_CATEGORIES.find(c => c.key === template.category)?.label || template.category}
+              </span>
+            </button>
+          );
+        })}
       </div>
       {filtered.length === 0 && (
         <div className="mt-3 text-[11px] text-gray-500 text-center py-8">
@@ -291,6 +309,7 @@ export function DialogManager({
   exportDialogOpen,
   setExportDialogOpen,
   currentSpec,
+  activeTheme,
 }: DialogManagerProps): JSX.Element {
   return (
     <>
@@ -461,21 +480,32 @@ export function DialogManager({
       <Modal open={newDialogOpen} onClose={() => setNewDialogOpen(false)} title="Create New Design" size="lg" variant="light">
         <p className="text-sm text-gray-600 mb-4">Choose a template to get started:</p>
         <div className="grid grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto pr-1">
-          {templates.map((template) => (
-            <button
-              key={template.id}
-              onClick={() => onApplyTemplate(template.id)}
-              className="flex flex-col items-start p-4 rounded-lg border border-gray-200 bg-white hover:border-blue-400 hover:bg-blue-50 transition-all duration-150 text-left group"
-            >
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white shadow-sm group-hover:scale-105 transition-transform">
-                  <i className={`${template.icon} text-lg`} />
+          {templates.map((template) => {
+            const iconBg = activeTheme
+              ? `linear-gradient(135deg, ${activeTheme.colors['color.accent.primary'] ?? '#3b82f6'}, ${activeTheme.colors['color.accent.secondary'] ?? '#06b6d4'})`
+              : undefined;
+            const iconTextColor = activeTheme
+              ? (activeTheme.colors['color.text.inverse'] ?? '#ffffff')
+              : '#ffffff';
+            return (
+              <button
+                key={template.id}
+                onClick={() => onApplyTemplate(template.id)}
+                className="flex flex-col items-start p-4 rounded-lg border border-gray-200 bg-white hover:border-blue-400 hover:bg-blue-50 transition-all duration-150 text-left group"
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <div
+                    className={`w-10 h-10 rounded-lg flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform ${!activeTheme ? 'bg-gradient-to-br from-blue-500 to-cyan-500' : ''}`}
+                    style={activeTheme ? { background: iconBg, color: iconTextColor } : { color: '#ffffff' }}
+                  >
+                    <i className={`${template.icon} text-lg`} />
+                  </div>
+                  <span className="font-medium text-gray-900">{template.name}</span>
                 </div>
-                <span className="font-medium text-gray-900">{template.name}</span>
-              </div>
-              <p className="text-xs text-gray-500 leading-relaxed">{template.description}</p>
-            </button>
-          ))}
+                <p className="text-xs text-gray-500 leading-relaxed">{template.description}</p>
+              </button>
+            );
+          })}
         </div>
       </Modal>
 
@@ -526,6 +556,7 @@ export function DialogManager({
       <Modal open={templateBrowserOpen} onClose={() => setTemplateBrowserOpen(false)} title="Template Browser" size="lg" variant="light">
         <TemplateBrowser
           templates={templates}
+          activeTheme={activeTheme}
           onSelectTemplate={(templateId) => {
             onApplyTemplate(templateId);
             setTemplateBrowserOpen(false);
