@@ -13,6 +13,8 @@ export interface HeaderToolbarProps {
   setHelpOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
   setAboutOpen: (open: boolean) => void;
   setCheatOpen: (open: boolean) => void;
+  setGettingStartedOpen: (open: boolean) => void;
+  setCanvasGuideOpen: (open: boolean) => void;
   isCollaborative: boolean;
   status: ConnectionStatus;
   collaborators: Map<number, UserAwareness>;
@@ -33,6 +35,8 @@ export function HeaderToolbar({
   setHelpOpen,
   setAboutOpen,
   setCheatOpen,
+  setGettingStartedOpen,
+  setCanvasGuideOpen,
   isCollaborative,
   status,
   collaborators,
@@ -44,55 +48,70 @@ export function HeaderToolbar({
   tool,
 }: HeaderToolbarProps) {
   return (
-    <header ref={headerRef} className="flex items-center justify-between border-b border-blue-900/30 bg-gradient-to-r from-blue-950 via-blue-900 to-cyan-700 shadow-lg select-none" style={{ padding: '20px' }}>
-      <div className="flex items-center gap-8">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-white/15 backdrop-blur flex items-center justify-center shadow-sm overflow-hidden">
-              <img src="/vizail-mark.svg" alt="Vizail" className="w-7 h-7" />
+    <header ref={headerRef} className="flex items-center justify-between border-b border-blue-900/30 bg-gradient-to-r from-blue-950 via-blue-900 to-cyan-700 shadow-lg select-none px-5 py-2.5">
+      {/* Left: Logo + menus */}
+      <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2.5 mr-4">
+            <div className="w-8 h-8 rounded-lg bg-white/15 backdrop-blur flex items-center justify-center shadow-sm overflow-hidden">
+              <img src="/vizail-mark.svg" alt="Vizail" className="w-5 h-5" />
             </div>
-            <h1 className="tracking-wide text-white" style={{ fontFamily: '"Cal Sans", "Cal Sans Semibold", sans-serif', fontWeight: 600, fontSize: '2em' }}>Viz<span className="text-cyan-300">ai</span>l</h1>
+            <h1 className="tracking-wide text-white" style={{ fontFamily: '"Cal Sans", "Cal Sans Semibold", sans-serif', fontWeight: 600, fontSize: '1.35em' }}>Viz<span className="text-cyan-300">ai</span>l</h1>
           </div>
+          <div className="w-px h-5 bg-white/15 mx-1" />
           {/* File menu */}
           <div className="relative">
             <button
               onClick={() => setFileOpen(o => !o)}
-              className={`text-sm px-3 py-1.5 rounded-md transition-colors duration-150 text-white/90 hover:bg-white/10 ${fileOpen ? 'bg-white/10' : ''}`}
+              className={`text-[13px] px-2.5 py-1.5 rounded-md transition-colors duration-150 text-white/80 hover:text-white hover:bg-white/10 font-medium ${fileOpen ? 'bg-white/10 text-white' : ''}`}
               aria-haspopup="true"
               aria-expanded={fileOpen}
             >
-              <i className="fa-regular fa-folder mr-1.5 text-cyan-300" />
               File
-              <i className="fa-solid fa-chevron-down ml-1.5 text-[10px] text-white/50" />
             </button>
             {fileOpen && (
-              <div className="absolute left-0 mt-1.5 w-48 rounded-lg border border-gray-200 bg-white shadow-xl z-50 p-1.5 flex flex-col overflow-hidden">
+              <div className="absolute left-0 mt-1 w-52 rounded-lg border border-gray-200/90 bg-white shadow-2xl z-50 py-1 flex flex-col overflow-hidden">
                 {[
-                  ["fa-regular fa-file", "New", "new", "⌘N"],
+                  ["fa-regular fa-file", "New Design", "new", "⌘N"],
                   ["fa-regular fa-folder-open", "Open…", "open", "⌘O"],
                   ["fa-solid fa-grid-2", "Templates…", "templates", ""],
+                ].map(([icon, label, act, shortcut]) => (
+                  <button
+                    key={act}
+                    onClick={() => { fileAction(act); setFileOpen(false); }}
+                    className="w-full flex items-center justify-between px-3 py-1.5 text-[13px] hover:bg-blue-50 transition-colors duration-100"
+                  >
+                    <span className="flex items-center gap-2.5">
+                      <i className={`${icon} text-gray-400 w-4 text-xs`} />
+                      <span className="text-gray-700">{label}</span>
+                    </span>
+                    {shortcut && <span className="text-[10px] text-gray-400 font-mono">{shortcut}</span>}
+                  </button>
+                ))}
+                <div className="border-t border-gray-100 my-1" />
+                {[
                   ["fa-regular fa-floppy-disk", "Save", "save", "⌘S"],
                   ["fa-solid fa-file-export", "Save As…", "saveAs", "⇧⌘S"],
                 ].map(([icon, label, act, shortcut]) => (
                   <button
                     key={act}
                     onClick={() => { fileAction(act); setFileOpen(false); }}
-                    className="w-full flex items-center justify-between px-3 py-2 text-sm rounded-md hover:bg-gray-100 transition-colors duration-100"
+                    className="w-full flex items-center justify-between px-3 py-1.5 text-[13px] hover:bg-blue-50 transition-colors duration-100"
                   >
                     <span className="flex items-center gap-2.5">
-                      <i className={`${icon} text-gray-500 w-4`} />
-                      {label}
+                      <i className={`${icon} text-gray-400 w-4 text-xs`} />
+                      <span className="text-gray-700">{label}</span>
                     </span>
                     {shortcut && <span className="text-[10px] text-gray-400 font-mono">{shortcut}</span>}
                   </button>
                 ))}
-                <div className="border-t border-gray-200 my-1.5" />
+                <div className="border-t border-gray-100 my-1" />
                 <button
                   onClick={() => { setExportDialogOpen(true); setFileOpen(false); }}
-                  className="w-full flex items-center justify-between px-3 py-2 text-sm rounded-md hover:bg-gray-100 transition-colors duration-100"
+                  className="w-full flex items-center justify-between px-3 py-1.5 text-[13px] hover:bg-blue-50 transition-colors duration-100"
                 >
                   <span className="flex items-center gap-2.5">
-                    <i className="fa-solid fa-download text-gray-500 w-4" />
-                    Export…
+                    <i className="fa-solid fa-download text-gray-400 w-4 text-xs" />
+                    <span className="text-gray-700">Export…</span>
                   </span>
                   <span className="text-[10px] text-gray-400 font-mono">⇧⌘E</span>
                 </button>
@@ -103,35 +122,50 @@ export function HeaderToolbar({
           <div className="relative">
             <button
               onClick={() => setHelpOpen(o => !o)}
-              className={`text-sm px-3 py-1.5 rounded-md transition-colors duration-150 text-white/90 hover:bg-white/10 ${helpOpen ? 'bg-white/10' : ''}`}
+              className={`text-[13px] px-2.5 py-1.5 rounded-md transition-colors duration-150 text-white/80 hover:text-white hover:bg-white/10 font-medium ${helpOpen ? 'bg-white/10 text-white' : ''}`}
               aria-haspopup="true"
               aria-expanded={helpOpen}
             >
-              <i className="fa-regular fa-circle-question mr-1.5 text-cyan-300" />
               Help
-              <i className="fa-solid fa-chevron-down ml-1.5 text-[10px] text-white/50" />
             </button>
             {helpOpen && (
-              <div className="absolute left-0 mt-1.5 w-52 rounded-lg border border-gray-200 bg-white shadow-xl z-50 p-1.5 flex flex-col overflow-hidden">
+              <div className="absolute left-0 mt-1 w-56 rounded-lg border border-gray-200/90 bg-white shadow-2xl z-50 py-1 flex flex-col overflow-hidden">
                 <button
-                  onClick={() => { setAboutOpen(true); setHelpOpen(false); }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-sm rounded-md hover:bg-gray-100 transition-colors duration-100"
+                  onClick={() => { setGettingStartedOpen(true); setHelpOpen(false); }}
+                  className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[13px] hover:bg-blue-50 transition-colors duration-100"
                 >
-                  <i className="fa-solid fa-info-circle text-gray-500 w-4" />
-                  About
+                  <i className="fa-solid fa-rocket text-blue-400 w-4 text-xs" />
+                  <span className="text-gray-700">Getting Started</span>
                 </button>
                 <button
-                  onClick={() => { setCheatOpen(true); setHelpOpen(false); }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-sm rounded-md hover:bg-gray-100 transition-colors duration-100"
+                  onClick={() => { setCanvasGuideOpen(true); setHelpOpen(false); }}
+                  className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[13px] hover:bg-blue-50 transition-colors duration-100"
                 >
-                  <i className="fa-regular fa-keyboard text-gray-500 w-4" />
-                  Keyboard Shortcuts
+                  <i className="fa-solid fa-paintbrush text-purple-400 w-4 text-xs" />
+                  <span className="text-gray-700">Canvas Tools Guide</span>
+                </button>
+                <div className="border-t border-gray-100 my-1" />
+                <button
+                  onClick={() => { setCheatOpen(true); setHelpOpen(false); }}
+                  className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[13px] hover:bg-blue-50 transition-colors duration-100"
+                >
+                  <i className="fa-regular fa-keyboard text-gray-400 w-4 text-xs" />
+                  <span className="text-gray-700">Keyboard Shortcuts</span>
+                </button>
+                <div className="border-t border-gray-100 my-1" />
+                <button
+                  onClick={() => { setAboutOpen(true); setHelpOpen(false); }}
+                  className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[13px] hover:bg-blue-50 transition-colors duration-100"
+                >
+                  <i className="fa-solid fa-info-circle text-gray-400 w-4 text-xs" />
+                  <span className="text-gray-700">About Vizail</span>
                 </button>
               </div>
             )}
           </div>
       </div>
-      <div className="flex items-center gap-4">
+      {/* Right: Collab + SignIn + Share + Tool */}
+      <div className="flex items-center gap-3">
         {/* Collaboration status (when in collaborative mode) */}
         {isCollaborative && (
           <div className="flex items-center gap-3">
@@ -146,21 +180,20 @@ export function HeaderToolbar({
           </div>
         )}
         {/* Sign-in (Cloudflare Access) */}
-        <div className="flex items-center">
-          <SignIn />
-        </div>
+        <SignIn />
+        <div className="w-px h-5 bg-white/15" />
         {/* Share button */}
         <button
           onClick={() => setShareDialogOpen(true)}
-          className="flex items-center gap-2 text-sm font-medium text-white bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 px-4 py-2 rounded-lg shadow-md transition-all duration-150"
+          className="flex items-center gap-1.5 text-[13px] font-medium text-white bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 px-3.5 py-1.5 rounded-lg shadow-md transition-all duration-150"
         >
-          <i className="fa-solid fa-share-nodes" />
+          <i className="fa-solid fa-share-nodes text-xs" />
           Share
         </button>
         
         {/* Tool indicator */}
-        <div className="flex items-center gap-2 text-xs font-medium text-white/90 bg-white/15 backdrop-blur px-4 py-2 rounded-full border border-white/10">
-          <i className="fa-solid fa-wand-magic-sparkles text-cyan-300" />
+        <div className="flex items-center gap-1.5 text-[11px] font-medium text-white/80 bg-white/10 backdrop-blur px-3 py-1.5 rounded-full border border-white/10">
+          <i className="fa-solid fa-wand-magic-sparkles text-cyan-300 text-[10px]" />
           <span className="capitalize">{tool}</span>
         </div>
       </div>

@@ -5,6 +5,8 @@ export interface DialogState {
   fileOpen: boolean;
   aboutOpen: boolean;
   cheatOpen: boolean;
+  gettingStartedOpen: boolean;
+  canvasGuideOpen: boolean;
   iconLibraryOpen: boolean;
   componentLibraryOpen: boolean;
   newDialogOpen: boolean;
@@ -19,6 +21,8 @@ export interface UseDialogStateReturn extends DialogState {
   setFileOpen: React.Dispatch<React.SetStateAction<boolean>>;
   setAboutOpen: React.Dispatch<React.SetStateAction<boolean>>;
   setCheatOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  setGettingStartedOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  setCanvasGuideOpen: React.Dispatch<React.SetStateAction<boolean>>;
   setIconLibraryOpen: React.Dispatch<React.SetStateAction<boolean>>;
   setComponentLibraryOpen: React.Dispatch<React.SetStateAction<boolean>>;
   setNewDialogOpen: React.Dispatch<React.SetStateAction<boolean>>;
@@ -37,6 +41,8 @@ export function useDialogState(): UseDialogStateReturn {
   const [fileOpen, setFileOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [cheatOpen, setCheatOpen] = useState(false);
+  const [gettingStartedOpen, setGettingStartedOpen] = useState(false);
+  const [canvasGuideOpen, setCanvasGuideOpen] = useState(false);
   const [iconLibraryOpen, setIconLibraryOpen] = useState(false);
   const [componentLibraryOpen, setComponentLibraryOpen] = useState(false);
   const [newDialogOpen, setNewDialogOpen] = useState(false);
@@ -50,6 +56,8 @@ export function useDialogState(): UseDialogStateReturn {
     setFileOpen(false);
     setAboutOpen(false);
     setCheatOpen(false);
+    setGettingStartedOpen(false);
+    setCanvasGuideOpen(false);
     setIconLibraryOpen(false);
     setComponentLibraryOpen(false);
     setNewDialogOpen(false);
@@ -68,6 +76,10 @@ export function useDialogState(): UseDialogStateReturn {
     setAboutOpen,
     cheatOpen,
     setCheatOpen,
+    gettingStartedOpen,
+    setGettingStartedOpen,
+    canvasGuideOpen,
+    setCanvasGuideOpen,
     iconLibraryOpen,
     setIconLibraryOpen,
     componentLibraryOpen,

@@ -37,6 +37,10 @@ export interface DialogManagerProps {
   setAboutOpen: (open: boolean) => void;
   cheatOpen: boolean;
   setCheatOpen: (open: boolean) => void;
+  gettingStartedOpen: boolean;
+  setGettingStartedOpen: (open: boolean) => void;
+  canvasGuideOpen: boolean;
+  setCanvasGuideOpen: (open: boolean) => void;
   iconLibraryOpen: boolean;
   setIconLibraryOpen: (open: boolean) => void;
   componentLibraryOpen: boolean;
@@ -281,6 +285,10 @@ export function DialogManager({
   setAboutOpen,
   cheatOpen,
   setCheatOpen,
+  gettingStartedOpen,
+  setGettingStartedOpen,
+  canvasGuideOpen,
+  setCanvasGuideOpen,
   iconLibraryOpen,
   setIconLibraryOpen,
   componentLibraryOpen,
@@ -385,29 +393,312 @@ export function DialogManager({
 
       {/* About Modal */}
       <Modal open={aboutOpen} onClose={() => setAboutOpen(false)} title="About Vizail" size="sm" variant="light">
-        <p><strong>Vizail</strong> version <code>{appVersion}</code></p>
-        <p className="mt-2">Experimental canvas + layout editor. Transforms are baked to schema on release.</p>
-        <p className="mt-4 opacity-70 text-[10px]">© {new Date().getFullYear()} Vizail</p>
+        <div className="space-y-3">
+          <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center shadow-sm">
+              <i className="fa-solid fa-pen-nib text-white text-lg" />
+            </div>
+            <div>
+              <p className="font-semibold text-gray-800">Vizail</p>
+              <p className="text-xs text-gray-500">Version {appVersion}</p>
+            </div>
+          </div>
+          <p className="text-sm text-gray-600">A visual canvas and layout editor for designing interfaces. Create, prototype, and export design specifications with real-time collaboration.</p>
+          <p className="mt-3 text-[10px] text-gray-400">© {new Date().getFullYear()} Vizail. All rights reserved.</p>
+        </div>
       </Modal>
 
       {/* Keyboard Shortcuts Modal */}
-      <Modal open={cheatOpen} onClose={() => setCheatOpen(false)} title="Interaction Cheatsheet" size="sm" variant="light">
-        <ul className="space-y-1 list-disc pl-4 pr-1 max-h-72 overflow-auto text-xs">
-          <li>Select: Click; Shift/Ctrl multi; marquee drag empty space.</li>
-          <li>Pan: Space+Drag / Middle / Alt+Drag.</li>
-          <li>Zoom: Wheel (cursor focus).</li>
-          <li>Resize: Drag handles; Shift=aspect; Alt=center; Shift+Alt=center+aspect.</li>
-          <li>Rotate: Handle (snaps 0/90/180/270).</li>
-          <li>Images: Non-uniform stretch disables aspect; context menu to restore.</li>
-          <li><strong>Tool Shortcuts:</strong> V=Select, R=Rectangle, O=Ellipse, L=Line, P=Curve, T=Text, I=Image.</li>
-          <li>Rectangle/Ellipse: Drag to draw; Shift=circle/square; Alt=center-out.</li>
-          <li>Line: Click and drag to draw a straight line.</li>
-          <li>Curve: Click to add points, Enter or double-click to finish.</li>
-          <li>Text/Image: Click to place at cursor position.</li>
-          <li>Group: Ctrl/Cmd+G; Ungroup: Ctrl/Cmd+Shift+G.</li>
-          <li>Duplicate: Ctrl/Cmd+D. Delete: Del/Backspace.</li>
-          <li>Nudge: Arrows (1px) / Shift+Arrows (10px).</li>
-        </ul>
+      <Modal open={cheatOpen} onClose={() => setCheatOpen(false)} title="Keyboard Shortcuts" size="lg" variant="light">
+        <div className="grid grid-cols-2 gap-6">
+          {/* Navigation */}
+          <div>
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+              <i className="fa-solid fa-arrows-up-down-left-right text-blue-400" />
+              Navigation
+            </h3>
+            <div className="space-y-1.5">
+              {[
+                ['Click', 'Select element'],
+                ['Shift / Ctrl + Click', 'Multi-select'],
+                ['Drag empty space', 'Marquee select'],
+                ['Space + Drag', 'Pan canvas'],
+                ['Middle mouse drag', 'Pan canvas'],
+                ['Alt + Drag', 'Pan canvas'],
+                ['Scroll wheel', 'Zoom (cursor focus)'],
+              ].map(([key, desc]) => (
+                <div key={key} className="flex items-center justify-between text-[12px]">
+                  <span className="text-gray-600">{desc}</span>
+                  <kbd className="px-1.5 py-0.5 rounded bg-gray-100 border border-gray-200 text-[10px] text-gray-500 font-mono whitespace-nowrap">{key}</kbd>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Tools */}
+          <div>
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+              <i className="fa-solid fa-wand-magic-sparkles text-purple-400" />
+              Tool Shortcuts
+            </h3>
+            <div className="space-y-1.5">
+              {[
+                ['V', 'Select tool'],
+                ['R', 'Rectangle'],
+                ['O', 'Ellipse'],
+                ['L', 'Line'],
+                ['P', 'Curve / Pen'],
+                ['T', 'Text'],
+                ['I', 'Image'],
+              ].map(([key, desc]) => (
+                <div key={key} className="flex items-center justify-between text-[12px]">
+                  <span className="text-gray-600">{desc}</span>
+                  <kbd className="px-1.5 py-0.5 rounded bg-gray-100 border border-gray-200 text-[10px] text-gray-500 font-mono">{key}</kbd>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Transform */}
+          <div>
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+              <i className="fa-solid fa-up-right-and-down-left-from-center text-green-400" />
+              Transform
+            </h3>
+            <div className="space-y-1.5">
+              {[
+                ['Drag handles', 'Resize element'],
+                ['Shift + Drag', 'Maintain aspect ratio'],
+                ['Alt + Drag', 'Resize from center'],
+                ['Shift + Alt + Drag', 'Center + aspect ratio'],
+                ['Rotation handle', 'Rotate (snaps 0/90/180/270)'],
+                ['Arrows', 'Nudge 1px'],
+                ['Shift + Arrows', 'Nudge 10px'],
+              ].map(([key, desc]) => (
+                <div key={key} className="flex items-center justify-between text-[12px]">
+                  <span className="text-gray-600">{desc}</span>
+                  <kbd className="px-1.5 py-0.5 rounded bg-gray-100 border border-gray-200 text-[10px] text-gray-500 font-mono whitespace-nowrap">{key}</kbd>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div>
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+              <i className="fa-solid fa-bolt text-amber-400" />
+              Actions
+            </h3>
+            <div className="space-y-1.5">
+              {[
+                ['⌘ + Z', 'Undo'],
+                ['⌘ + Shift + Z', 'Redo'],
+                ['⌘ + C', 'Copy'],
+                ['⌘ + V', 'Paste'],
+                ['⌘ + D', 'Duplicate'],
+                ['⌘ + G', 'Group selection'],
+                ['⌘ + Shift + G', 'Ungroup'],
+                ['Delete / Backspace', 'Delete selected'],
+              ].map(([key, desc]) => (
+                <div key={key} className="flex items-center justify-between text-[12px]">
+                  <span className="text-gray-600">{desc}</span>
+                  <kbd className="px-1.5 py-0.5 rounded bg-gray-100 border border-gray-200 text-[10px] text-gray-500 font-mono whitespace-nowrap">{key}</kbd>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Drawing tips */}
+        <div className="mt-4 pt-4 border-t border-gray-100">
+          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+            <i className="fa-solid fa-lightbulb text-yellow-400" />
+            Drawing Tips
+          </h3>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
+            {[
+              ['Rectangle / Ellipse', 'Drag to draw; Shift = square/circle; Alt = center-out'],
+              ['Line', 'Click and drag to draw a straight line'],
+              ['Curve', 'Click to add points; Enter or double-click to finish'],
+              ['Text / Image', 'Click to place at cursor position'],
+              ['Images', 'Non-uniform stretch disables aspect lock; right-click to restore'],
+            ].map(([tool, tip]) => (
+              <div key={tool} className="text-[12px]">
+                <span className="font-medium text-gray-700">{tool}:</span>{' '}
+                <span className="text-gray-500">{tip}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Modal>
+
+      {/* Getting Started Modal */}
+      <Modal open={gettingStartedOpen} onClose={() => setGettingStartedOpen(false)} title="Getting Started" size="lg" variant="light">
+        <div className="space-y-5">
+          <p className="text-sm text-gray-600">Welcome to Vizail! Here's a quick overview to get you up and running.</p>
+
+          <div className="grid grid-cols-1 gap-4">
+            {[
+              {
+                icon: 'fa-solid fa-pen-ruler',
+                color: 'from-blue-500 to-cyan-400',
+                title: 'Create Designs',
+                desc: 'Use the left toolbar to select drawing tools — rectangles, ellipses, lines, curves, and text. Click or drag on the canvas to place elements.',
+              },
+              {
+                icon: 'fa-solid fa-layer-group',
+                color: 'from-purple-500 to-pink-400',
+                title: 'Organize with Layers',
+                desc: 'Group elements with ⌘G and ungroup with ⌘⇧G. Use the right sidebar to inspect and adjust properties of selected elements.',
+              },
+              {
+                icon: 'fa-solid fa-palette',
+                color: 'from-amber-500 to-orange-400',
+                title: 'Apply Themes',
+                desc: 'Switch to the Theme tab in the right sidebar to browse and apply color palettes. Themes propagate to all canvas elements automatically.',
+              },
+              {
+                icon: 'fa-solid fa-puzzle-piece',
+                color: 'from-green-500 to-emerald-400',
+                title: 'Use Components & Templates',
+                desc: 'Open the component or template library from File menu to quickly scaffold designs. Templates come pre-styled with the active theme.',
+              },
+              {
+                icon: 'fa-solid fa-users',
+                color: 'from-cyan-500 to-blue-400',
+                title: 'Collaborate in Real-Time',
+                desc: 'Click Share to start or join a collaborative session. Changes sync instantly across all participants — both humans and AI agents.',
+              },
+              {
+                icon: 'fa-solid fa-file-export',
+                color: 'from-rose-500 to-pink-400',
+                title: 'Export Your Work',
+                desc: 'Export your design as JSON, PNG, or SVG from File → Export. Save your work at any time with ⌘S.',
+              },
+            ].map((item) => (
+              <div key={item.title} className="flex gap-3 items-start">
+                <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${item.color} flex items-center justify-center shadow-sm flex-shrink-0`}>
+                  <i className={`${item.icon} text-white text-sm`} />
+                </div>
+                <div className="min-w-0">
+                  <h4 className="text-sm font-semibold text-gray-800">{item.title}</h4>
+                  <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{item.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
+            <p className="text-xs text-blue-700 flex items-center gap-1.5">
+              <i className="fa-solid fa-lightbulb text-blue-400" />
+              <strong>Tip:</strong> Press <kbd className="px-1 py-0.5 rounded bg-white border border-blue-200 text-[10px] font-mono">?</kbd> at any time to open keyboard shortcuts.
+            </p>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Canvas Tools Guide Modal */}
+      <Modal open={canvasGuideOpen} onClose={() => setCanvasGuideOpen(false)} title="Canvas Tools Guide" size="lg" variant="light">
+        <div className="space-y-5">
+          <p className="text-sm text-gray-600">A detailed guide to each tool available in the canvas editor.</p>
+
+          {[
+            {
+              icon: 'fa-solid fa-arrow-pointer',
+              key: 'V',
+              title: 'Select Tool',
+              color: 'text-gray-600',
+              details: [
+                'Click any element to select it',
+                'Hold Shift or Ctrl to add to the selection',
+                'Drag on empty space to create a marquee selection box',
+                'Drag selected elements to move them',
+                'Use corner handles to resize; edge handles for single-axis resize',
+              ],
+            },
+            {
+              icon: 'fa-regular fa-square',
+              key: 'R',
+              title: 'Rectangle Tool',
+              color: 'text-blue-500',
+              details: [
+                'Click and drag to draw a rectangle',
+                'Hold Shift while dragging for a perfect square',
+                'Hold Alt to draw from center outward',
+                'Combine Shift + Alt for a centered square',
+                'Adjust corner radius in the right sidebar after drawing',
+              ],
+            },
+            {
+              icon: 'fa-regular fa-circle',
+              key: 'O',
+              title: 'Ellipse Tool',
+              color: 'text-purple-500',
+              details: [
+                'Click and drag to draw an ellipse',
+                'Hold Shift for a perfect circle',
+                'Hold Alt to draw from center outward',
+              ],
+            },
+            {
+              icon: 'fa-solid fa-minus',
+              key: 'L',
+              title: 'Line Tool',
+              color: 'text-green-500',
+              details: [
+                'Click and drag to draw a straight line',
+                'Adjust stroke width and color in the right sidebar',
+              ],
+            },
+            {
+              icon: 'fa-solid fa-bezier-curve',
+              key: 'P',
+              title: 'Curve / Pen Tool',
+              color: 'text-amber-500',
+              details: [
+                'Click to place anchor points along a path',
+                'Press Enter or double-click the last point to finish',
+                'Creates smooth, editable vector curves',
+              ],
+            },
+            {
+              icon: 'fa-solid fa-font',
+              key: 'T',
+              title: 'Text Tool',
+              color: 'text-rose-500',
+              details: [
+                'Click on the canvas to place a text element',
+                'Double-click an existing text to edit it inline',
+                'Change font family, size, weight, and color in the sidebar',
+                'Supports theme-aware font propagation',
+              ],
+            },
+            {
+              icon: 'fa-regular fa-image',
+              key: 'I',
+              title: 'Image Tool',
+              color: 'text-cyan-500',
+              details: [
+                'Click on the canvas to place an image placeholder',
+                'Upload or paste an image URL in the sidebar',
+                'Drag handles to resize; Shift to maintain aspect ratio',
+              ],
+            },
+          ].map((tool) => (
+            <div key={tool.key} className="border border-gray-100 rounded-lg p-3">
+              <div className="flex items-center gap-2.5 mb-2">
+                <i className={`${tool.icon} ${tool.color} w-4`} />
+                <h4 className="text-sm font-semibold text-gray-800">{tool.title}</h4>
+                <kbd className="ml-auto px-1.5 py-0.5 rounded bg-gray-100 border border-gray-200 text-[10px] text-gray-500 font-mono">{tool.key}</kbd>
+              </div>
+              <ul className="space-y-1 ml-6">
+                {tool.details.map((d, i) => (
+                  <li key={i} className="text-xs text-gray-500 list-disc leading-relaxed">{d}</li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
       </Modal>
 
       {/* Icon Library Modal */}

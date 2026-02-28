@@ -767,6 +767,10 @@ export default function CanvasApp() {
     setAboutOpen,
     cheatOpen,
     setCheatOpen,
+    gettingStartedOpen,
+    setGettingStartedOpen,
+    canvasGuideOpen,
+    setCanvasGuideOpen,
     iconLibraryOpen,
     setIconLibraryOpen,
     componentLibraryOpen,
@@ -1257,6 +1261,8 @@ export default function CanvasApp() {
         setHelpOpen={setHelpOpen}
         setAboutOpen={setAboutOpen}
         setCheatOpen={setCheatOpen}
+        setGettingStartedOpen={setGettingStartedOpen}
+        setCanvasGuideOpen={setCanvasGuideOpen}
         isCollaborative={isCollaborative}
         status={status}
         collaborators={collaborators}
@@ -1275,6 +1281,10 @@ export default function CanvasApp() {
         setAboutOpen={setAboutOpen}
         cheatOpen={cheatOpen}
         setCheatOpen={setCheatOpen}
+        gettingStartedOpen={gettingStartedOpen}
+        setGettingStartedOpen={setGettingStartedOpen}
+        canvasGuideOpen={canvasGuideOpen}
+        setCanvasGuideOpen={setCanvasGuideOpen}
         iconLibraryOpen={iconLibraryOpen}
         setIconLibraryOpen={setIconLibraryOpen}
         componentLibraryOpen={componentLibraryOpen}
