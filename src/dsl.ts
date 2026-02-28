@@ -109,6 +109,25 @@ export type RootSpec = {
   body: NodeSpec;
 };
 
+// ── Namespaced aliases ──────────────────────────────────────────────
+// These Dsl-prefixed aliases distinguish the Tailwind-class-based DSL
+// types from the pixel-based canvas types in layout-schema.ts which
+// share the same short names (TextNode, StackNode, GridNode, etc.).
+// New code should prefer the Dsl-prefixed versions for clarity.
+export type DslTextNode = TextNode;
+export type DslStackNode = StackNode;
+export type DslGridNode = GridNode;
+export type DslIconNode = IconNode;
+export type DslImageNode = ImageNode;
+export type DslBadgeNode = BadgeNode;
+export type DslProgressNode = ProgressNode;
+export type DslAccordionItemNode = AccordionItemNode;
+export type DslAccordionNode = AccordionNode;
+export type DslCarouselNode = CarouselNode;
+export type DslBoxNode = BoxNode;
+export type DslNodeSpec = NodeSpec;
+export type DslRootSpec = RootSpec;
+
 export function cx(...parts: Array<string | false | null | undefined>): string {
   return parts.filter(Boolean).join(" ");
 }

@@ -579,7 +579,7 @@ function CanvasStage({
       setPolygonSides(newSides);
     };
     window.addEventListener('wheel', onWheel, { passive: false, capture: true });
-    return () => window.removeEventListener('wheel', onWheel, { capture: true } as any);
+    return () => window.removeEventListener('wheel', onWheel, { capture: true } as EventListenerOptions);
   }, [isPolygonMode, polygonDraft]);
 
   // Curve edit mode: exit on Escape or Enter

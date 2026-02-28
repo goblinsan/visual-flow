@@ -1,6 +1,6 @@
 import { useCallback, useState, useRef, useEffect, type MutableRefObject } from 'react';
 import type Konva from 'konva';
-import type { LayoutSpec, TextNode, TextSpan, FrameNode } from '../../layout-schema';
+import type { LayoutSpec, LayoutNode, TextNode, TextSpan, FrameNode } from '../../layout-schema';
 import { mapNode } from '../../commands/types';
 import type { RichTextEditorHandle } from '../../components/RichTextEditor';
 
@@ -9,7 +9,7 @@ export interface UseTextEditingProps {
   setSpec: (spec: LayoutSpec | ((prev: LayoutSpec) => LayoutSpec)) => void;
   onToolChange?: (tool: string) => void;
   setSelection: (ids: string[]) => void;
-  findNode: (root: any, id: string) => any;
+  findNode: (root: LayoutNode, id: string) => LayoutNode | null;
   getNodeWorldPosition: (id: string) => { x: number; y: number } | null;
   stageRef: React.RefObject<Konva.Stage | null>;
   wrapperRef: React.RefObject<HTMLDivElement | null>;

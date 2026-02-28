@@ -104,7 +104,7 @@ export function yjsToLayoutSpec(ydoc: Y.Doc): LayoutSpec {
     }
 
     // Convert Y.Map to plain object
-    const nodeProps: any = {};
+    const nodeProps: Record<string, unknown> = {};
     yNodeProps.forEach((value, key) => {
       nodeProps[key] = value;
     });
@@ -128,7 +128,7 @@ export function yjsToLayoutSpec(ydoc: Y.Doc): LayoutSpec {
 
   // Convert flows
   const flows = yFlows.toArray().map(yFlow => {
-    const flow: any = {};
+    const flow: Record<string, unknown> = {};
     yFlow.forEach((value, key) => {
       flow[key] = value;
     });

@@ -544,7 +544,7 @@ export function AttributesSidebar({
                           />
                         </div>
                         {/* Navigate into nested groups */}
-                        {(['group', 'frame', 'stack', 'grid'].includes(child.type) && 'children' in child && (child.children as any[]).length > 0) && (
+                        {(['group', 'frame', 'stack', 'grid'].includes(child.type) && 'children' in child && (child.children as LayoutNode[]).length > 0) && (
                           <button
                             type="button"
                             onMouseDown={(e) => {
@@ -580,7 +580,7 @@ export function AttributesSidebar({
                             className="w-full px-2 py-1.5 text-[11px] bg-blue-50 text-blue-600 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors flex items-center justify-center gap-1.5"
                           >
                             <i className="fa-solid fa-arrow-right-to-bracket" />
-                            Edit Nested Group ({(child.children as any[]).length} children)
+                            Edit Nested Group ({(child.children as LayoutNode[]).length} children)
                           </button>
                         )}
                         {renderElementPanelFor(child)}

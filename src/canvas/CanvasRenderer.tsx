@@ -528,7 +528,7 @@ function renderCurve(n: CurveNode) {
   }
 
   // Determine fill (supports gradient)
-  let fillProps: any = {};
+  let fillProps: Record<string, unknown> = {};
   if (n.fill !== undefined || n.fillGradient !== undefined) {
     if (n.fillGradient) {
       const colorStops: number[] = [];
@@ -671,7 +671,7 @@ function renderPolygon(n: PolygonNode) {
   const hasStroke = n.stroke !== undefined;
   
   // Handle gradient fills
-  let gradientProps: any = {};
+  let gradientProps: Record<string, unknown> = {};
   if (n.fillGradient) {
     const colorStops: number[] = [];
     n.fillGradient.colors.forEach((color, index) => {

@@ -5,7 +5,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import type { LayoutSpec } from '../layout-schema';
+import type { LayoutSpec, LayoutNode } from '../layout-schema';
 import type { UserAwareness } from '../collaboration/types';
 
 interface ConflictEvent {
@@ -111,8 +111,8 @@ function detectChangedNodes(
   const changedIds: string[] = [];
 
   // Build node maps for comparison
-  const prevNodes = new Map<string, any>();
-  const currentNodes = new Map<string, any>();
+  const prevNodes = new Map<string, LayoutNode>();
+  const currentNodes = new Map<string, LayoutNode>();
 
   // Collect all nodes from specs
   collectNodes(prevSpec.root, prevNodes);
@@ -140,7 +140,7 @@ function detectChangedNodes(
 /**
  * Recursively collect all nodes from a tree
  */
-function collectNodes(node: any, nodeMap: Map<string, any>) {
+function collectNodes(node: LayoutNode, nodeMap: Map<string, LayoutNode>) {
   if (!node || typeof node !== 'object') return;
   
   if (node.id) {
