@@ -219,8 +219,6 @@ function buildDashboard(c: string[], hf: string, bf: string): LayoutSpec {
 
 function buildLanding(c: string[], hf: string, bf: string): LayoutSpec {
   const primary = safe(c, 0);
-  const accent = safe(c, 1);
-  const secondary = c.length > 2 ? safe(c, 2) : accent;
   return {
     root: {
       id: 'root', type: 'frame', size: { width: 1440, height: 1200 }, background: undefined,
@@ -313,7 +311,6 @@ function PreviewTopNav({ colors, hf, bf }: { colors: string[]; hf: string; bf: s
 
 function PreviewLeftNav({ colors, hf, bf }: { colors: string[]; hf: string; bf: string }) {
   const sidebar = safe(colors, 0);
-  const accent = safe(colors, 1);
   return (
     <div style={{ fontFamily: bf, display: 'flex', minHeight: '100%' }}>
       <aside style={{ width: 220, background: sidebar, padding: '24px 16px', flexShrink: 0 }}>
@@ -347,7 +344,6 @@ function PreviewLeftNav({ colors, hf, bf }: { colors: string[]; hf: string; bf: 
 
 function PreviewMobile({ colors, hf, bf }: { colors: string[]; hf: string; bf: string }) {
   const primary = safe(colors, 0);
-  const accent = safe(colors, 1);
   return (
     <div style={{ fontFamily: bf, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100%', background: '#e5e7eb', padding: 32 }}>
       <div style={{ width: 375, height: 760, background: '#fff', borderRadius: 44, border: '2px solid #d1d5db', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
@@ -420,7 +416,6 @@ function PreviewDashboard({ colors, hf, bf }: { colors: string[]; hf: string; bf
 
 function PreviewLanding({ colors, hf, bf }: { colors: string[]; hf: string; bf: string }) {
   const primary = safe(colors, 0);
-  const accent = safe(colors, 1);
   return (
     <div style={{ fontFamily: bf, background: '#fff', minHeight: '100%' }}>
       <nav style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 48px', height: 64, borderBottom: '1px solid #e5e7eb' }}>
