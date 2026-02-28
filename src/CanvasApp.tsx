@@ -35,6 +35,8 @@ import { AgentPanel } from './components/canvas/AgentPanel';
 import { ToolSettingsBar } from './components/canvas/ToolSettingsBar';
 import { ChooseModeModal } from './roblox/ChooseModeModal';
 import type { DesignMode } from './roblox/ChooseModeModal';
+import { useDesignTheme } from './theme';
+import { applyThemeToSpec } from './theme';
 
 /** Get room ID from URL query param ?room=xxx */
 function getRoomIdFromURL(): string | null {
@@ -661,7 +663,12 @@ const TEMPLATES: { id: string; name: string; icon: string; description: string; 
 
 export default function CanvasApp() {
   // Design mode (#142): null = not chosen yet, shown as modal on first load
-  const [designMode, setDesignMode] = useState<DesignMode | null>(null);
+  // Auto-select 'general' when arriving from the Kulrs import flow
+  const [designMode, setDesignMode] = useState<DesignMode | null>(() => {
+    const name = getCurrentDesignName();
+    if (name && name.startsWith('Kulrs Import')) return 'general';
+    return null;
+  });
 
   // Collaboration state
   const [roomId, setRoomId] = useState<string | null>(getRoomIdFromURL);
@@ -851,6 +858,16 @@ export default function CanvasApp() {
   const skipNormalizationRef = useRef(false);
   const appVersion = import.meta.env.VITE_APP_VERSION ?? '0.0.0';
 
+  // Design theme (Kulrs integration)
+  const {
+    theme: activeTheme,
+    applyPalette,
+    toggleMode: toggleThemeMode,
+    updateTokenColor,
+    updateTypography,
+    updatePaletteOrder,
+  } = useDesignTheme();
+
   const { isAuthenticated } = useAuth();
 
   // Toast notification for save feedback
@@ -889,6 +906,22 @@ export default function CanvasApp() {
 
   const pushRecent = useCallback((col?: string) => { if (col) commitRecent(col); }, [commitRecent]);
   const wrappedPreviewRecent = useCallback((col?: string) => { if (col) previewRecent(col); }, [previewRecent]);
+
+  /** Apply a Kulrs palette as the active design theme and update the spec */
+  const handleApplyPaletteAsTheme = useCallback((paletteColors: string[], mode: 'light' | 'dark', paletteId?: string) => {
+    const newTheme = applyPalette(paletteColors, mode, {
+      name: `Kulrs ${mode === 'dark' ? 'Dark' : 'Light'}`,
+      kulrsPaletteId: paletteId,
+    });
+    // Apply theme to the current spec (resolve all bindings)
+    setSpec(prev => applyThemeToSpec(prev, newTheme));
+  }, [applyPalette, setSpec]);
+
+  /** Handle picking a theme color — apply to selected element or current tool */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const handlePickThemeColor = useCallback((hex: string, _token: import('./theme/types').ColorTokenName) => {
+    pushRecent(hex);
+  }, [pushRecent]);
 
   const updateFlows = useCallback((nextFlows: Flow[]) => {
     setSpec(prev => ({ ...prev, flows: nextFlows }));
@@ -1285,6 +1318,8 @@ export default function CanvasApp() {
             snapAnchor={snapAnchor}
             setSnapAnchor={setSnapAnchor}
             selectedCount={selectedIds.length}
+            activeTheme={activeTheme}
+            onPickThemeColor={handlePickThemeColor}
           />
           <div 
             ref={canvasRef} 
@@ -1619,6 +1654,13 @@ export default function CanvasApp() {
                   updateSelection={updateSelection}
                   blockCanvasClicksRef={blockCanvasClicksRef}
                   skipNormalizationRef={skipNormalizationRef}
+                  activeTheme={activeTheme}
+                  onApplyPaletteAsTheme={handleApplyPaletteAsTheme}
+                  onUpdateTokenColor={updateTokenColor}
+                  onUpdateTypography={updateTypography}
+                  onUpdatePaletteOrder={updatePaletteOrder}
+                  onToggleThemeMode={toggleThemeMode}
+                  onPickThemeColor={handlePickThemeColor}
                 />
               )}
 

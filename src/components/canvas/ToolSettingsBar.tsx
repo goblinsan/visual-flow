@@ -1,5 +1,7 @@
 // ToolSettingsBar — persistent settings bar at top of canvas area
 import { useState, useRef, useEffect, useMemo } from 'react';
+import type { DesignTheme, ColorTokenName } from '../../theme/types';
+// COLOR_TOKEN_GROUPS and tokenShortName available from theme/types if needed
 
 /** Curated font list for quick selection in the toolbar */
 const TOOLBAR_FONTS = [
@@ -198,6 +200,10 @@ interface ToolSettingsBarProps {
   setSnapAnchor: (anchor: 'center' | 'border' | 'both') => void;
   /** Selection info */
   selectedCount: number;
+  /** Active design theme (if any) */
+  activeTheme?: DesignTheme | null;
+  /** Called when a theme color is picked from the toolbar */
+  onPickThemeColor?: (hex: string, token: ColorTokenName) => void;
 }
 
 const DRAWING_TOOLS: Record<string, string> = {
@@ -239,6 +245,8 @@ export function ToolSettingsBar({
   snapAnchor,
   setSnapAnchor,
   selectedCount,
+  activeTheme,
+  onPickThemeColor,
 }: ToolSettingsBarProps) {
   const isDrawingTool = Boolean(DRAWING_TOOLS[tool]);
   const isShapeTool = tool === 'rect' || tool === 'ellipse' || tool === 'polygon';
@@ -677,6 +685,34 @@ export function ToolSettingsBar({
               className="w-12 px-1 py-0.5 border border-gray-300 rounded text-center text-xs focus:outline-none focus:ring-1 focus:ring-blue-400"
             />
           </label>
+        </>
+      )}
+
+      {/* ─── Theme color swatches (when a theme is active and a drawing tool is selected) ─── */}
+      {activeTheme && isDrawingTool && onPickThemeColor && (
+        <>
+          <div className="w-px h-4 bg-gray-200" />
+          <div className="flex items-center gap-1">
+            <i className="fa-solid fa-palette text-teal-500 text-[9px]" title="Theme colors" />
+            {activeTheme.paletteColors.map((hex, idx) => (
+              <button
+                key={`${hex}-${idx}`}
+                type="button"
+                onClick={() => {
+                  // Apply to the appropriate default based on tool
+                  if (isShapeTool) updateRectDefaults({ fill: hex });
+                  else if (isLineTool) updateLineDefaults({ stroke: hex });
+                  else if (tool === 'curve') updateCurveDefaults({ stroke: hex });
+                  else if (tool === 'draw') updateDrawDefaults({ stroke: hex });
+                  else if (isTextTool) updateTextDefaults({ color: hex });
+                  onPickThemeColor(hex, 'color.accent.primary');
+                }}
+                className="w-4 h-4 rounded-sm border border-gray-300 hover:ring-2 hover:ring-teal-300 cursor-pointer transition-all flex-shrink-0"
+                style={{ backgroundColor: hex }}
+                title={`Theme color: ${hex}`}
+              />
+            ))}
+          </div>
         </>
       )}
 

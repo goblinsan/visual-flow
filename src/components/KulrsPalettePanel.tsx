@@ -243,6 +243,10 @@ export interface KulrsPalettePanelProps {
   spec?: LayoutSpec;
   /** Spec updater (for theme remapping). */
   setSpec?: (fn: (prev: LayoutSpec) => LayoutSpec) => void;
+  /** Apply a Kulrs palette as the design theme (new) */
+  onApplyAsTheme?: (paletteColors: string[], mode: 'light' | 'dark', paletteId?: string) => void;
+  /** Whether a design theme is currently active */
+  hasActiveTheme?: boolean;
 }
 
 type SortMode = 'recent' | 'popular';
@@ -253,6 +257,7 @@ export function KulrsPalettePanel({
   onApplyStroke,
   spec,
   setSpec,
+  onApplyAsTheme,
 }: KulrsPalettePanelProps) {
   const [palettes, setPalettes] = useState<KulrsPalette[]>([]);
   const [loading, setLoading] = useState(false);
@@ -500,6 +505,37 @@ export function KulrsPalettePanel({
                 </span>
                 <span>{new Date(searchResult.createdAt).toLocaleDateString()}</span>
               </div>
+              {/* Apply as Theme buttons */}
+              {onApplyAsTheme && (
+                <div className="flex gap-1 mt-1">
+                  <button
+                    type="button"
+                    onClick={() => onApplyAsTheme(
+                      searchResult.colors.sort((a, b) => a.position - b.position).map(c => c.hexValue),
+                      'light',
+                      searchResult.id,
+                    )}
+                    className="flex-1 text-[9px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors flex items-center justify-center gap-1"
+                    title="Apply this palette as a light design theme"
+                  >
+                    <i className="fa-solid fa-sun text-[7px]" />
+                    Light Theme
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onApplyAsTheme(
+                      searchResult.colors.sort((a, b) => a.position - b.position).map(c => c.hexValue),
+                      'dark',
+                      searchResult.id,
+                    )}
+                    className="flex-1 text-[9px] px-1.5 py-0.5 rounded bg-slate-700 text-slate-200 border border-slate-600 hover:bg-slate-600 transition-colors flex items-center justify-center gap-1"
+                    title="Apply this palette as a dark design theme"
+                  >
+                    <i className="fa-solid fa-moon text-[7px]" />
+                    Dark Theme
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -559,15 +595,45 @@ export function KulrsPalettePanel({
                       />
                     ))}
                 </div>
-                {/* Meta */}
-                <div className="flex justify-between text-[9px] text-gray-400 mt-0.5 px-0.5">
+                {/* Meta + Apply as Theme */}
+                <div className="flex justify-between items-center text-[9px] text-gray-400 mt-0.5 px-0.5">
                   <span>
                     {palette.colors.length} colors
                     {palette.likesCount > 0 && (
                       <> · ❤ {palette.likesCount}</>
                     )}
                   </span>
-                  <span>{new Date(palette.createdAt).toLocaleDateString()}</span>
+                  <div className="flex items-center gap-1">
+                    {onApplyAsTheme && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => onApplyAsTheme(
+                            palette.colors.sort((a, b) => a.position - b.position).map(c => c.hexValue),
+                            'light',
+                            palette.id,
+                          )}
+                          className="px-1 py-0 rounded text-[8px] bg-amber-50 text-amber-600 hover:bg-amber-100 border border-amber-200 transition-colors opacity-0 group-hover/palette:opacity-100"
+                          title="Apply as light theme"
+                        >
+                          <i className="fa-solid fa-sun" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onApplyAsTheme(
+                            palette.colors.sort((a, b) => a.position - b.position).map(c => c.hexValue),
+                            'dark',
+                            palette.id,
+                          )}
+                          className="px-1 py-0 rounded text-[8px] bg-slate-600 text-slate-200 hover:bg-slate-500 border border-slate-500 transition-colors opacity-0 group-hover/palette:opacity-100"
+                          title="Apply as dark theme"
+                        >
+                          <i className="fa-solid fa-moon" />
+                        </button>
+                      </>
+                    )}
+                    <span>{new Date(palette.createdAt).toLocaleDateString()}</span>
+                  </div>
                 </div>
               </div>
             ))}

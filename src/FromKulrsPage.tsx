@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { LayoutSpec, LayoutNode } from './layout-schema';
 import { saveDesignSpec, setCurrentDesignName } from './utils/persistence';
+import { generateThemeFromPalette } from './theme/themeGenerator';
 
 /* ── URL param parsing ─────────────────────────────────────────────── */
 
@@ -533,6 +534,15 @@ export default function FromKulrsPage() {
   const handleEditInVizail = () => {
     saveDesignSpec(spec);
     setCurrentDesignName(`Kulrs Import — ${TEMPLATE_LABELS[template]}`);
+    // Also save the Kulrs palette as a design theme so it's available in the editor
+    const themeMode = theme === 'dark' ? 'dark' : 'light';
+    const designTheme = generateThemeFromPalette(colors, themeMode as 'light' | 'dark', {
+      name: `Kulrs ${themeMode === 'dark' ? 'Dark' : 'Light'}`,
+      typography: { headingFont, bodyFont },
+    });
+    try {
+      localStorage.setItem('vizail_design_theme', JSON.stringify(designTheme));
+    } catch { /* ignore */ }
     setEditOpened(true);
     window.location.href = '/';
   };

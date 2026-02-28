@@ -1,5 +1,7 @@
 // Unified layout schema (formerly V2)
 
+import type { ColorTokenName } from './theme/types';
+
 export type NodeType =
   | "frame"
   | "stack"
@@ -15,6 +17,10 @@ export type NodeType =
   | "draw"
   | "polygon";
 
+/** Binds a node's color properties to semantic theme tokens.
+ *  When a theme changes, all bound properties update automatically. */
+export type ThemeBindings = Partial<Record<'fill' | 'stroke' | 'color' | 'background', ColorTokenName>>;
+
 export interface BaseNode {
   id: string;
   name?: string;
@@ -27,6 +33,8 @@ export interface BaseNode {
   position?: Pos;
   size?: Size;
   children?: LayoutNode[];
+  /** Optional theme bindings — maps color properties to semantic tokens */
+  themeBindings?: ThemeBindings;
 }
 
 export interface Pos {
@@ -242,6 +250,8 @@ export interface LayoutSpec {
   version?: string; // schema version (e.g., "1.0.0"); undefined = legacy/pre-versioning
   root: FrameNode;
   flows?: Flow[];
+  /** ID of the active design theme (persisted separately in useDesignTheme) */
+  activeThemeId?: string;
 }
 
 export interface FlowTransition {
