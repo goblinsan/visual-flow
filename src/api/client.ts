@@ -136,6 +136,8 @@ function mapAgentConnectResponse(raw: Record<string, unknown>): AgentConnectResp
 
 export class ApiClient {
   private baseUrl: string;
+  /** Maximum retries on 429 rate-limit responses */
+  private maxRetries = 3;
 
   constructor(baseUrl: string = '/api') {
     this.baseUrl = baseUrl;
@@ -145,28 +147,44 @@ export class ApiClient {
     path: string,
     options: RequestInit = {}
   ): Promise<{ data?: T; error?: string }> {
-    try {
-      const response = await fetch(`${this.baseUrl}${path}`, {
-        ...options,
-        headers: {
-          'Content-Type': 'application/json',
-          // In development, send X-User-Email for testing
-          // In production, rely on Cloudflare Access which sets CF-Access-Authenticated-User-Email
-          ...(import.meta.env.DEV ? { 'X-User-Email': 'dev@localhost' } : {}),
-          ...options.headers,
-        },
-      });
+    let lastError: string | undefined;
 
-      const data = await response.json();
+    for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
+      try {
+        const response = await fetch(`${this.baseUrl}${path}`, {
+          ...options,
+          headers: {
+            'Content-Type': 'application/json',
+            ...(import.meta.env.DEV ? { 'X-User-Email': 'dev@localhost' } : {}),
+            ...options.headers,
+          },
+        });
 
-      if (!response.ok) {
-        return { error: data.error || `HTTP ${response.status}` };
+        // Retry on 429 with exponential backoff
+        if (response.status === 429 && attempt < this.maxRetries) {
+          const retryAfter = response.headers.get('Retry-After');
+          const delayMs = retryAfter
+            ? Math.min(parseInt(retryAfter, 10) * 1000, 30_000)
+            : Math.min(1000 * 2 ** attempt, 30_000);
+          await new Promise(r => setTimeout(r, delayMs));
+          continue;
+        }
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          return { error: data.error || `HTTP ${response.status}` };
+        }
+
+        return { data };
+      } catch (err) {
+        lastError = err instanceof Error ? err.message : 'Network error';
+        // Don't retry network errors
+        break;
       }
-
-      return { data };
-    } catch (err) {
-      return { error: err instanceof Error ? err.message : 'Network error' };
     }
+
+    return { error: lastError ?? 'Rate limited — please try again' };
   }
 
   // Canvas methods

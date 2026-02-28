@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { Select } from './Select';
+import { uploadImageFile } from '../utils/imageUpload';
 
 export interface ImageNode {
   id: string;
@@ -37,10 +38,11 @@ export const ImageAttributesPanel: React.FC<ImageAttributesPanelProps> = ({
       return;
     }
 
-    // Create object URL for the selected file
-    const url = URL.createObjectURL(file);
-    updateNode({ src: url, alt: file.name });
-    setUrlInput(url);
+    // Upload to R2 (falls back to data URL if offline)
+    uploadImageFile(file).then(({ url }) => {
+      updateNode({ src: url, alt: file.name });
+      setUrlInput(url);
+    });
   };
 
   // Handle URL input

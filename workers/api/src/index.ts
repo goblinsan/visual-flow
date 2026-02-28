@@ -8,7 +8,6 @@ import { authenticateRequest, authenticateUser } from './auth';
 import type { Env } from './types';
 import { errorResponse, jsonResponse } from './utils';
 import { getCorsHeaders } from './cors';
-import { checkRateLimit, getRateLimitType } from './rateLimit';
 import {
   listCanvases,
   createCanvas,
@@ -42,6 +41,7 @@ import {
   approveProposal,
   rejectProposal,
 } from './routes/proposals';
+import { uploadImage, deleteImage } from './routes/images';
 import { agentDiscoveryResponse } from './routes/discovery';
 
 const CANVAS_ID_ROUTE = new RegExp('^/api/canvases/([^/]+)$');
@@ -57,6 +57,7 @@ const BRANCH_PROPOSALS_ROUTE = new RegExp('^/api/branches/([^/]+)/proposals$');
 const PROPOSAL_ID_ROUTE = new RegExp('^/api/proposals/([^/]+)$');
 const PROPOSAL_APPROVE_ROUTE = new RegExp('^/api/proposals/([^/]+)/approve$');
 const PROPOSAL_REJECT_ROUTE = new RegExp('^/api/proposals/([^/]+)/reject$');
+const IMAGE_DELETE_ROUTE = new RegExp('^/api/images/(.+)$');
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -71,11 +72,14 @@ export default {
       });
     }
 
-    // C3: Reject oversized request bodies (2 MB limit)
+    // C3: Reject oversized request bodies
+    // Image uploads are allowed up to 5 MB; all other requests capped at 2 MB
+    const isImageUpload = url.pathname === '/api/images' && request.method === 'POST';
     const contentLength = request.headers.get('Content-Length');
-    const MAX_BODY_BYTES = 2 * 1024 * 1024;
+    const MAX_BODY_BYTES = isImageUpload ? 5 * 1024 * 1024 : 2 * 1024 * 1024;
     if (contentLength && parseInt(contentLength, 10) > MAX_BODY_BYTES) {
-      return errorResponse('Request body too large (2 MB limit)', 413, env, origin);
+      const limitLabel = isImageUpload ? '5 MB' : '2 MB';
+      return errorResponse(`Request body too large (${limitLabel} limit)`, 413, env, origin);
     }
 
     // Public routes (no auth required)
@@ -199,21 +203,20 @@ export default {
       return jsonResponse({ ok: true, display_name: sanitized }, 200, env, origin);
     }
 
-    // Rate limiting
-    const rateLimitType = getRateLimitType(request.method, url.pathname);
-    const rateLimit = checkRateLimit(user.id, rateLimitType);
-    if (!rateLimit.allowed) {
-      return new Response(JSON.stringify({ error: rateLimit.error }), {
-        status: 429,
-        headers: {
-          'Content-Type': 'application/json',
-          'Retry-After': '60',
-          ...corsHeaders,
-        },
-      });
-    }
+    // Rate limiting is handled by Cloudflare Rate Limiting rules at the edge
+    // (see docs/MIGRATION_C1_C5.md § C5). No in-worker check needed.
 
     try {
+      // Image upload / delete routes
+      if (path === '/api/images' && method === 'POST') {
+        return await uploadImage(user, env, request);
+      }
+
+      const imageDeleteMatch = path.match(IMAGE_DELETE_ROUTE);
+      if (imageDeleteMatch && method === 'DELETE') {
+        return await deleteImage(user, env, imageDeleteMatch[1]);
+      }
+
       if (path === '/api/agent/connect' && method === 'POST') {
         return await connectAgent(user, env, request, authResult);
       }

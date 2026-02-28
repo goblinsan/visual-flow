@@ -50,6 +50,14 @@ User uploads image
 
 ### Implementation Steps
 
+> **Status:** Steps 1–5 are implemented.
+> - R2 binding: `workers/api/wrangler.toml`
+> - Upload/delete routes: `workers/api/src/routes/images.ts`
+> - Frontend utility: `src/utils/imageUpload.ts` (with offline fallback)
+> - ImagePickerModal & ImageAttributesPanel: updated to use `uploadImageFile()`
+> - Migration utility: `src/utils/migrateImages.ts`
+> - Tests: `workers/api/src/routes/images.test.ts`, `src/utils/imageUpload.test.ts`, `src/utils/migrateImages.test.ts`
+
 #### 1. Provision R2 Bucket
 
 ```toml
@@ -248,9 +256,9 @@ prevention beyond what IP-based rules provide.
 
 ### Migration Checklist
 
-- [ ] Configure Cloudflare Rate Limiting rules in dashboard/Terraform
-- [ ] Remove `workers/api/src/rateLimit.ts`
-- [ ] Remove `checkRateLimit` and `getRateLimitType` imports from API router
-- [ ] Add `429` handling to `src/api/client.ts` (retry with backoff)
+- [x] Configure Cloudflare Rate Limiting rules — documented in `workers/api/rate-limit-rules.md`
+- [x] Remove `workers/api/src/rateLimit.ts` — deleted
+- [x] Remove `checkRateLimit` and `getRateLimitType` imports from API router
+- [x] Add `429` handling to `src/api/client.ts` (retry with exponential backoff, max 3 retries)
 - [ ] Smoke-test rate limit responses from the edge
 - [ ] Monitor rule hit rates in Cloudflare Analytics

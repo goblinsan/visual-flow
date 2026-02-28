@@ -8,6 +8,11 @@ binding = "DB"
 database_name = "vizail-db"
 database_id = "313e76a2-8864-495d-abe2-5cbc6e419847"
 
+# R2 Object Storage for image uploads
+[[r2_buckets]]
+binding = "IMAGES"
+bucket_name = "vizail-images"
+
 # Environment configuration
 [env.production]
 [env.production.vars]
@@ -23,6 +28,10 @@ binding = "DB"
 database_name = "vizail-db"
 database_id = "313e76a2-8864-495d-abe2-5cbc6e419847"
 
+[[env.production.r2_buckets]]
+binding = "IMAGES"
+bucket_name = "vizail-images"
+
 [env.staging]
 vars = { ENVIRONMENT = "staging" }
 
@@ -30,3 +39,7 @@ vars = { ENVIRONMENT = "staging" }
 binding = "DB"
 database_name = "vizail-db"
 database_id = "313e76a2-8864-495d-abe2-5cbc6e419847"
+
+[[env.staging.r2_buckets]]
+binding = "IMAGES"
+bucket_name = "vizail-images"

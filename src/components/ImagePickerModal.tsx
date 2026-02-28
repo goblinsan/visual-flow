@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
+import { uploadImageFile } from '../utils/imageUpload';
 
 export interface ImagePickerModalProps {
   isOpen: boolean;
@@ -45,16 +46,12 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
       setError('Please select an image file.');
       return;
     }
-    
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      loadImage(dataUrl);
-    };
-    reader.onerror = () => {
-      setError('Failed to read file.');
-    };
-    reader.readAsDataURL(file);
+
+    setIsLoading(true);
+    setError(null);
+    uploadImageFile(file)
+      .then(({ url }) => loadImage(url))
+      .catch(() => setError('Failed to upload image.'));
   }, [loadImage]);
 
   const handleUrlSubmit = useCallback(() => {
@@ -70,12 +67,11 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
     
     const file = e.dataTransfer.files?.[0];
     if (file && file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const dataUrl = reader.result as string;
-        loadImage(dataUrl);
-      };
-      reader.readAsDataURL(file);
+      setIsLoading(true);
+      setError(null);
+      uploadImageFile(file)
+        .then(({ url }) => loadImage(url))
+        .catch(() => setError('Failed to upload image.'));
     } else {
       // Try URL from drag data
       const url = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain');

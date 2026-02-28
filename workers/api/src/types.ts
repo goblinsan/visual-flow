@@ -6,7 +6,11 @@ import type { LayoutSpec } from '../../src/layout-schema';
 
 export interface Env {
   DB: D1Database;
+  /** R2 bucket for uploaded images */
+  IMAGES: R2Bucket;
   ENVIRONMENT?: string;
+  /** Public base URL for the R2 bucket (e.g. https://assets.vizail.io) */
+  R2_PUBLIC_URL?: string;
   /** Cloudflare Access team domain, e.g. "myteam.cloudflareaccess.com" */
   CF_ACCESS_TEAM_DOMAIN?: string;
   /** Cloudflare Access Application Audience (AUD) tag */
