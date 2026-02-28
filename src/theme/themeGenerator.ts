@@ -332,6 +332,18 @@ export function resolveThemeBindings(spec: LayoutSpec, theme: DesignTheme): Layo
       }
     }
 
+    // Icon images: regenerate SVG src when fill colour changes
+    if (node.type === 'image' && 'iconId' in node && (node as { iconId?: string }).iconId && patched.fill) {
+      const imgNode = node as { src: string };
+      try {
+        const decoded = decodeURIComponent(imgNode.src.replace('data:image/svg+xml;utf8,', ''));
+        const updated = decoded.replace(/fill="[^"]*"/, `fill="${patched.fill as string}"`);
+        patched.src = `data:image/svg+xml;utf8,${encodeURIComponent(updated)}`;
+      } catch {
+        // If decoding fails, leave src unchanged
+      }
+    }
+
     const hasChildren = 'children' in node && Array.isArray((node as { children?: LayoutNode[] }).children);
     const children = hasChildren
       ? (node as { children: LayoutNode[] }).children.map(resolveNode)

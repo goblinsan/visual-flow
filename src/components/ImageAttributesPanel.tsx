@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Select } from './Select';
 import { uploadImageFile } from '../utils/imageUpload';
+import { buildIconSvgSrc } from '../canvas/utils/iconComponentUtils';
 
 export interface ImageNode {
   id: string;
@@ -11,6 +12,8 @@ export interface ImageNode {
   objectFit?: 'cover' | 'contain';
   preserveAspect?: boolean;
   opacity?: number;
+  iconId?: string;
+  fill?: string;
 }
 
 export interface ImageAttributesPanelProps {
@@ -22,10 +25,28 @@ export const ImageAttributesPanel: React.FC<ImageAttributesPanelProps> = ({
   imageNode,
   updateNode,
 }) => {
-  const { src, alt, radius, objectFit, preserveAspect, opacity } = imageNode;
+  const { src, alt, radius, objectFit, preserveAspect, opacity, iconId, fill } = imageNode;
+  const isIcon = !!iconId;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [urlInput, setUrlInput] = useState(src);
   const [showUrlInput, setShowUrlInput] = useState(false);
+  const [colorInput, setColorInput] = useState(fill || '#111827');
+
+  // Keep local color input in sync when fill prop changes externally
+  React.useEffect(() => {
+    if (fill) setColorInput(fill);
+  }, [fill]);
+
+  // Update icon colour: regenerates SVG src AND sets fill
+  const handleIconColorChange = (newColor: string) => {
+    setColorInput(newColor);
+    if (!iconId) return;
+    const newSrc = buildIconSvgSrc(iconId, newColor);
+    if (newSrc) {
+      // Clear theme binding when user picks a manual color
+      updateNode({ fill: newColor, src: newSrc, themeBindings: undefined } as unknown as Partial<ImageNode>);
+    }
+  };
 
   // Handle file selection
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -56,11 +77,62 @@ export const ImageAttributesPanel: React.FC<ImageAttributesPanelProps> = ({
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2 mb-3">
-        <div className="w-5 h-5 rounded bg-cyan-100 flex items-center justify-center">
-          <i className="fa-regular fa-image text-cyan-600 text-xs" />
+        <div className={`w-5 h-5 rounded flex items-center justify-center ${isIcon ? 'bg-purple-100' : 'bg-cyan-100'}`}>
+          <i className={isIcon ? 'fa-solid fa-icons text-purple-600 text-xs' : 'fa-regular fa-image text-cyan-600 text-xs'} />
         </div>
-        <span className="text-xs font-semibold text-gray-700">Image</span>
+        <span className="text-xs font-semibold text-gray-700">{isIcon ? 'Icon' : 'Image'}</span>
       </div>
+
+      {/* Icon Color Picker — only for icon images */}
+      {isIcon && (
+        <div className="space-y-2">
+          <p className="text-[11px] uppercase tracking-wide font-semibold text-gray-500">Icon Color</p>
+          <div className="flex items-center gap-2">
+            <input
+              type="color"
+              value={colorInput}
+              onChange={e => handleIconColorChange(e.target.value)}
+              className="w-8 h-8 rounded border border-gray-200 cursor-pointer p-0.5 bg-white"
+              title="Pick icon color"
+            />
+            <input
+              type="text"
+              value={colorInput}
+              onChange={e => {
+                setColorInput(e.target.value);
+                // Apply on valid hex
+                if (/^#[0-9a-fA-F]{6}$/.test(e.target.value)) {
+                  handleIconColorChange(e.target.value);
+                }
+              }}
+              onBlur={() => {
+                if (/^#[0-9a-fA-F]{6}$/.test(colorInput)) {
+                  handleIconColorChange(colorInput);
+                } else {
+                  setColorInput(fill || '#111827');
+                }
+              }}
+              className="flex-1 border border-gray-200 rounded-md px-2 py-1.5 text-[11px] font-mono bg-white focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition-colors"
+              placeholder="#111827"
+            />
+          </div>
+          {/* Quick color swatches */}
+          <div className="flex gap-1.5 flex-wrap">
+            {['#111827', '#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899', '#6b7280', '#ffffff'].map(c => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => handleIconColorChange(c)}
+                className={`w-6 h-6 rounded-md border-2 transition-transform hover:scale-110 ${
+                  colorInput === c ? 'border-blue-500 ring-1 ring-blue-300' : 'border-gray-200'
+                }`}
+                style={{ backgroundColor: c }}
+                title={c}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Image Preview */}
       <div className="border border-gray-200 rounded-lg p-2.5 bg-gray-50">

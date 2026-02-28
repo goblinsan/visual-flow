@@ -7,6 +7,7 @@ import CurveAttributesPanel from '../CurveAttributesPanel';
 import PolygonAttributesPanel from '../PolygonAttributesPanel';
 import TextAttributesPanel from '../TextAttributesPanel';
 import ImageAttributesPanel from '../ImageAttributesPanel';
+import { buildIconSvgSrc } from '../../canvas/utils/iconComponentUtils';
 import DefaultsPanel from '../DefaultsPanel';
 import { ThemeTokenBinder } from '../ThemeTokenBinder';
 import { FlowAttributesPanel } from '../FlowAttributesPanel';
@@ -718,6 +719,15 @@ export function AttributesSidebar({
                   for (const [prop, token] of Object.entries(updated)) {
                     if (token && activeTheme.colors[token as keyof typeof activeTheme.colors]) {
                       patch[prop] = activeTheme.colors[token as keyof typeof activeTheme.colors];
+                    }
+                  }
+                  // Icon images: regenerate SVG src when fill colour changes
+                  if (node.type === 'image' && 'iconId' in node) {
+                    const iconId = (node as unknown as { iconId?: string }).iconId;
+                    const newFill = patch.fill as string | undefined;
+                    if (iconId && newFill) {
+                      const newSrc = buildIconSvgSrc(iconId, newFill);
+                      if (newSrc) patch.src = newSrc;
                     }
                   }
                   setSpec(prev => ({
