@@ -229,6 +229,50 @@ function findClosestHue(colors: string[], targetHue: number): string | null {
 import type { LayoutSpec, LayoutNode } from '../layout-schema';
 import type { ThemeBindings } from './types';
 
+// ---------------------------------------------------------------------------
+// Known default-color → semantic-token mapping
+// Used to auto-bind existing elements to theme tokens so that
+// subsequent palette / mode / token changes propagate.
+// ---------------------------------------------------------------------------
+
+export const KNOWN_COLOR_BINDINGS: Record<string, ColorTokenName> = {
+  // Primary action fills → accent primary
+  '#3b82f6': 'color.accent.primary',
+  '#7c3aed': 'color.accent.primary',
+  '#2563eb': 'color.accent.primary',
+  '#1d4ed8': 'color.accent.primary',
+  // Secondary fills → accent secondary
+  '#06b6d4': 'color.accent.secondary',
+  '#059669': 'color.accent.secondary',
+  // Light backgrounds
+  '#dbeafe': 'color.background.secondary',
+  '#e2e8f0': 'color.border.primary',
+  '#f1f5f9': 'color.background.secondary',
+  '#f3f4f6': 'color.background.secondary',
+  '#f9fafb': 'color.background.secondary',
+  // White → background primary  (for fill/stroke; text-color uses text.inverse)
+  '#ffffff': 'color.background.primary',
+  // Dark text colours
+  '#111827': 'color.text.primary',
+  '#0f172a': 'color.text.primary',
+  '#1f2937': 'color.text.primary',
+  '#334155': 'color.text.primary',
+  '#374151': 'color.text.secondary',
+  // Secondary text
+  '#64748b': 'color.text.secondary',
+  '#6b7280': 'color.text.secondary',
+  '#94a3b8': 'color.text.secondary',
+  '#9ca3af': 'color.text.secondary',
+  // Borders
+  '#cbd5f5': 'color.border.primary',
+  '#d1d5db': 'color.border.primary',
+  '#e5e7eb': 'color.border.primary',
+  // Status
+  '#ef4444': 'color.status.error',
+  '#22c55e': 'color.status.success',
+  '#eab308': 'color.status.warning',
+};
+
 /**
  * Walk the spec tree and resolve any theme-bound colors.
  * Nodes with `themeBindings` get their fill/stroke/color/background
@@ -294,6 +338,98 @@ export function resolveThemeBindings(spec: LayoutSpec, theme: DesignTheme): Layo
  */
 export function applyThemeToSpec(spec: LayoutSpec, theme: DesignTheme): LayoutSpec {
   return resolveThemeBindings(spec, theme);
+}
+
+/**
+ * Infer theme-bindings for nodes whose fill/stroke/color match well-known
+ * default colours, then resolve every binding in the tree.
+ *
+ * Safe to call repeatedly — nodes that already own bindings keep them,
+ * and nodes whose colours no longer match any known default are left alone.
+ */
+export function bindAndApplyTheme(spec: LayoutSpec, theme: DesignTheme): LayoutSpec {
+  function processNode(node: LayoutNode): LayoutNode {
+    const existing = (node as LayoutNode & { themeBindings?: ThemeBindings }).themeBindings;
+    const inferred: ThemeBindings = { ...(existing ?? {}) };
+    const patched: Record<string, unknown> = {};
+    let changed = false;
+
+    // ── Infer bindings for props that don't already have one ──────────
+    const norm = (h: string) => h.toLowerCase();
+
+    if (!inferred.fill && 'fill' in node) {
+      const v = (node as { fill?: string }).fill;
+      if (typeof v === 'string') {
+        const token = KNOWN_COLOR_BINDINGS[norm(v)];
+        if (token) { inferred.fill = token; changed = true; }
+      }
+    }
+    if (!inferred.stroke && 'stroke' in node) {
+      const v = (node as { stroke?: string }).stroke;
+      if (typeof v === 'string') {
+        const token = KNOWN_COLOR_BINDINGS[norm(v)];
+        if (token) { inferred.stroke = token; changed = true; }
+      }
+    }
+    if (!inferred.color && 'color' in node) {
+      const v = (node as { color?: string }).color;
+      if (typeof v === 'string') {
+        const lo = norm(v);
+        // White text should bind to text.inverse, not background.primary
+        const token = lo === '#ffffff'
+          ? 'color.text.inverse' as ColorTokenName
+          : KNOWN_COLOR_BINDINGS[lo];
+        if (token) { inferred.color = token; changed = true; }
+      }
+    }
+
+    // ── Resolve bindings → actual hex values ─────────────────────────
+    if (inferred.fill && theme.colors[inferred.fill]) {
+      patched.fill = theme.colors[inferred.fill];
+    }
+    if (inferred.stroke && theme.colors[inferred.stroke]) {
+      patched.stroke = theme.colors[inferred.stroke];
+    }
+    if (inferred.color && theme.colors[inferred.color]) {
+      patched.color = theme.colors[inferred.color];
+    }
+    if (inferred.background && theme.colors[inferred.background]) {
+      patched.background = theme.colors[inferred.background];
+    }
+
+    // Typography for heading text nodes
+    if (node.type === 'text' && theme.typography) {
+      const variant = (node as { variant?: string }).variant;
+      if ((variant === 'h1' || variant === 'h2' || variant === 'h3') && inferred.color) {
+        patched.fontFamily = theme.typography.headingFont;
+      }
+    }
+
+    // Persist bindings when we inferred new ones
+    if (changed) {
+      patched.themeBindings = inferred;
+    }
+
+    // Recurse children
+    const hasChildren = 'children' in node && Array.isArray((node as { children?: LayoutNode[] }).children);
+    const children = hasChildren
+      ? (node as { children: LayoutNode[] }).children.map(processNode)
+      : undefined;
+
+    if (Object.keys(patched).length === 0 && !hasChildren) return node;
+    return { ...node, ...patched, ...(children ? { children } : {}) } as LayoutNode;
+  }
+
+  const rootBg = theme.colors['color.background.primary'];
+
+  return {
+    ...spec,
+    root: {
+      ...spec.root,
+      background: rootBg ?? spec.root.background,
+      children: spec.root.children.map(processNode),
+    },
+  };
 }
 
 /**

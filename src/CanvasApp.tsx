@@ -36,7 +36,7 @@ import { ToolSettingsBar } from './components/canvas/ToolSettingsBar';
 import { ChooseModeModal } from './roblox/ChooseModeModal';
 import type { DesignMode } from './roblox/ChooseModeModal';
 import { useDesignTheme } from './theme';
-import { applyThemeToSpec } from './theme';
+import { bindAndApplyTheme } from './theme';
 
 /** Get room ID from URL query param ?room=xxx */
 function getRoomIdFromURL(): string | null {
@@ -868,6 +868,18 @@ export default function CanvasApp() {
     updatePaletteOrder,
   } = useDesignTheme();
 
+  // ── Propagate theme changes to all elements on the canvas ──────────
+  // We use a ref to track whether this is the initial mount so we don't
+  // double-apply on first render (handleApplyPaletteAsTheme already does it).
+  const themeAppliedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!activeTheme) return;
+    // Skip if the theme instance hasn't actually changed
+    if (themeAppliedRef.current === activeTheme.id + JSON.stringify(activeTheme.colors) + activeTheme.mode) return;
+    themeAppliedRef.current = activeTheme.id + JSON.stringify(activeTheme.colors) + activeTheme.mode;
+    setSpec(prev => bindAndApplyTheme(prev, activeTheme));
+  }, [activeTheme, setSpec]);
+
   const { isAuthenticated } = useAuth();
 
   // Toast notification for save feedback
@@ -913,8 +925,8 @@ export default function CanvasApp() {
       name: `Kulrs ${mode === 'dark' ? 'Dark' : 'Light'}`,
       kulrsPaletteId: paletteId,
     });
-    // Apply theme to the current spec (resolve all bindings)
-    setSpec(prev => applyThemeToSpec(prev, newTheme));
+    // Infer bindings for existing nodes + resolve all bindings
+    setSpec(prev => bindAndApplyTheme(prev, newTheme));
   }, [applyPalette, setSpec]);
 
   /** Handle picking a theme color — apply to selected element or current tool */

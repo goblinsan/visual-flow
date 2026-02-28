@@ -154,20 +154,32 @@ export function ThemePanel({
             </div>
           </div>
 
-          {/* Light/Dark toggle */}
+          {/* Light / Dark mode buttons */}
           <div className="flex items-center gap-2">
             <span className="text-[10px] text-gray-500">Mode:</span>
             <button
               type="button"
-              onClick={onToggleMode}
+              onClick={() => { if (theme.mode !== 'light') onToggleMode(); }}
               className={`text-[10px] px-2.5 py-1 rounded flex items-center gap-1.5 transition-colors ${
                 theme.mode === 'light'
-                  ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                  : 'bg-slate-700 text-slate-200 border border-slate-600'
+                  ? 'bg-amber-100 text-amber-800 border border-amber-300 font-semibold'
+                  : 'bg-white text-gray-500 border border-gray-200 hover:bg-amber-50 hover:text-amber-700'
               }`}
             >
-              <i className={`fa-solid ${theme.mode === 'light' ? 'fa-sun' : 'fa-moon'} text-[9px]`} />
-              {theme.mode === 'light' ? 'Light' : 'Dark'}
+              <i className="fa-solid fa-sun text-[9px]" />
+              Light
+            </button>
+            <button
+              type="button"
+              onClick={() => { if (theme.mode !== 'dark') onToggleMode(); }}
+              className={`text-[10px] px-2.5 py-1 rounded flex items-center gap-1.5 transition-colors ${
+                theme.mode === 'dark'
+                  ? 'bg-slate-700 text-slate-100 border border-slate-600 font-semibold'
+                  : 'bg-white text-gray-500 border border-gray-200 hover:bg-slate-100 hover:text-slate-700'
+              }`}
+            >
+              <i className="fa-solid fa-moon text-[9px]" />
+              Dark
             </button>
           </div>
 

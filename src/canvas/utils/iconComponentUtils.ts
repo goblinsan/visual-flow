@@ -1,7 +1,9 @@
 import type { LayoutNode, ImageNode, LayoutSpec } from "../../layout-schema";
+import type { ThemeBindings } from "../../layout-schema";
 import { ICON_LIBRARY, COMPONENT_LIBRARY } from "../../library";
 import { makeId } from "./canvasUtils";
-import type { DesignTheme } from "../../theme/types";
+import type { DesignTheme, ColorTokenName } from "../../theme/types";
+import { KNOWN_COLOR_BINDINGS } from "../../theme/themeGenerator";
 
 // ─── Component-color-to-theme color mapping ────────────────────────────────
 // Maps common hardcoded component colors to semantic theme tokens so that
@@ -47,27 +49,46 @@ const COMPONENT_COLOR_MAP: Record<string, (t: DesignTheme) => string> = {
 
 function applyThemeToComponentNode(node: LayoutNode, theme: DesignTheme): LayoutNode {
   const patched: Record<string, unknown> = {};
+  const bindings: ThemeBindings = {};
   const n = (hex: string) => hex.toLowerCase();
 
   if ('fill' in node && typeof (node as { fill?: string }).fill === 'string') {
     const orig = n((node as { fill: string }).fill);
     const mapper = COMPONENT_COLOR_MAP[orig];
-    if (mapper) patched.fill = mapper(theme);
+    if (mapper) {
+      patched.fill = mapper(theme);
+      const token = KNOWN_COLOR_BINDINGS[orig];
+      if (token) bindings.fill = token;
+    }
   }
   if ('stroke' in node && typeof (node as { stroke?: string }).stroke === 'string') {
     const orig = n((node as { stroke: string }).stroke);
     const mapper = COMPONENT_COLOR_MAP[orig];
-    if (mapper) patched.stroke = mapper(theme);
+    if (mapper) {
+      patched.stroke = mapper(theme);
+      const token = KNOWN_COLOR_BINDINGS[orig];
+      if (token) bindings.stroke = token;
+    }
   }
   if ('color' in node && typeof (node as { color?: string }).color === 'string') {
     const orig = n((node as { color: string }).color);
     // White text on accent → inverse text color
     if (orig === '#ffffff') {
       patched.color = theme.colors['color.text.inverse'];
+      bindings.color = 'color.text.inverse' as ColorTokenName;
     } else {
       const mapper = COMPONENT_COLOR_MAP[orig];
-      if (mapper) patched.color = mapper(theme);
+      if (mapper) {
+        patched.color = mapper(theme);
+        const token = KNOWN_COLOR_BINDINGS[orig];
+        if (token) bindings.color = token;
+      }
     }
+  }
+
+  // Persist theme bindings so future theme changes propagate
+  if (Object.keys(bindings).length > 0) {
+    patched.themeBindings = bindings;
   }
 
   const hasChildren = 'children' in node && Array.isArray((node as { children?: LayoutNode[] }).children);
