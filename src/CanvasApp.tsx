@@ -17,6 +17,7 @@ import CanvasStage from "./canvas/CanvasStage.tsx";
 import type {
   LayoutSpec,
   LayoutNode,
+  FrameNode,
   FlowTransition,
   Flow,
 } from "./layout-schema.ts";
@@ -1763,8 +1764,9 @@ export default function CanvasApp() {
                     if (selectedIds.length === 1) {
                       setSpec(prev => ({
                         ...prev,
-                        root: ((): LayoutNode => {
-                          const updateNode = (n: LayoutNode): LayoutNode => {
+                        root: {
+                          ...prev.root,
+                          children: prev.root.children.map(function updateNode(n: LayoutNode): LayoutNode {
                             if (n.id === selectedIds[0]) {
                               return {
                                 ...n,
@@ -1780,9 +1782,8 @@ export default function CanvasApp() {
                               return { ...n, children: (n as { children: LayoutNode[] }).children.map(updateNode) } as LayoutNode;
                             }
                             return n;
-                          };
-                          return { ...prev.root, children: prev.root.children.map(updateNode) } as typeof prev.root;
-                        })()
+                          }),
+                        } as FrameNode,
                       }));
                     }
                     pushRecent(hex);
