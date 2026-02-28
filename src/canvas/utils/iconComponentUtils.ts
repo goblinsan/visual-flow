@@ -86,6 +86,16 @@ function applyThemeToComponentNode(node: LayoutNode, theme: DesignTheme): Layout
     }
   }
 
+  // Apply theme fonts to text nodes within components
+  if (node.type === 'text' && theme.typography) {
+    const variant = (node as { variant?: string }).variant;
+    if (variant === 'h1' || variant === 'h2' || variant === 'h3') {
+      patched.fontFamily = theme.typography.headingFont;
+    } else {
+      patched.fontFamily = theme.typography.bodyFont;
+    }
+  }
+
   // Persist theme bindings so future theme changes propagate
   if (Object.keys(bindings).length > 0) {
     patched.themeBindings = bindings;

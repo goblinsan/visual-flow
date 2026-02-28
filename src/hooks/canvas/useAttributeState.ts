@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 export interface AttributeState {
   attributeTab: 'element' | 'flow';
-  panelMode: 'attributes' | 'agent';
+  panelMode: 'attributes' | 'agent' | 'theme';
   rawDashInput: string;
   lastFillById: Record<string, string>;
   lastStrokeById: Record<string, string>;
@@ -10,7 +10,7 @@ export interface AttributeState {
 
 export interface UseAttributeStateReturn extends AttributeState {
   setAttributeTab: React.Dispatch<React.SetStateAction<'element' | 'flow'>>;
-  setPanelMode: React.Dispatch<React.SetStateAction<'attributes' | 'agent'>>;
+  setPanelMode: React.Dispatch<React.SetStateAction<'attributes' | 'agent' | 'theme'>>;
   setRawDashInput: React.Dispatch<React.SetStateAction<string>>;
   setLastFillById: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   setLastStrokeById: React.Dispatch<React.SetStateAction<Record<string, string>>>;
@@ -21,7 +21,7 @@ export interface UseAttributeStateReturn extends AttributeState {
  */
 export function useAttributeState(): UseAttributeStateReturn {
   const [attributeTab, setAttributeTab] = useState<'element' | 'flow'>('element');
-  const [panelMode, setPanelMode] = useState<'attributes' | 'agent'>('attributes');
+  const [panelMode, setPanelMode] = useState<'attributes' | 'agent' | 'theme'>('attributes');
   const [rawDashInput, setRawDashInput] = useState<string>('');
   const [lastFillById, setLastFillById] = useState<Record<string, string>>({});
   const [lastStrokeById, setLastStrokeById] = useState<Record<string, string>>({});

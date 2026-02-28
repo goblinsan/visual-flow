@@ -9,10 +9,9 @@ import TextAttributesPanel from '../TextAttributesPanel';
 import ImageAttributesPanel from '../ImageAttributesPanel';
 import DefaultsPanel from '../DefaultsPanel';
 import { KulrsPalettePanel } from '../KulrsPalettePanel';
-import { ThemePanel } from '../ThemePanel';
 import { FlowAttributesPanel } from '../FlowAttributesPanel';
 import type { RectDefaults } from '../../hooks/usePersistentRectDefaults';
-import type { DesignTheme, ColorTokenName, ThemeTypography } from '../../theme/types';
+import type { DesignTheme, ColorTokenName } from '../../theme/types';
 import type {
   LayoutSpec,
   LayoutNode,
@@ -68,10 +67,6 @@ interface AttributesSidebarProps {
   // Theme props
   activeTheme?: DesignTheme | null;
   onApplyPaletteAsTheme?: (paletteColors: string[], mode: 'light' | 'dark', paletteId?: string) => void;
-  onUpdateTokenColor?: (token: ColorTokenName, hex: string) => void;
-  onUpdateTypography?: (updates: Partial<ThemeTypography>) => void;
-  onUpdatePaletteOrder?: (newOrder: string[]) => void;
-  onToggleThemeMode?: () => void;
   onPickThemeColor?: (hex: string, token: ColorTokenName) => void;
 }
 
@@ -116,10 +111,6 @@ export function AttributesSidebar({
   // Theme props
   activeTheme,
   onApplyPaletteAsTheme,
-  onUpdateTokenColor,
-  onUpdateTypography,
-  onUpdatePaletteOrder,
-  onToggleThemeMode,
   onPickThemeColor,
 }: AttributesSidebarProps): JSX.Element {
   return (
@@ -729,36 +720,7 @@ export function AttributesSidebar({
             onApplyAsTheme={onApplyPaletteAsTheme}
           />
 
-          {/* Theme Editor Panel */}
-          {activeTheme && onUpdateTokenColor && onUpdateTypography && onUpdatePaletteOrder && onToggleThemeMode && (
-            <div className="mt-3 border-t border-gray-200 pt-3">
-              <ThemePanel
-                theme={activeTheme}
-                onUpdateTokenColor={onUpdateTokenColor}
-                onUpdateTypography={onUpdateTypography}
-                onUpdatePaletteOrder={onUpdatePaletteOrder}
-                onToggleMode={onToggleThemeMode}
-                onPickThemeColor={(hex, token) => {
-                  // Apply to selection fill if something is selected
-                  if (selectedIds.length === 1) {
-                    setSpec(prev => ({
-                      ...prev,
-                      root: updateNode(prev.root, selectedIds[0], {
-                        fill: hex,
-                        fillGradient: undefined,
-                        themeBindings: {
-                          ...((findNode(prev.root, selectedIds[0]) as unknown as Record<string, unknown>)?.themeBindings as Record<string, unknown> ?? {}),
-                          fill: token,
-                        },
-                      })
-                    }));
-                  }
-                  pushRecent(hex);
-                  onPickThemeColor?.(hex, token);
-                }}
-              />
-            </div>
-          )}
+
         </>
       )}
     </>

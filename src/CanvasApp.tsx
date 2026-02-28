@@ -32,6 +32,7 @@ import { HeaderToolbar } from './components/canvas/HeaderToolbar';
 import { LeftToolbar } from './components/canvas/LeftToolbar';
 import { AttributesSidebar } from './components/canvas/AttributesSidebar';
 import { AgentPanel } from './components/canvas/AgentPanel';
+import { ThemePanel } from './components/ThemePanel';
 import { ToolSettingsBar } from './components/canvas/ToolSettingsBar';
 import { ChooseModeModal } from './roblox/ChooseModeModal';
 import type { DesignMode } from './roblox/ChooseModeModal';
@@ -874,11 +875,23 @@ export default function CanvasApp() {
   const themeAppliedRef = useRef<string | null>(null);
   useEffect(() => {
     if (!activeTheme) return;
+    // Build fingerprint that includes colors, mode, AND typography
+    const fingerprint = activeTheme.id
+      + JSON.stringify(activeTheme.colors)
+      + activeTheme.mode
+      + (activeTheme.typography?.headingFont ?? '')
+      + (activeTheme.typography?.bodyFont ?? '');
     // Skip if the theme instance hasn't actually changed
-    if (themeAppliedRef.current === activeTheme.id + JSON.stringify(activeTheme.colors) + activeTheme.mode) return;
-    themeAppliedRef.current = activeTheme.id + JSON.stringify(activeTheme.colors) + activeTheme.mode;
+    if (themeAppliedRef.current === fingerprint) return;
+    themeAppliedRef.current = fingerprint;
     setSpec(prev => bindAndApplyTheme(prev, activeTheme));
-  }, [activeTheme, setSpec]);
+
+    // Also update tool default colours to match the theme
+    updateRectDefaults({
+      fill: activeTheme.colors['color.background.primary'],
+      stroke: activeTheme.colors['color.border.primary'],
+    });
+  }, [activeTheme, setSpec, updateRectDefaults]);
 
   const { isAuthenticated } = useAuth();
 
@@ -1531,6 +1544,38 @@ export default function CanvasApp() {
                 AGENT
               </span>
             </button>
+            <button
+              onClick={() => {
+                setSidebarVisible(true);
+                setPanelMode('theme');
+              }}
+              className={`fixed right-0 z-10 h-32 shadow-md transition-colors flex items-center justify-center ${
+                panelMode === 'theme'
+                  ? 'bg-gradient-to-b from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700'
+                  : 'bg-gradient-to-b from-gray-300 to-gray-400 hover:from-gray-400 hover:to-gray-500'
+              }`}
+              title="Show Theme"
+              style={{
+                padding: 0,
+                width: '20px',
+                top: '432px',
+                borderRadius: '8px 0 0 8px',
+                borderLeft: `1px solid ${panelMode === 'theme' ? '#0d9488' : '#9ca3af'}`,
+                borderTop: `1px solid ${panelMode === 'theme' ? '#0d9488' : '#9ca3af'}`,
+                borderBottom: `1px solid ${panelMode === 'theme' ? '#0d9488' : '#9ca3af'}`
+              }}
+            >
+              <span
+                className={`text-[10px] font-semibold ${panelMode === 'theme' ? 'text-white' : 'text-gray-700'}`}
+                style={{
+                  transform: 'rotate(-90deg)',
+                  whiteSpace: 'nowrap',
+                  letterSpacing: '0.5px'
+                }}
+              >
+                THEME
+              </span>
+            </button>
           </>
         )}
         {sidebarVisible && (
@@ -1613,11 +1658,46 @@ export default function CanvasApp() {
                 AGENT
               </span>
             </button>
+            <button
+              onClick={() => setPanelMode('theme')}
+              className={`fixed z-10 h-32 shadow-md transition-colors flex items-center justify-center ${
+                panelMode === 'theme'
+                  ? 'bg-gradient-to-b from-teal-500 to-teal-600'
+                  : 'bg-gradient-to-b from-gray-300 to-gray-400 hover:from-gray-400 hover:to-gray-500'
+              }`}
+              title="Theme"
+              style={{
+                padding: 0,
+                width: '20px',
+                top: '432px',
+                right: '288px',
+                borderRadius: '8px 0 0 8px',
+                borderLeft: `1px solid ${panelMode === 'theme' ? '#0d9488' : '#9ca3af'}`,
+                borderTop: `1px solid ${panelMode === 'theme' ? '#0d9488' : '#9ca3af'}`,
+                borderBottom: `1px solid ${panelMode === 'theme' ? '#0d9488' : '#9ca3af'}`
+              }}
+            >
+              <span
+                className={`text-[10px] font-semibold ${panelMode === 'theme' ? 'text-white' : 'text-gray-700'}`}
+                style={{
+                  transform: 'rotate(-90deg)',
+                  whiteSpace: 'nowrap',
+                  letterSpacing: '0.5px'
+                }}
+              >
+                THEME
+              </span>
+            </button>
             <div className="p-4 border-b border-gray-200 flex items-center gap-2">
               {panelMode === 'attributes' ? (
                 <>
                   <i className="fa-solid fa-sliders text-gray-400" />
                   <span className="text-sm font-semibold text-gray-700">Attributes</span>
+                </>
+              ) : panelMode === 'theme' ? (
+                <>
+                  <i className="fa-solid fa-palette text-teal-500" />
+                  <span className="text-sm font-semibold text-gray-700">Theme</span>
                 </>
               ) : (
                 <>
@@ -1668,11 +1748,48 @@ export default function CanvasApp() {
                   skipNormalizationRef={skipNormalizationRef}
                   activeTheme={activeTheme}
                   onApplyPaletteAsTheme={handleApplyPaletteAsTheme}
+                  onPickThemeColor={handlePickThemeColor}
+                />
+              )}
+
+              {/* Theme Panel Content */}
+              {panelMode === 'theme' && (
+                <ThemePanel
+                  theme={activeTheme}
                   onUpdateTokenColor={updateTokenColor}
                   onUpdateTypography={updateTypography}
                   onUpdatePaletteOrder={updatePaletteOrder}
-                  onToggleThemeMode={toggleThemeMode}
-                  onPickThemeColor={handlePickThemeColor}
+                  onToggleMode={toggleThemeMode}
+                  onPickThemeColor={(hex, token) => {
+                    // Apply to selection fill if something is selected
+                    if (selectedIds.length === 1) {
+                      setSpec(prev => ({
+                        ...prev,
+                        root: ((): LayoutNode => {
+                          const updateNode = (n: LayoutNode): LayoutNode => {
+                            if (n.id === selectedIds[0]) {
+                              return {
+                                ...n,
+                                fill: hex,
+                                fillGradient: undefined,
+                                themeBindings: {
+                                  ...((n as unknown as Record<string, unknown>)?.themeBindings as Record<string, unknown> ?? {}),
+                                  fill: token,
+                                },
+                              } as LayoutNode;
+                            }
+                            if ('children' in n && Array.isArray((n as { children?: LayoutNode[] }).children)) {
+                              return { ...n, children: (n as { children: LayoutNode[] }).children.map(updateNode) } as LayoutNode;
+                            }
+                            return n;
+                          };
+                          return { ...prev.root, children: prev.root.children.map(updateNode) };
+                        })()
+                      }));
+                    }
+                    pushRecent(hex);
+                    handlePickThemeColor(hex, token);
+                  }}
                 />
               )}
 

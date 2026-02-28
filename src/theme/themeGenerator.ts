@@ -299,13 +299,13 @@ export function resolveThemeBindings(spec: LayoutSpec, theme: DesignTheme): Layo
     }
 
     // Resolve typography if node is text and theme has fonts
-    if (node.type === 'text' && theme.typography) {
+    if (node.type === 'text' && theme.typography && bindings) {
       const variant = (node as { variant?: string }).variant;
       if (variant === 'h1' || variant === 'h2' || variant === 'h3') {
-        // Only apply if token-bound (not manually overridden)
-        if (bindings?.color) {
-          patched.fontFamily = theme.typography.headingFont;
-        }
+        patched.fontFamily = theme.typography.headingFont;
+      } else if (bindings.color) {
+        // Body text nodes that are theme-bound
+        patched.fontFamily = theme.typography.bodyFont;
       }
     }
 
@@ -397,11 +397,13 @@ export function bindAndApplyTheme(spec: LayoutSpec, theme: DesignTheme): LayoutS
       patched.background = theme.colors[inferred.background];
     }
 
-    // Typography for heading text nodes
-    if (node.type === 'text' && theme.typography) {
+    // Typography: heading text → headingFont, all other theme-bound text → bodyFont
+    if (node.type === 'text' && theme.typography && (inferred.color || inferred.fill)) {
       const variant = (node as { variant?: string }).variant;
-      if ((variant === 'h1' || variant === 'h2' || variant === 'h3') && inferred.color) {
+      if (variant === 'h1' || variant === 'h2' || variant === 'h3') {
         patched.fontFamily = theme.typography.headingFont;
+      } else {
+        patched.fontFamily = theme.typography.bodyFont;
       }
     }
 
