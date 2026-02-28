@@ -11,7 +11,7 @@ import DefaultsPanel from '../DefaultsPanel';
 import { KulrsPalettePanel } from '../KulrsPalettePanel';
 import { FlowAttributesPanel } from '../FlowAttributesPanel';
 import type { RectDefaults } from '../../hooks/usePersistentRectDefaults';
-import type { DesignTheme, ColorTokenName } from '../../theme/types';
+
 import type {
   LayoutSpec,
   LayoutNode,
@@ -65,9 +65,7 @@ interface AttributesSidebarProps {
   blockCanvasClicksRef: React.RefObject<boolean>;
   skipNormalizationRef: React.RefObject<boolean>;
   // Theme props
-  activeTheme?: DesignTheme | null;
   onApplyPaletteAsTheme?: (paletteColors: string[], mode: 'light' | 'dark', paletteId?: string) => void;
-  onPickThemeColor?: (hex: string, token: ColorTokenName) => void;
 }
 
 export function AttributesSidebar({
@@ -109,9 +107,7 @@ export function AttributesSidebar({
   blockCanvasClicksRef,
   skipNormalizationRef,
   // Theme props
-  activeTheme,
   onApplyPaletteAsTheme,
-  onPickThemeColor,
 }: AttributesSidebarProps): JSX.Element {
   return (
     <>

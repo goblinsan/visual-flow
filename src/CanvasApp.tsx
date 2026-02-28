@@ -1746,9 +1746,7 @@ export default function CanvasApp() {
                   updateSelection={updateSelection}
                   blockCanvasClicksRef={blockCanvasClicksRef}
                   skipNormalizationRef={skipNormalizationRef}
-                  activeTheme={activeTheme}
                   onApplyPaletteAsTheme={handleApplyPaletteAsTheme}
-                  onPickThemeColor={handlePickThemeColor}
                 />
               )}
 
@@ -1783,7 +1781,7 @@ export default function CanvasApp() {
                             }
                             return n;
                           };
-                          return { ...prev.root, children: prev.root.children.map(updateNode) };
+                          return { ...prev.root, children: prev.root.children.map(updateNode) } as typeof prev.root;
                         })()
                       }));
                     }
