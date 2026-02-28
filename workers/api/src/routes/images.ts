@@ -69,7 +69,7 @@ export async function uploadImage(
   }
 
   const ext = extForMime(file.type);
-  const key = `images/${crypto.randomUUID()}.${ext}`;
+  const key = `${crypto.randomUUID()}.${ext}`;
 
   await env.IMAGES.put(key, file, {
     httpMetadata: { contentType: file.type },
@@ -96,8 +96,8 @@ export async function deleteImage(
   env: Env,
   key: string,
 ): Promise<Response> {
-  // Ensure key starts with images/
-  if (!key.startsWith('images/')) {
+  // Validate the key is a simple filename (uuid.ext)
+  if (!key || key.includes('/') || key.includes('..')) {
     return errorResponse('Invalid image key', 400, env);
   }
 

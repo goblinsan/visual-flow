@@ -21,7 +21,6 @@ import { dashArrayToInput } from './utils/paint';
 import { applyProposalOperations } from './utils/proposalHelpers';
 import CanvasStage from "./canvas/CanvasStage.tsx";
 import type {
-  LayoutSpec,
   LayoutNode,
   FrameNode,
 } from "./layout-schema.ts";
@@ -163,6 +162,17 @@ export default function CanvasApp() {
   // Rectangle default attributes (persisted)
   const { defaults: rectDefaults, update: updateRectDefaults } = usePersistentRectDefaults({ fill: '#ffffff', stroke: '#334155', strokeWidth: 1, radius: 0, opacity: 1, strokeDash: undefined });
 
+  // Design theme (Kulrs integration) — declared before useToolDefaults which reads activeTheme
+  const {
+    theme: activeTheme,
+    setTheme,
+    applyPalette,
+    toggleMode: toggleThemeMode,
+    updateTokenColor,
+    updateTypography,
+    updatePaletteOrder,
+  } = useDesignTheme();
+
   // Tool defaults (extracted hook)
   const {
     lineDefaults, updateLineDefaults,
@@ -204,22 +214,6 @@ export default function CanvasApp() {
   const skipNormalizationRef = useRef(false);
   const appVersion = import.meta.env.VITE_APP_VERSION ?? '0.0.0';
 
-  // Design theme (Kulrs integration)
-  const {
-    theme: activeTheme,
-    setTheme,
-    applyPalette,
-    toggleMode: toggleThemeMode,
-    updateTokenColor,
-    updateTypography,
-    updatePaletteOrder,
-  } = useDesignTheme();
-
-  // Theme propagation + action handlers (extracted hook)
-  const { handleApplyPaletteAsTheme, handleClearTheme, handlePickThemeColor } = useThemeActions(
-    activeTheme, setSpec, updateRectDefaults, setTextDefaults, applyPalette, setTheme, pushRecent,
-  );
-
   const { isAuthenticated } = useAuth();
 
   // Toast notification for save feedback
@@ -258,6 +252,11 @@ export default function CanvasApp() {
 
   const pushRecent = useCallback((col?: string) => { if (col) commitRecent(col); }, [commitRecent]);
   const wrappedPreviewRecent = useCallback((col?: string) => { if (col) previewRecent(col); }, [previewRecent]);
+
+  // Theme propagation + action handlers (extracted hook)
+  const { handleApplyPaletteAsTheme, handleClearTheme, handlePickThemeColor } = useThemeActions(
+    activeTheme, setSpec, updateRectDefaults, setTextDefaults, applyPalette, setTheme, pushRecent,
+  );
 
   const handleViewportChange = useCallback((newViewport: { scale: number; x: number; y: number }) => {
     setViewport(newViewport);

@@ -4,7 +4,7 @@
  */
 
 import * as Y from 'yjs';
-import type { LayoutSpec, LayoutNode } from '../layout-schema';
+import type { LayoutSpec, LayoutNode, Flow } from '../layout-schema';
 
 /**
  * Yjs document structure for collaborative canvas editing
@@ -115,7 +115,7 @@ export function yjsToLayoutSpec(ydoc: Y.Doc): LayoutSpec {
       nodeProps.children = yChildArray.toArray().map(childId => buildNode(childId));
     }
 
-    return nodeProps as LayoutNode;
+    return nodeProps as unknown as LayoutNode;
   }
 
   // Build root node
@@ -138,7 +138,7 @@ export function yjsToLayoutSpec(ydoc: Y.Doc): LayoutSpec {
   return {
     version,
     root: root as any, // Type assertion since we checked type === 'frame'
-    flows: flows.length > 0 ? flows : undefined,
+    flows: flows.length > 0 ? (flows as unknown as Flow[]) : undefined,
   };
 }
 

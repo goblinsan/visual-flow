@@ -57,7 +57,7 @@ const BRANCH_PROPOSALS_ROUTE = new RegExp('^/api/branches/([^/]+)/proposals$');
 const PROPOSAL_ID_ROUTE = new RegExp('^/api/proposals/([^/]+)$');
 const PROPOSAL_APPROVE_ROUTE = new RegExp('^/api/proposals/([^/]+)/approve$');
 const PROPOSAL_REJECT_ROUTE = new RegExp('^/api/proposals/([^/]+)/reject$');
-const IMAGE_DELETE_ROUTE = new RegExp('^/api/images/(.+)$');
+const IMAGE_DELETE_ROUTE = new RegExp('^/api/images/([^/]+)$');
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {

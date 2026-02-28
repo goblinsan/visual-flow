@@ -76,8 +76,7 @@ describe('uploadImage', () => {
     const body = await response.json() as { url: string };
 
     expect(response.status).toBe(201);
-    expect(body.url).toContain('/images/');
-    expect(body.url).toContain('.png');
+    expect(body.url).toMatch(/\/r2\/[a-f0-9-]+\.png$/);
     expect(r2.stored.size).toBe(1);
 
     // Verify metadata
@@ -128,7 +127,7 @@ describe('deleteImage', () => {
   });
 
   it('deletes an image uploaded by the same user', async () => {
-    const key = 'images/test-uuid.png';
+    const key = 'test-uuid.png';
     r2.stored.set(key, {
       body: new ReadableStream(),
       contentType: 'image/png',
@@ -141,7 +140,7 @@ describe('deleteImage', () => {
   });
 
   it('rejects deletion by a different user', async () => {
-    const key = 'images/test-uuid.png';
+    const key = 'test-uuid.png';
     r2.stored.set(key, {
       body: new ReadableStream(),
       contentType: 'image/png',
@@ -153,11 +152,16 @@ describe('deleteImage', () => {
   });
 
   it('returns 404 for non-existent image', async () => {
-    const response = await deleteImage(testUser, env, 'images/does-not-exist.png');
+    const response = await deleteImage(testUser, env, 'does-not-exist.png');
     expect(response.status).toBe(404);
   });
 
-  it('rejects invalid key prefix', async () => {
+  it('rejects key with path traversal', async () => {
+    const response = await deleteImage(testUser, env, '../secrets');
+    expect(response.status).toBe(400);
+  });
+
+  it('rejects key with slashes', async () => {
     const response = await deleteImage(testUser, env, 'malicious/key');
     expect(response.status).toBe(400);
   });

@@ -22,7 +22,7 @@ function stripApiPrefix(route) {
 
 function extractIndexPaths(text) {
   const paths = new Set();
-  const literalRegex = /'\/(?:health|api\/health|api\/agent\/discover|api\/agent\/connect|api\/agent\/link-code|api\/agent\/link-code\/exchange|api\/openapi\.json|api\/debug|api\/auth\/signin|api\/auth\/signout|api\/whoami|api\/user\/display-name|api\/canvases)'/g;
+  const literalRegex = /'\/(?:health|api\/health|api\/agent\/discover|api\/agent\/connect|api\/agent\/link-code|api\/agent\/link-code\/exchange|api\/openapi\.json|api\/debug|api\/auth\/signin|api\/auth\/signout|api\/whoami|api\/user\/display-name|api\/canvases|api\/images)'/g;
 
   for (const match of text.matchAll(literalRegex)) {
     paths.add(match[0].slice(1, -1));

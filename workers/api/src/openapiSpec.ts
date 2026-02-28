@@ -1171,5 +1171,59 @@ Example creating a red rectangle:
           },
         },
       },
+      '/images': {
+        post: {
+          operationId: 'uploadImage',
+          summary: 'Upload an image to R2 storage',
+          requestBody: {
+            required: true,
+            content: {
+              'multipart/form-data': {
+                schema: {
+                  type: 'object',
+                  required: ['file'],
+                  properties: {
+                    file: { type: 'string', format: 'binary', description: 'Image file (png, jpeg, gif, webp, svg, avif). Max 5 MB.' },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            '201': {
+              description: 'Image uploaded',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      url: { type: 'string', description: 'Public URL of the uploaded image' },
+                    },
+                  },
+                },
+              },
+            },
+            '413': { description: 'File too large (5 MB max)' },
+            '415': { description: 'Unsupported image type' },
+          },
+        },
+      },
+      '/images/{imageKey}': {
+        delete: {
+          operationId: 'deleteImage',
+          summary: 'Delete an uploaded image from R2 storage',
+          parameters: [
+            { name: 'imageKey', in: 'path', required: true, schema: { type: 'string' }, description: 'Image key (uuid.ext)' },
+          ],
+          responses: {
+            '200': {
+              description: 'Image deleted',
+              content: { 'application/json': { schema: { type: 'object', properties: { ok: { type: 'boolean' } } } } },
+            },
+            '403': { description: 'Forbidden — not the uploader' },
+            '404': { description: 'Image not found' },
+          },
+        },
+      },
     },
   };
