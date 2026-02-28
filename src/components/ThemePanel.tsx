@@ -10,6 +10,7 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import type { DesignTheme, ColorTokenName, ThemeTypography } from '../theme/types';
+import { loadGoogleFont } from '../utils/googleFonts';
 import { COLOR_TOKEN_GROUPS, tokenShortName } from '../theme/types';
 
 // ---------------------------------------------------------------------------
@@ -95,17 +96,8 @@ const FONT_CATEGORIES: { key: FontCategory; label: string; icon: string }[] = [
   { key: 'monospace', label: 'Mono', icon: 'fa-code' },
 ];
 
-const SYSTEM_FONTS = new Set(['Arial', 'Helvetica', 'Verdana', 'Georgia', 'Times New Roman', 'Courier New']);
-const loadedFonts = new Set<string>();
-
-function ensureFont(name: string) {
-  if (SYSTEM_FONTS.has(name) || loadedFonts.has(name)) return;
-  loadedFonts.add(name);
-  const link = document.createElement('link');
-  link.rel = 'stylesheet';
-  link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(name).replace(/%20/g, '+')}:wght@400;700&display=swap`;
-  document.head.appendChild(link);
-}
+/** Alias to shared font loader for backward compat within this file */
+const ensureFont = (name: string) => loadGoogleFont(name);
 
 // ---------------------------------------------------------------------------
 // Component

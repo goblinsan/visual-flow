@@ -7,7 +7,9 @@ import type { Env } from './types';
 
 export function jsonResponse(data: unknown, status = 200, env?: Env, origin: string | null = null): Response {
   const corsHeaders = env ? getCorsHeaders(origin, env) : {
-    'Access-Control-Allow-Origin': '*',
+    // When env is not available, do NOT fall back to wildcard '*'.
+    // Omit CORS headers entirely — the main fetch handler already sets
+    // corsHeaders on the top-level response for routes that need it.
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   };

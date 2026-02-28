@@ -8,12 +8,18 @@ import { z } from 'zod';
 // Canvas validation schemas
 export const createCanvasSchema = z.object({
   name: z.string().min(1).max(255),
-  spec: z.record(z.unknown()), // LayoutSpec - validated by application logic
+  spec: z.record(z.unknown()).refine(
+    (val) => JSON.stringify(val).length <= 2_000_000,
+    { message: 'Spec JSON must be under 2 MB' },
+  ),
 });
 
 export const updateCanvasSchema = z.object({
   name: z.string().min(1).max(255).optional(),
-  spec: z.record(z.unknown()).optional(),
+  spec: z.record(z.unknown()).refine(
+    (val) => JSON.stringify(val).length <= 2_000_000,
+    { message: 'Spec JSON must be under 2 MB' },
+  ).optional(),
 }).refine(data => data.name !== undefined || data.spec !== undefined, {
   message: 'At least one field (name or spec) must be provided',
 });

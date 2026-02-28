@@ -11,6 +11,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { loadGoogleFont } from '../utils/googleFonts';
 
 export type DesignMode = "general" | "roblox";
 
@@ -75,15 +76,7 @@ const TEMPLATE_CATEGORIES = [
 ];
 
 // ── Helper: ensure a Google Font is loaded for preview ─────────────────────
-function ensureFont(name: string) {
-  const id = `gf-${name.replace(/\s+/g, '-').toLowerCase()}`;
-  if (document.getElementById(id)) return;
-  const link = document.createElement('link');
-  link.id = id;
-  link.rel = 'stylesheet';
-  link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(name)}:wght@400;600;700&display=swap`;
-  document.head.appendChild(link);
-}
+const ensureFont = (name: string) => loadGoogleFont(name, [400, 600, 700]);
 
 export function ChooseModeModal({
   onSelect,

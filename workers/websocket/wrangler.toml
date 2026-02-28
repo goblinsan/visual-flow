@@ -11,6 +11,22 @@ bindings = [
   { name = "CANVAS_ROOM", class_name = "CanvasRoom" }
 ]
 
+# D1 Database binding (shared with API worker for auth validation)
+[[d1_databases]]
+binding = "DB"
+database_name = "vizail-db"
+database_id = "313e76a2-8864-495d-abe2-5cbc6e419847"
+
+# Environment configuration
+[env.production]
+[env.production.vars]
+ENVIRONMENT = "production"
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "vizail-db"
+database_id = "313e76a2-8864-495d-abe2-5cbc6e419847"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["CanvasRoom"]

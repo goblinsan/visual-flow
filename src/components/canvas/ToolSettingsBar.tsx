@@ -43,18 +43,9 @@ const TOOLBAR_FONTS = [
   { name: 'Source Code Pro', value: 'Source Code Pro' },
 ];
 
-// Set of system fonts that don't need loading
-const SYSTEM_FONT_NAMES = new Set(['Arial', 'Helvetica', 'Verdana', 'Georgia', 'Times New Roman', 'Courier New']);
-const loadedToolbarFonts = new Set<string>();
+import { loadGoogleFont } from '../../utils/googleFonts';
 
-function loadToolbarFont(fontName: string): void {
-  if (SYSTEM_FONT_NAMES.has(fontName) || loadedToolbarFonts.has(fontName)) return;
-  loadedToolbarFonts.add(fontName);
-  const link = document.createElement('link');
-  link.rel = 'stylesheet';
-  link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(fontName).replace(/%20/g, '+')}:wght@400;700&display=swap`;
-  document.head.appendChild(link);
-}
+const loadToolbarFont = (fontName: string) => loadGoogleFont(fontName);
 
 /** Compact searchable font dropdown for the toolbar */
 function ToolbarFontPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {

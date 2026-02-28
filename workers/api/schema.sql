@@ -40,13 +40,12 @@ CREATE INDEX IF NOT EXISTS idx_canvases_owner ON canvases(owner_id);
 CREATE INDEX IF NOT EXISTS idx_memberships_canvas ON memberships(canvas_id);
 CREATE INDEX IF NOT EXISTS idx_memberships_user ON memberships(user_id);
 
--- Agent tokens
+-- Agent tokens (hashed — plaintext token never stored)
 CREATE TABLE IF NOT EXISTS agent_tokens (
   id TEXT PRIMARY KEY,
   canvas_id TEXT NOT NULL,
   agent_id TEXT NOT NULL,
-  token TEXT NOT NULL,
-  token_hash TEXT,
+  token_hash TEXT NOT NULL,
   scope TEXT NOT NULL,
   expires_at INTEGER NOT NULL,
   created_at INTEGER NOT NULL

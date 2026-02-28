@@ -98,3 +98,38 @@ export function addRecentColor(list: string[], color: string, limit = 8): string
   const existing = list.filter(c => !isSameColor(c, hex));
   return [hex, ...existing].slice(0, limit);
 }
+
+// ---------------------------------------------------------------------------
+// Brightness / lighten / darken — shared helpers used by theme, palette, etc.
+// ---------------------------------------------------------------------------
+
+/** Perceived brightness 0–255 using the ITU-R BT.601 luminance formula */
+export function brightness(hex: string): number {
+  const p = parseColor(hex);
+  if (!p) return 0;
+  return (p.r * 299 + p.g * 587 + p.b * 114) / 1000;
+}
+
+/** Lighten a hex colour toward white by `amount` (0 = no change, 1 = white) */
+export function lighten(hex: string, amount: number): string {
+  const p = parseColor(hex);
+  if (!p) return hex;
+  return toHex({
+    r: Math.round(p.r + (255 - p.r) * amount),
+    g: Math.round(p.g + (255 - p.g) * amount),
+    b: Math.round(p.b + (255 - p.b) * amount),
+    a: p.a,
+  });
+}
+
+/** Darken a hex colour toward black by `amount` (0 = no change, 1 = black) */
+export function darken(hex: string, amount: number): string {
+  const p = parseColor(hex);
+  if (!p) return hex;
+  return toHex({
+    r: Math.round(p.r * (1 - amount)),
+    g: Math.round(p.g * (1 - amount)),
+    b: Math.round(p.b * (1 - amount)),
+    a: p.a,
+  });
+}

@@ -76,20 +76,7 @@ const SYSTEM_FONTS = [
   { name: 'Verdana', value: 'Verdana, sans-serif', category: 'system' },
 ];
 
-// Set to track which fonts have been loaded
-const loadedFonts = new Set<string>();
-
-// Load a Google Font dynamically
-function loadGoogleFont(fontName: string): void {
-  if (loadedFonts.has(fontName)) return;
-  loadedFonts.add(fontName);
-  
-  const link = document.createElement('link');
-  link.rel = 'stylesheet';
-  // Load all weights in both normal and italic styles
-  link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(fontName).replace(/%20/g, '+')}:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap`;
-  document.head.appendChild(link);
-}
+import { loadGoogleFont } from '../utils/googleFonts';
 
 export interface GoogleFontPickerProps {
   value: string;

@@ -71,6 +71,13 @@ export default {
       });
     }
 
+    // C3: Reject oversized request bodies (2 MB limit)
+    const contentLength = request.headers.get('Content-Length');
+    const MAX_BODY_BYTES = 2 * 1024 * 1024;
+    if (contentLength && parseInt(contentLength, 10) > MAX_BODY_BYTES) {
+      return errorResponse('Request body too large (2 MB limit)', 413, env, origin);
+    }
+
     // Public routes (no auth required)
     if (url.pathname === '/health' || url.pathname === '/api/health') {
       return new Response(JSON.stringify({ status: 'ok', timestamp: Date.now() }), {
@@ -94,29 +101,6 @@ export default {
 
     if (url.pathname === '/api/agent/link-code/exchange' && request.method === 'POST') {
       return await exchangeLinkCode(env, request);
-    }
-
-    // Debug endpoint - shows request headers to diagnose auth issues
-    if (url.pathname === '/api/debug' && request.method === 'GET') {
-      const headers: Record<string, string> = {};
-      request.headers.forEach((value, key) => {
-        headers[key] = value;
-      });
-      return new Response(JSON.stringify({
-        url: request.url,
-        method: request.method,
-        headers,
-        cf: request.cf ? {
-          country: request.cf.country,
-          colo: request.cf.colo,
-        } : null,
-        environment: env.ENVIRONMENT || 'not set',
-      }, null, 2), {
-        headers: {
-          'Content-Type': 'application/json',
-          ...corsHeaders,
-        },
-      });
     }
 
     // Route handling
@@ -201,13 +185,18 @@ export default {
     if (path === '/api/user/display-name' && (method === 'POST' || method === 'PUT')) {
       const body = await request.json().catch(() => ({})) as Record<string, unknown>;
       const newName = typeof body.display_name === 'string' ? body.display_name.trim() : '';
-      if (!newName) {
-        return errorResponse('display_name required', 400, env, origin);
+      if (!newName || newName.length > 100) {
+        return errorResponse('display_name required (1-100 characters)', 400, env, origin);
+      }
+      // Strip control characters
+      const sanitized = newName.replace(/[\x00-\x1F\x7F]/g, '');
+      if (!sanitized) {
+        return errorResponse('display_name contains invalid characters', 400, env, origin);
       }
       await env.DB.prepare('UPDATE users SET display_name = ?, updated_at = ? WHERE id = ?')
-        .bind(newName, Date.now(), user.id)
+        .bind(sanitized, Date.now(), user.id)
         .run();
-      return jsonResponse({ ok: true, display_name: newName }, 200, env, origin);
+      return jsonResponse({ ok: true, display_name: sanitized }, 200, env, origin);
     }
 
     // Rate limiting

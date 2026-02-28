@@ -7,65 +7,23 @@ import { CanvasImage } from "./components/CanvasImage";
 import { debugOnce, logger } from "../utils/logger";
 import { parseColor } from "../utils/color";
 import { getAnchors, computeBezierPath } from "./utils/bezierUtils";
+import { loadGoogleFont, onFontLoaded } from "../utils/googleFonts";
 
-// Font loading cache and callbacks
-const loadedFonts = new Set<string>();
-const pendingFonts = new Set<string>();
+// System fonts that don't need loading
 const systemFonts = new Set(['Arial', 'Helvetica', 'Times New Roman', 'Georgia', 'Courier New', 'Verdana', 'system-ui', 'sans-serif', 'serif', 'monospace']);
-const fontLoadCallbacks: Array<() => void> = [];
 
-function addFontLoadCallback(cb: () => void): void {
-  fontLoadCallbacks.push(cb);
-}
-
-function removeFontLoadCallback(cb: () => void): void {
-  const idx = fontLoadCallbacks.indexOf(cb);
-  if (idx >= 0) fontLoadCallbacks.splice(idx, 1);
-}
-
-function notifyFontLoaded(): void {
-  fontLoadCallbacks.forEach(cb => cb());
-}
-
-/** Hook to trigger re-render when fonts finish loading */
+/**
+ * Hook to trigger re-render when fonts finish loading
+ * (wired to the shared googleFonts utility)
+ */
 export function useFontLoading(): number {
   const [fontVersion, setFontVersion] = useState(0);
-  
-  useEffect(() => {
-    const callback = () => setFontVersion(v => v + 1);
-    addFontLoadCallback(callback);
-    return () => removeFontLoadCallback(callback);
-  }, []);
-  
-  return fontVersion;
-}
 
-function loadGoogleFont(fontName: string, weight: string = '400'): void {
-  if (!fontName || systemFonts.has(fontName)) return;
-  // Skip font values that look like font stacks (contain commas)
-  if (fontName.includes(',')) return;
-  
-  const fontKey = `${fontName}:${weight}`;
-  if (loadedFonts.has(fontKey) || pendingFonts.has(fontKey)) return;
-  
-  pendingFonts.add(fontKey);
-  
-  // Load font via CSS
-  const link = document.createElement('link');
-  link.rel = 'stylesheet';
-  link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(fontName).replace(/%20/g, '+')}:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap`;
-  document.head.appendChild(link);
-  
-  // Wait for font to be ready
-  document.fonts.ready.then(() => {
-    // Check if the specific font+weight is now available
-    const fontSpec = `${weight} 16px "${fontName}"`;
-    document.fonts.load(fontSpec).then(() => {
-      loadedFonts.add(fontKey);
-      pendingFonts.delete(fontKey);
-      notifyFontLoaded();
-    });
-  });
+  useEffect(() => {
+    return onFontLoaded(() => setFontVersion(v => v + 1));
+  }, []);
+
+  return fontVersion;
 }
 
 // Helper to compute Konva fontStyle string
@@ -121,8 +79,8 @@ function renderText(n: TextNode) {
   if (!n.spans || n.spans.length === 0) {
     // Ensure font is loaded for Google Fonts
     if (baseFontFamily && !systemFonts.has(baseFontFamily)) {
-      const numericWeight = baseFontWeight === 'bold' ? '700' : (baseFontWeight === 'normal' ? '400' : baseFontWeight);
-      loadGoogleFont(baseFontFamily, numericWeight);
+      const numericWeight = baseFontWeight === 'bold' ? 700 : (baseFontWeight === 'normal' ? 400 : parseInt(baseFontWeight, 10) || 400);
+      loadGoogleFont(baseFontFamily, [numericWeight]);
     }
     
     const fontStyleValue = computeFontStyle(baseFontWeight, baseFontStyle, baseFontFamily);
@@ -157,8 +115,8 @@ function renderText(n: TextNode) {
     const fontFamily = span.fontFamily || baseFontFamily;
     const fontWeight = span.fontWeight || baseFontWeight;
     if (fontFamily && !systemFonts.has(fontFamily)) {
-      const numericWeight = fontWeight === 'bold' ? '700' : (fontWeight === 'normal' ? '400' : fontWeight);
-      loadGoogleFont(fontFamily, numericWeight);
+      const numericWeight = fontWeight === 'bold' ? 700 : (fontWeight === 'normal' ? 400 : parseInt(fontWeight, 10) || 400);
+      loadGoogleFont(fontFamily, [numericWeight]);
     }
   });
   

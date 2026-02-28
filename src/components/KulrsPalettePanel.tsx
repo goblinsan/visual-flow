@@ -11,6 +11,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import type { LayoutSpec, LayoutNode } from '../layout-schema';
+import { brightness, lighten } from '../utils/color';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -88,24 +89,6 @@ async function fetchKulrsPaletteById(
 // Theme helpers
 // ---------------------------------------------------------------------------
 
-/** Perceived brightness 0-255 */
-function brightness(hex: string): number {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return (r * 299 + g * 587 + b * 114) / 1000;
-}
-
-function lightenHex(hex: string, amount: number): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  const lr = Math.round(r + (255 - r) * amount);
-  const lg = Math.round(g + (255 - g) * amount);
-  const lb = Math.round(b + (255 - b) * amount);
-  return `#${lr.toString(16).padStart(2, '0')}${lg.toString(16).padStart(2, '0')}${lb.toString(16).padStart(2, '0')}`;
-}
-
 function resolveTheme(mode: ThemeMode, customBg: string): ThemeColors {
   if (mode === 'dark') {
     return { pageBg: '#0f172a', cardBg: '#1e293b', textPrimary: '#f1f5f9', textSecondary: '#94a3b8', border: '#334155', isDark: true };
@@ -114,10 +97,10 @@ function resolveTheme(mode: ThemeMode, customBg: string): ThemeColors {
     const dark = brightness(customBg) < 140;
     return {
       pageBg: customBg,
-      cardBg: dark ? lightenHex(customBg, 0.08) : '#ffffff',
+      cardBg: dark ? lighten(customBg, 0.08) : '#ffffff',
       textPrimary: dark ? '#f1f5f9' : '#0f172a',
       textSecondary: dark ? '#94a3b8' : '#64748b',
-      border: dark ? lightenHex(customBg, 0.15) : '#e2e8f0',
+      border: dark ? lighten(customBg, 0.15) : '#e2e8f0',
       isDark: dark,
     };
   }

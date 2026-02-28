@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import type { LayoutSpec, LayoutNode } from './layout-schema';
 import { saveDesignSpec, setCurrentDesignName } from './utils/persistence';
 import { generateThemeFromPalette } from './theme/themeGenerator';
+import { brightness, lighten, darken } from './utils/color';
+import { loadGoogleFont } from './utils/googleFonts';
 
 /* ── URL param parsing ─────────────────────────────────────────────── */
 
@@ -42,20 +44,7 @@ function parseKulrsParams(): KulrsParams {
 
 function useGoogleFonts(fonts: string[]) {
   useEffect(() => {
-    if (fonts.length === 0) return;
-    const families = fonts
-      .filter(Boolean)
-      .map(f => f.replace(/ /g, '+'))
-      .map(f => `family=${f}:wght@300;400;500;600;700`)
-      .join('&');
-    const href = `https://fonts.googleapis.com/css2?${families}&display=swap`;
-    const existing = document.querySelector(`link[href="${href}"]`);
-    if (existing) return;
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = href;
-    document.head.appendChild(link);
-    return () => { link.remove(); };
+    fonts.filter(Boolean).forEach(f => loadGoogleFont(f, [300, 400, 500, 600, 700]));
   }, [fonts]);
 }
 
@@ -63,36 +52,6 @@ function useGoogleFonts(fonts: string[]) {
 
 function safe(colors: string[], idx: number): string {
   return colors[idx % colors.length] || '#888888';
-}
-
-/** Lighten a hex color by mixing toward white */
-function lighten(hex: string, amount: number): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  const lr = Math.round(r + (255 - r) * amount);
-  const lg = Math.round(g + (255 - g) * amount);
-  const lb = Math.round(b + (255 - b) * amount);
-  return `#${lr.toString(16).padStart(2, '0')}${lg.toString(16).padStart(2, '0')}${lb.toString(16).padStart(2, '0')}`;
-}
-
-/** Darken a hex color by mixing toward black */
-function darken(hex: string, amount: number): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  const dr = Math.round(r * (1 - amount));
-  const dg = Math.round(g * (1 - amount));
-  const db = Math.round(b * (1 - amount));
-  return `#${dr.toString(16).padStart(2, '0')}${dg.toString(16).padStart(2, '0')}${db.toString(16).padStart(2, '0')}`;
-}
-
-/** Perceived brightness (0-255) */
-function brightness(hex: string): number {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return (r * 299 + g * 587 + b * 114) / 1000;
 }
 
 function textOn(bg: string): string {

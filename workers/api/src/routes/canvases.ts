@@ -40,21 +40,15 @@ export async function listCanvases(
   try {
     const result = await env.DB
       .prepare(`
-        SELECT c.* FROM canvases c
+        SELECT c.id, c.owner_id, c.name, c.created_at, c.updated_at FROM canvases c
         INNER JOIN memberships m ON c.id = m.canvas_id
         WHERE m.user_id = ?
         ORDER BY c.updated_at DESC
       `)
       .bind(user.id)
-      .all<Canvas>();
+      .all<Omit<Canvas, 'spec'>>();
 
-    // Parse spec JSON for each canvas
-    const canvases = result.results?.map(c => ({
-      ...c,
-      spec: normalizeSpec(c.spec as string | LayoutSpec),
-    })) || [];
-
-    return jsonResponse(canvases);
+    return jsonResponse(result.results || []);
   } catch (error) {
     console.error('Error listing canvases:', error);
     return errorResponse('Failed to list canvases', 500);
