@@ -852,7 +852,7 @@ export function DialogManager({
       <Modal open={newDialogOpen} onClose={() => setNewDialogOpen(false)} title="Create New Design" size="lg" variant="light">
         <NewDesignDialogContent
           templates={templates}
-          activeTheme={activeTheme}
+          activeTheme={activeTheme ?? null}
           onApplyTemplate={onApplyTemplate}
           onClose={() => setNewDialogOpen(false)}
         />
