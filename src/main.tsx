@@ -3,12 +3,14 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import CanvasApp from './CanvasApp'
 import ProposalsTestPage from './ProposalsTestPage'
+import FromKulrsPage from './FromKulrsPage'
 
-// Check URL for test page
+// Route based on URL
 const isTestPage = window.location.search.includes('test=proposals');
+const isFromKulrs = window.location.pathname === '/from-kulrs';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    {isTestPage ? <ProposalsTestPage /> : <CanvasApp />}
+    {isFromKulrs ? <FromKulrsPage /> : isTestPage ? <ProposalsTestPage /> : <CanvasApp />}
   </StrictMode>,
 )
