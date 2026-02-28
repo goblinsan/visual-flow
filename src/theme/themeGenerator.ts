@@ -381,7 +381,9 @@ export function bindAndApplyTheme(spec: LayoutSpec, theme: DesignTheme): LayoutS
     const norm = (h: string) => h.toLowerCase();
 
     // Dark fills used as backgrounds should map to background.inverse, not text.primary
-    const FILL_OVERRIDES: Record<string, ColorTokenName> = {
+    // Exception: icon images use dark fill as the icon colour → text.primary
+    const isIconImage = node.type === 'image' && 'iconId' in node && !!(node as { iconId?: string }).iconId;
+    const FILL_OVERRIDES: Record<string, ColorTokenName> = isIconImage ? {} : {
       '#111827': 'color.background.inverse',
       '#0f172a': 'color.background.inverse',
       '#1f2937': 'color.background.inverse',
@@ -436,6 +438,22 @@ export function bindAndApplyTheme(spec: LayoutSpec, theme: DesignTheme): LayoutS
         patched.fontFamily = theme.typography.headingFont;
       } else {
         patched.fontFamily = theme.typography.bodyFont;
+      }
+    }
+
+    // Icon images: regenerate SVG src when fill colour changes
+    if (node.type === 'image' && 'iconId' in node && (node as { iconId?: string }).iconId) {
+      const newFill = patched.fill as string | undefined;
+      if (newFill) {
+        // Decode the existing SVG data-URL, replace the fill colour, encode back
+        const imgNode = node as { src: string; fill?: string };
+        try {
+          const decoded = decodeURIComponent(imgNode.src.replace('data:image/svg+xml;utf8,', ''));
+          const updated = decoded.replace(/fill="[^"]*"/, `fill="${newFill}"`);
+          patched.src = `data:image/svg+xml;utf8,${encodeURIComponent(updated)}`;
+        } catch {
+          // If decoding fails, leave src unchanged
+        }
       }
     }
 

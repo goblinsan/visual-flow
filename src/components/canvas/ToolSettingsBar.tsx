@@ -181,6 +181,7 @@ interface ToolSettingsBarProps {
     fontWeight: string;
     fontStyle: string;
     color: string;
+    variant?: string;
   };
   updateTextDefaults: (patch: Record<string, unknown>) => void;
   /** Snapping toggles */
@@ -366,6 +367,32 @@ export function ToolSettingsBar({
       {/* Text tool settings */}
       {isTextTool && (
         <>
+          {/* Heading / Body variant toggle */}
+          <div className="flex items-center border border-gray-300 rounded overflow-hidden">
+            <button
+              onClick={() => updateTextDefaults({ variant: 'h2' })}
+              className={`px-2 py-1 text-[10px] font-semibold transition-colors ${
+                textDefaults.variant === 'h1' || textDefaults.variant === 'h2' || textDefaults.variant === 'h3'
+                  ? 'bg-blue-100 text-blue-600'
+                  : 'bg-white text-gray-500 hover:bg-gray-50'
+              }`}
+              title="Heading text — uses the theme heading font"
+            >
+              H
+            </button>
+            <button
+              onClick={() => updateTextDefaults({ variant: 'body' })}
+              className={`px-2 py-1 text-[10px] font-medium transition-colors ${
+                !textDefaults.variant || textDefaults.variant === 'body' || textDefaults.variant === 'caption'
+                  ? 'bg-blue-100 text-blue-600'
+                  : 'bg-white text-gray-500 hover:bg-gray-50'
+              }`}
+              title="Body text — uses the theme body font"
+            >
+              P
+            </button>
+          </div>
+
           {/* Font Family - searchable dropdown */}
           <div className="flex items-center gap-1.5 text-gray-600">
             <span>Font</span>

@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import type Konva from 'konva';
-import type { LayoutSpec, LayoutNode, TextNode } from '../../layout-schema';
+import type { LayoutSpec, LayoutNode, TextNode, ThemeBindings } from '../../layout-schema';
 import { computeClickSelection, computeMarqueeSelection } from '../../renderer/interaction';
 import { beginDrag, updateDrag, finalizeDrag } from '../../interaction/drag';
 import { computeSnap, type SnapGuideLine, type SpacingGuide, type SnapBounds, type SnapAnchor } from '../../interaction/snapping';
@@ -90,7 +90,7 @@ interface UseMouseEventHandlersProps {
   startTextEdit: (id: string, node: TextNode) => void;
   justStartedTextEditRef: React.MutableRefObject<boolean>;
   justCreatedShapeRef?: React.MutableRefObject<boolean>;
-  textDefaults?: { fontFamily: string; fontSize: number; fontWeight: string; fontStyle: string; color: string };
+  textDefaults?: { fontFamily: string; fontSize: number; fontWeight: string; fontStyle: string; color: string; variant?: string };
   
   // Callbacks
   onToolChange?: (tool: string) => void;
@@ -285,6 +285,12 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
       const initialWidth = Math.round(Math.max(200, initialFontSize * 10));
       
       const id = 'text_' + Math.random().toString(36).slice(2, 9);
+      const variant = textDefaults?.variant as TextNode['variant'] ?? undefined;
+      const themeBindings: ThemeBindings = {};
+      // If text color matches a known default, bind to text.primary
+      if (textDefaults?.color && textDefaults.color !== '#000000') {
+        themeBindings.color = 'color.text.primary';
+      }
       const placeholderText: TextNode = {
         id,
         type: 'text',
@@ -297,6 +303,8 @@ export function useMouseEventHandlers(props: UseMouseEventHandlersProps) {
         fontStyle: (textDefaults?.fontStyle ?? 'normal') as TextNode['fontStyle'],
         color: textDefaults?.color ?? '#000000',
         spans: [],
+        ...(variant ? { variant } : {}),
+        ...(Object.keys(themeBindings).length > 0 ? { themeBindings } : {}),
       };
       setSpec(prev => appendNodesToRoot(prev, [placeholderText]));
       setSelection([id]);

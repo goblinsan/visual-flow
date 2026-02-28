@@ -1,5 +1,4 @@
-import type { LayoutNode, ImageNode, LayoutSpec } from "../../layout-schema";
-import type { ThemeBindings } from "../../layout-schema";
+import type { LayoutNode, ImageNode, LayoutSpec, ThemeBindings } from "../../layout-schema";
 import { ICON_LIBRARY, COMPONENT_LIBRARY } from "../../library";
 import { makeId } from "./canvasUtils";
 import type { DesignTheme, ColorTokenName } from "../../theme/types";
@@ -136,21 +135,37 @@ export function appendNodesToRoot(spec: LayoutSpec, nodes: LayoutNode[]): Layout
 }
 
 /**
- * Create an icon node at the specified world position
+ * Build an SVG data-URL for an icon with a given fill colour.
+ * Exported so bindAndApplyTheme can regenerate icon srcs when colours change.
+ */
+export function buildIconSvgSrc(iconId: string, fill: string): string | null {
+  const icon = ICON_LIBRARY.find(i => i.id === iconId);
+  if (!icon) return null;
+  const [w, h, , , d] = icon.icon.icon;
+  const path = Array.isArray(d) ? d.join(' ') : d;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" fill="${fill}"><path d="${path}"/></svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+/**
+ * Create an icon node at the specified world position.
+ * When an activeTheme is provided the icon colour and font are derived from
+ * the theme and themeBindings are persisted so future theme switches update it.
  */
 export function createIcon(
   worldPos: { x: number; y: number },
-  selectedIconId?: string
+  selectedIconId?: string,
+  activeTheme?: DesignTheme | null,
 ): ImageNode | null {
   const icon = ICON_LIBRARY.find(i => i.id === selectedIconId) ?? ICON_LIBRARY[0];
   if (!icon) return null;
-  
+
   const id = makeId('icon');
-  const [w, h, , , d] = icon.icon.icon;
-  const path = Array.isArray(d) ? d.join(' ') : d;
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" fill="#111827"><path d="${path}"/></svg>`;
-  const src = `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
-  
+  const fillColor = activeTheme
+    ? activeTheme.colors['color.text.primary']
+    : '#111827';
+  const src = buildIconSvgSrc(icon.id, fillColor)!;
+
   const iconNode: ImageNode = {
     id,
     type: 'image',
@@ -159,8 +174,11 @@ export function createIcon(
     src,
     alt: icon.label,
     objectFit: 'contain',
+    iconId: icon.id,
+    fill: fillColor,
+    ...(activeTheme ? { themeBindings: { fill: 'color.text.primary' as ColorTokenName } } : {}),
   };
-  
+
   return iconNode;
 }
 

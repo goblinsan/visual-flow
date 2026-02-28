@@ -23,6 +23,10 @@ describe('DialogManager', () => {
   const mockOnStartCollaborativeSession = vi.fn();
   const mockOnLeaveCollaborativeSession = vi.fn();
   const mockOnCopyShareLink = vi.fn();
+  const mockSetGettingStartedOpen = vi.fn();
+  const mockSetCanvasGuideOpen = vi.fn();
+  const mockSetTemplateBrowserOpen = vi.fn();
+  const mockSetExportDialogOpen = vi.fn();
 
   const mockTemplates = [
     {
@@ -43,6 +47,10 @@ describe('DialogManager', () => {
     setAboutOpen: mockSetAboutOpen,
     cheatOpen: false,
     setCheatOpen: mockSetCheatOpen,
+    gettingStartedOpen: false,
+    setGettingStartedOpen: mockSetGettingStartedOpen,
+    canvasGuideOpen: false,
+    setCanvasGuideOpen: mockSetCanvasGuideOpen,
     iconLibraryOpen: false,
     setIconLibraryOpen: mockSetIconLibraryOpen,
     componentLibraryOpen: false,
@@ -51,6 +59,12 @@ describe('DialogManager', () => {
     setNewDialogOpen: mockSetNewDialogOpen,
     openDialogOpen: false,
     setOpenDialogOpen: mockSetOpenDialogOpen,
+    templateBrowserOpen: false,
+    setTemplateBrowserOpen: mockSetTemplateBrowserOpen,
+    exportDialogOpen: false,
+    setExportDialogOpen: mockSetExportDialogOpen,
+    currentSpec: { root: { id: 'root', type: 'frame' as const, size: { width: 1600, height: 1200 }, background: undefined, children: [] } },
+    activeTheme: null,
     isCollaborative: false,
     roomId: null,
     selectedIconId: 'star',
@@ -71,14 +85,14 @@ describe('DialogManager', () => {
   it('renders about modal when aboutOpen is true', () => {
     render(<DialogManager {...defaultProps} aboutOpen={true} />);
     expect(screen.getByText(/About Vizail/)).toBeInTheDocument();
-    expect(screen.getByText(/version/)).toBeInTheDocument();
+    expect(screen.getByText(/Version/)).toBeInTheDocument();
     expect(screen.getByText(/1.0.0/)).toBeInTheDocument();
   });
 
   it('renders keyboard shortcuts modal when cheatOpen is true', () => {
     render(<DialogManager {...defaultProps} cheatOpen={true} />);
-    expect(screen.getByText(/Interaction Cheatsheet/)).toBeInTheDocument();
-    expect(screen.getByText(/Select: Click/)).toBeInTheDocument();
+    expect(screen.getByText(/Keyboard Shortcuts/)).toBeInTheDocument();
+    expect(screen.getByText(/Select element/)).toBeInTheDocument();
   });
 
   it('renders share dialog in non-collaborative mode', () => {

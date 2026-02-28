@@ -120,6 +120,10 @@ export interface ImageNode extends BaseNode, Partial<AbsoluteChild> {
   objectFit?: "cover" | "contain";
   /** If false, allow stretched (non-uniform) rendering ignoring objectFit scaling */
   preserveAspect?: boolean;
+  /** For icon images — the library icon ID so the SVG can be regenerated */
+  iconId?: string;
+  /** For icon images — the fill colour baked into the SVG */
+  fill?: string;
 }
 
 /** Generic box/container that can optionally hold children. */

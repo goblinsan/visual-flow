@@ -880,7 +880,7 @@ export default function CanvasApp() {
     setDrawDefaults(prev => ({ ...prev, ...patch }));
   }, []);
   // Text default attributes
-  const [textDefaults, setTextDefaults] = useState({ fontFamily: 'Arial', fontSize: 14, fontWeight: '400' as string, fontStyle: 'normal' as string, color: '#000000' });
+  const [textDefaults, setTextDefaults] = useState({ fontFamily: 'Arial', fontSize: 14, fontWeight: '400' as string, fontStyle: 'normal' as string, color: '#000000', variant: 'body' as string });
   const updateTextDefaults = useCallback((patch: Record<string, unknown>) => {
     setTextDefaults(prev => ({ ...prev, ...patch }));
   }, []);
@@ -942,7 +942,27 @@ export default function CanvasApp() {
       fill: activeTheme.colors['color.background.primary'],
       stroke: activeTheme.colors['color.border.primary'],
     });
+
+    // Update text tool defaults to match the theme
+    setTextDefaults(prev => {
+      const isHeading = prev.variant === 'h1' || prev.variant === 'h2' || prev.variant === 'h3';
+      return {
+        ...prev,
+        fontFamily: isHeading ? activeTheme.typography.headingFont : activeTheme.typography.bodyFont,
+        color: activeTheme.colors['color.text.primary'],
+      };
+    });
   }, [activeTheme, setSpec, updateRectDefaults]);
+
+  // When text variant toggles while a theme is active, switch to the appropriate theme font
+  useEffect(() => {
+    if (!activeTheme) return;
+    const isHeading = textDefaults.variant === 'h1' || textDefaults.variant === 'h2' || textDefaults.variant === 'h3';
+    const targetFont = isHeading ? activeTheme.typography.headingFont : activeTheme.typography.bodyFont;
+    if (textDefaults.fontFamily !== targetFont) {
+      setTextDefaults(prev => ({ ...prev, fontFamily: targetFont }));
+    }
+  }, [textDefaults.variant, activeTheme]);
 
   const { isAuthenticated } = useAuth();
 

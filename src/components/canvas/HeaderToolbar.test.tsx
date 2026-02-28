@@ -13,7 +13,10 @@ function setup(overrides: Partial<HeaderToolbarProps> = {}) {
   const mockSetHelpOpen = vi.fn();
   const mockSetAboutOpen = vi.fn();
   const mockSetCheatOpen = vi.fn();
+  const mockSetGettingStartedOpen = vi.fn();
+  const mockSetCanvasGuideOpen = vi.fn();
   const mockSetShareDialogOpen = vi.fn();
+  const mockSetExportDialogOpen = vi.fn();
 
   const props: HeaderToolbarProps = {
     headerRef: mockHeaderRef as React.RefObject<HTMLDivElement>,
@@ -24,6 +27,8 @@ function setup(overrides: Partial<HeaderToolbarProps> = {}) {
     setHelpOpen: mockSetHelpOpen,
     setAboutOpen: mockSetAboutOpen,
     setCheatOpen: mockSetCheatOpen,
+    setGettingStartedOpen: mockSetGettingStartedOpen,
+    setCanvasGuideOpen: mockSetCanvasGuideOpen,
     isCollaborative: false,
     status: 'disconnected' as ConnectionStatus,
     collaborators: mockCollaborators,
@@ -31,6 +36,7 @@ function setup(overrides: Partial<HeaderToolbarProps> = {}) {
     lastError: null,
     reconnect: mockReconnect,
     setShareDialogOpen: mockSetShareDialogOpen,
+    setExportDialogOpen: mockSetExportDialogOpen,
     tool: 'select',
     ...overrides,
   };
@@ -43,7 +49,10 @@ function setup(overrides: Partial<HeaderToolbarProps> = {}) {
     mockSetHelpOpen, 
     mockSetAboutOpen, 
     mockSetCheatOpen,
+    mockSetGettingStartedOpen,
+    mockSetCanvasGuideOpen,
     mockSetShareDialogOpen,
+    mockSetExportDialogOpen,
   };
 }
 
@@ -71,7 +80,7 @@ describe('HeaderToolbar', () => {
 
   it('displays file menu items when fileOpen is true', () => {
     const { getByText } = setup({ fileOpen: true });
-    expect(getByText('New')).toBeTruthy();
+    expect(getByText('New Design')).toBeTruthy();
     expect(getByText('Open…')).toBeTruthy();
     expect(getByText('Save')).toBeTruthy();
     expect(getByText('Save As…')).toBeTruthy();
@@ -79,7 +88,7 @@ describe('HeaderToolbar', () => {
 
   it('calls fileAction when file menu item is clicked', () => {
     const { getByText, mockFileAction, mockSetFileOpen } = setup({ fileOpen: true });
-    const newButton = getByText('New');
+    const newButton = getByText('New Design');
     fireEvent.click(newButton);
     expect(mockFileAction).toHaveBeenCalledWith('new');
     expect(mockSetFileOpen).toHaveBeenCalledWith(false);
@@ -87,13 +96,15 @@ describe('HeaderToolbar', () => {
 
   it('displays help menu items when helpOpen is true', () => {
     const { getByText } = setup({ helpOpen: true });
-    expect(getByText('About')).toBeTruthy();
+    expect(getByText('About Vizail')).toBeTruthy();
     expect(getByText('Keyboard Shortcuts')).toBeTruthy();
+    expect(getByText('Getting Started')).toBeTruthy();
+    expect(getByText('Canvas Tools Guide')).toBeTruthy();
   });
 
   it('calls setAboutOpen when About is clicked', () => {
     const { getByText, mockSetAboutOpen, mockSetHelpOpen } = setup({ helpOpen: true });
-    const aboutButton = getByText('About');
+    const aboutButton = getByText('About Vizail');
     fireEvent.click(aboutButton);
     expect(mockSetAboutOpen).toHaveBeenCalledWith(true);
     expect(mockSetHelpOpen).toHaveBeenCalledWith(false);

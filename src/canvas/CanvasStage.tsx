@@ -67,7 +67,7 @@ interface CanvasStageProps {
   lineDefaults?: { stroke?: string; strokeWidth: number; startArrow?: boolean; endArrow?: boolean; arrowSize?: number };
   curveDefaults?: { fill?: string; stroke?: string; strokeWidth: number; opacity: number; closed: boolean; tension: number };
   drawDefaults?: { stroke?: string; strokeWidth: number; strokeDash?: number[]; lineCap?: "butt" | "round" | "square"; smoothing: number };
-  textDefaults?: { fontFamily: string; fontSize: number; fontWeight: string; fontStyle: string; color: string };
+  textDefaults?: { fontFamily: string; fontSize: number; fontWeight: string; fontStyle: string; color: string; variant?: string };
   polygonSides?: number;
   setPolygonSides?: (sides: number) => void;
   selection: string[];
@@ -409,13 +409,13 @@ function CanvasStage({
   }, []);
 
   const createIconAtPosition = useCallback((worldPos: { x: number; y: number }) => {
-    const iconNode = createIcon(worldPos, selectedIconId);
+    const iconNode = createIcon(worldPos, selectedIconId, activeTheme);
     if (!iconNode) return;
     setSpec(prev => appendNodesToRoot(prev, [iconNode]));
     setSelection([iconNode.id]);
     onToolChange?.('select');
     justCreatedShapeRef.current = true;
-  }, [selectedIconId, setSelection, setSpec, onToolChange]);
+  }, [selectedIconId, setSelection, setSpec, onToolChange, activeTheme]);
 
   const createComponentAtPosition = useCallback((worldPos: { x: number; y: number }) => {
     const groupNode = createComponent(worldPos, spec.root, selectedComponentId, activeTheme);
