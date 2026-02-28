@@ -748,7 +748,7 @@ export function AttributesSidebar({
                         fill: hex,
                         fillGradient: undefined,
                         themeBindings: {
-                          ...((findNode(prev.root, selectedIds[0]) as Record<string, unknown>)?.themeBindings as Record<string, unknown> ?? {}),
+                          ...((findNode(prev.root, selectedIds[0]) as unknown as Record<string, unknown>)?.themeBindings as Record<string, unknown> ?? {}),
                           fill: token,
                         },
                       })

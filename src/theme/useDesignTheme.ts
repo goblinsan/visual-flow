@@ -146,7 +146,7 @@ export function useDesignTheme(): UseDesignThemeReturn {
       return theme.colors[bindings[prop]];
     }
     // Fall back to the raw value on the node
-    return (node as Record<string, unknown>)[prop] as string | undefined;
+    return (node as unknown as Record<string, unknown>)[prop] as string | undefined;
   }, [theme]);
 
   return {
