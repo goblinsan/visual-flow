@@ -475,3 +475,60 @@ export function createDefaultTheme(mode: 'light' | 'dark'): DesignTheme {
     : ['#f9fafb', '#ffffff', '#2563eb', '#059669', '#0f172a'];
   return generateThemeFromPalette(defaultPalette, mode, { name: `Default ${mode === 'dark' ? 'Dark' : 'Light'}` });
 }
+
+/**
+ * Create a monotone greyscale theme with all tokens defined.
+ * Used when the user removes/clears their palette — elements stay themed
+ * but with neutral grey tones instead of colourful palette values.
+ */
+export function createNeutralTheme(mode: 'light' | 'dark' = 'light'): DesignTheme {
+  const isDark = mode === 'dark';
+  const palette = isDark
+    ? ['#111111', '#333333', '#666666', '#999999', '#e5e5e5']
+    : ['#ffffff', '#f5f5f5', '#d4d4d4', '#737373', '#171717'];
+
+  const colors: Record<ColorTokenName, string> = {
+    // Backgrounds
+    'color.background.primary':   isDark ? '#111111' : '#ffffff',
+    'color.background.secondary': isDark ? '#1a1a1a' : '#f5f5f5',
+    'color.background.tertiary':  isDark ? '#262626' : '#e5e5e5',
+    'color.background.inverse':   isDark ? '#e5e5e5' : '#171717',
+    // Text
+    'color.text.primary':   isDark ? '#e5e5e5' : '#171717',
+    'color.text.secondary': isDark ? '#a3a3a3' : '#525252',
+    'color.text.inverse':   isDark ? '#171717' : '#e5e5e5',
+    'color.text.link':      isDark ? '#a3a3a3' : '#404040',
+    // Borders
+    'color.border.primary':   isDark ? '#404040' : '#d4d4d4',
+    'color.border.secondary': isDark ? '#333333' : '#e5e5e5',
+    'color.border.focus':     isDark ? '#737373' : '#525252',
+    // Actions
+    'color.action.primary':        isDark ? '#737373' : '#404040',
+    'color.action.primaryHover':   isDark ? '#8a8a8a' : '#333333',
+    'color.action.secondary':      isDark ? '#525252' : '#737373',
+    'color.action.secondaryHover': isDark ? '#666666' : '#666666',
+    // Status — subtle greyscale versions
+    'color.status.success': isDark ? '#aaaaaa' : '#555555',
+    'color.status.warning': isDark ? '#999999' : '#666666',
+    'color.status.error':   isDark ? '#888888' : '#444444',
+    'color.status.info':    isDark ? '#aaaaaa' : '#555555',
+    // Surface
+    'color.surface.card':    isDark ? '#1a1a1a' : '#ffffff',
+    'color.surface.overlay': isDark ? '#0a0a0a' : '#f0f0f0',
+    'color.accent.primary':   isDark ? '#999999' : '#333333',
+    'color.accent.secondary': isDark ? '#737373' : '#525252',
+  };
+
+  return {
+    id: `neutral_${mode}_${Date.now().toString(36)}`,
+    name: `Neutral ${isDark ? 'Dark' : 'Light'}`,
+    paletteColors: palette,
+    mode,
+    colors,
+    typography: {
+      headingFont: 'Inter',
+      bodyFont: 'Inter',
+      monoFont: 'Fira Code',
+    },
+  };
+}

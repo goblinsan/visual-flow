@@ -312,16 +312,16 @@ export function ThemePanel({
               title={`${hex} \u2014 click to apply, drag to reorder`}
             />
           ))}
-        </div>        {/* Remove theme button */}
+        </div>        {/* Revert to neutral greyscale theme */}
         {onClearTheme && (
           <button
             type="button"
             onClick={onClearTheme}
-            className="mt-1.5 w-full flex items-center justify-center gap-1.5 text-[10px] text-gray-400 hover:text-red-500 hover:bg-red-50 rounded py-1 transition-colors"
-            title="Remove the active palette and revert to neutral colors"
+            className="mt-1.5 w-full flex items-center justify-center gap-1.5 text-[10px] text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded py-1 transition-colors"
+            title="Revert to neutral greyscale colors"
           >
-            <i className="fa-solid fa-xmark text-[9px]" />
-            Remove Palette
+            <i className="fa-solid fa-circle-half-stroke text-[9px]" />
+            Reset to Neutral
           </button>
         )}      </div>
 

@@ -39,7 +39,7 @@ import { ToolSettingsBar } from './components/canvas/ToolSettingsBar';
 import { ChooseModeModal } from './roblox/ChooseModeModal';
 import type { WelcomeAction } from './roblox/ChooseModeModal';
 import { useDesignTheme } from './theme';
-import { bindAndApplyTheme } from './theme';
+import { bindAndApplyTheme, createNeutralTheme } from './theme';
 
 /** Get room ID from URL query param ?room=xxx */
 function getRoomIdFromURL(): string | null {
@@ -993,12 +993,15 @@ export default function CanvasApp() {
     setSpec(prev => bindAndApplyTheme(prev, newTheme));
   }, [applyPalette, setSpec]);
 
-  /** Clear / remove the active design theme */
+  /** Revert to a neutral monotone greyscale theme */
   const handleClearTheme = useCallback(() => {
-    setTheme(null);
+    const neutral = createNeutralTheme(activeTheme?.mode ?? 'light');
+    setTheme(neutral);
+    // Apply the neutral theme to all canvas elements
+    setSpec(prev => bindAndApplyTheme(prev, neutral));
     // Reset tool defaults to neutral colors
-    updateRectDefaults({ fill: '#e5e7eb', stroke: '#d1d5db' });
-  }, [setTheme, updateRectDefaults]);
+    updateRectDefaults({ fill: neutral.colors['color.background.secondary'], stroke: neutral.colors['color.border.primary'] });
+  }, [setTheme, setSpec, updateRectDefaults, activeTheme?.mode]);
 
   /** Handle picking a theme color — apply to selected element or current tool */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
