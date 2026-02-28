@@ -10,7 +10,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import type { LayoutSpec, LayoutNode } from '../../layout-schema';
+import type { LayoutSpec, LayoutNode } from '../layout-schema';
 
 // ---------------------------------------------------------------------------
 // Types
