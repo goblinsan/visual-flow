@@ -912,6 +912,7 @@ export default function CanvasApp() {
   // Design theme (Kulrs integration)
   const {
     theme: activeTheme,
+    setTheme,
     applyPalette,
     toggleMode: toggleThemeMode,
     updateTokenColor,
@@ -991,6 +992,13 @@ export default function CanvasApp() {
     // Infer bindings for existing nodes + resolve all bindings
     setSpec(prev => bindAndApplyTheme(prev, newTheme));
   }, [applyPalette, setSpec]);
+
+  /** Clear / remove the active design theme */
+  const handleClearTheme = useCallback(() => {
+    setTheme(null);
+    // Reset tool defaults to neutral colors
+    updateRectDefaults({ fill: '#e5e7eb', stroke: '#d1d5db' });
+  }, [setTheme, updateRectDefaults]);
 
   /** Handle picking a theme color — apply to selected element or current tool */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -1228,19 +1236,35 @@ export default function CanvasApp() {
         setTimeout(() => setGettingStartedOpen(true), 100);
         break;
       case 'template': {
-        // Map category to a representative template
-        const categoryTemplateMap: Record<string, string> = {
-          web: 'top-nav',
-          game: 'game-ui-hud',
-          presentation: 'presentation-deck',
-        };
-        const templateId = categoryTemplateMap[action.category] || 'blank';
-        applyTemplate(templateId);
+        // Apply the chosen template
+        applyTemplate(action.templateId);
+
+        // Apply palette if one was selected
+        if (action.palette && action.palette.length > 0) {
+          const newTheme = applyPalette(action.palette, 'light', { name: 'Quick Start' });
+          // Apply optional font pair on top of the palette theme
+          if (action.fonts) {
+            updateTypography({ headingFont: action.fonts.heading, bodyFont: action.fonts.body });
+          }
+          // Re-apply theme to the newly loaded spec after a tick
+          setTimeout(() => {
+            setSpec(prev => bindAndApplyTheme(prev, {
+              ...newTheme,
+              typography: {
+                ...newTheme.typography,
+                ...(action.fonts ?? {}),
+              },
+            }));
+          }, 0);
+        } else if (action.fonts) {
+          // Fonts only, no palette — just update typography if a theme is active
+          updateTypography({ headingFont: action.fonts.heading, bodyFont: action.fonts.body });
+        }
         break;
       }
     }
-    logger.info(`Welcome action: ${action.type}${action.type === 'template' ? ` (${action.category})` : ''}`);
-  }, [applyTemplate, setGettingStartedOpen]);
+    logger.info(`Welcome action: ${action.type}${action.type === 'template' ? ` (${action.category}/${action.templateId})` : ''}`);
+  }, [applyTemplate, applyPalette, updateTypography, setSpec, setGettingStartedOpen]);
 
   // Dialog action callbacks
   const handleStartCollaborativeSession = useCallback(() => {
@@ -1312,7 +1336,7 @@ export default function CanvasApp() {
   return (
     <div className="h-screen w-screen overflow-hidden bg-gray-100 text-gray-900 flex flex-col">
       {/* Choose Design Mode modal (#142) — shown until user picks a mode */}
-      {!designChosen && <ChooseModeModal onSelect={onWelcomeSelect} />}
+      {!designChosen && <ChooseModeModal onSelect={onWelcomeSelect} templates={TEMPLATES.map(t => ({ id: t.id, name: t.name, icon: t.icon, description: t.description, category: t.category }))} />}
       {/* Header */}
       <HeaderToolbar
         headerRef={headerRef}
@@ -1857,6 +1881,7 @@ export default function CanvasApp() {
                   onUpdateTypography={updateTypography}
                   onUpdatePaletteOrder={updatePaletteOrder}
                   onToggleMode={toggleThemeMode}
+                  onClearTheme={handleClearTheme}
                   onPickThemeColor={(hex, token) => {
                     // Apply to selection fill if something is selected
                     if (selectedIds.length === 1) {

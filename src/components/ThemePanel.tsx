@@ -119,6 +119,8 @@ export interface ThemePanelProps {
   onToggleMode: () => void;
   /** Called when a token color is picked — can apply to selection or tool */
   onPickThemeColor?: (hex: string, token: ColorTokenName) => void;
+  /** Called to clear / remove the active theme */
+  onClearTheme?: () => void;
 }
 
 export function ThemePanel({
@@ -128,6 +130,7 @@ export function ThemePanel({
   onUpdatePaletteOrder,
   onToggleMode,
   onPickThemeColor,
+  onClearTheme,
 }: ThemePanelProps) {
   const [fontCategory, setFontCategory] = useState<FontCategory>('all');
   const [fontSearchHeading, setFontSearchHeading] = useState('');
@@ -309,8 +312,18 @@ export function ThemePanel({
               title={`${hex} \u2014 click to apply, drag to reorder`}
             />
           ))}
-        </div>
-      </div>
+        </div>        {/* Remove theme button */}
+        {onClearTheme && (
+          <button
+            type="button"
+            onClick={onClearTheme}
+            className="mt-1.5 w-full flex items-center justify-center gap-1.5 text-[10px] text-gray-400 hover:text-red-500 hover:bg-red-50 rounded py-1 transition-colors"
+            title="Remove the active palette and revert to neutral colors"
+          >
+            <i className="fa-solid fa-xmark text-[9px]" />
+            Remove Palette
+          </button>
+        )}      </div>
 
       {/* \u2500\u2500\u2500 Light / Dark mode \u2500\u2500\u2500 */}
       <div className="flex items-center gap-2">

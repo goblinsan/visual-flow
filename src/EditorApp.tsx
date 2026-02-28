@@ -159,7 +159,7 @@ export default function EditorApp() {
   return (
     <div className="min-h-screen bg-dark-gradient text-slate-100">
       {/* Choose Design Mode modal (#142) */}
-      {showModeModal && <ChooseModeModal onSelect={onWelcomeSelect} />}
+      {showModeModal && <ChooseModeModal onSelect={onWelcomeSelect as (a: WelcomeAction) => void} />}
 
       <div className="w-full">
         {/* Toolbar */}
