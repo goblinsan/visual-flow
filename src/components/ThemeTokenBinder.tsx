@@ -9,7 +9,7 @@
  */
 
 import { useState } from 'react';
-import type { DesignTheme, ColorTokenName, ThemeTypography } from '../theme/types';
+import type { DesignTheme } from '../theme/types';
 import { COLOR_TOKEN_NAMES, tokenShortName } from '../theme/types';
 import type { ThemeBindings } from '../theme/types';
 
