@@ -8,9 +8,11 @@ import PolygonAttributesPanel from '../PolygonAttributesPanel';
 import TextAttributesPanel from '../TextAttributesPanel';
 import ImageAttributesPanel from '../ImageAttributesPanel';
 import DefaultsPanel from '../DefaultsPanel';
-import { KulrsPalettePanel } from '../KulrsPalettePanel';
+import { ThemeTokenBinder } from '../ThemeTokenBinder';
 import { FlowAttributesPanel } from '../FlowAttributesPanel';
 import type { RectDefaults } from '../../hooks/usePersistentRectDefaults';
+import type { DesignTheme } from '../../theme/types';
+import type { ThemeBindings } from '../../theme/types';
 
 import type {
   LayoutSpec,
@@ -64,8 +66,8 @@ interface AttributesSidebarProps {
   updateSelection: (ids: string[]) => void;
   blockCanvasClicksRef: React.RefObject<boolean>;
   skipNormalizationRef: React.RefObject<boolean>;
-  // Theme props
-  onApplyPaletteAsTheme?: (paletteColors: string[], mode: 'light' | 'dark', paletteId?: string) => void;
+  /** Active design theme (read-only, for theme token binding UI) */
+  activeTheme?: DesignTheme | null;
 }
 
 export function AttributesSidebar({
@@ -106,8 +108,7 @@ export function AttributesSidebar({
   updateSelection,
   blockCanvasClicksRef,
   skipNormalizationRef,
-  // Theme props
-  onApplyPaletteAsTheme,
+  activeTheme,
 }: AttributesSidebarProps): JSX.Element {
   return (
     <>
@@ -694,27 +695,45 @@ export function AttributesSidebar({
             <div className="text-[11px] text-gray-400">{selectedIds.length === 0 ? 'No selection' : 'Multiple selection (attributes coming soon).'}</div>
           )}
 
-          {/* Kulrs Palette Integration */}
-          <KulrsPalettePanel
-            onPickColor={(hex) => pushRecent(hex)}
-            onApplyFill={selectedIds.length === 1 ? (hex) => {
-              setSpec(prev => ({
-                ...prev,
-                root: updateNode(prev.root, selectedIds[0], { fill: hex, fillGradient: undefined })
-              }));
-              pushRecent(hex);
-            } : undefined}
-            onApplyStroke={selectedIds.length === 1 ? (hex) => {
-              setSpec(prev => ({
-                ...prev,
-                root: updateNode(prev.root, selectedIds[0], { stroke: hex })
-              }));
-              pushRecent(hex);
-            } : undefined}
-            spec={spec}
-            setSpec={setSpec}
-            onApplyAsTheme={onApplyPaletteAsTheme}
-          />
+          {/* Theme Token Binder — shown when an element is selected and a theme is active */}
+          {selectedIds.length === 1 && activeTheme && (() => {
+            const node = findNode(spec.root, selectedIds[0]) as LayoutNode | null;
+            if (!node) return null;
+            const bindings = (node as unknown as Record<string, unknown>).themeBindings as ThemeBindings | undefined;
+            const colorProps: { prop: 'fill' | 'stroke' | 'color'; currentValue?: string }[] = [];
+            if ('fill' in node) colorProps.push({ prop: 'fill', currentValue: (node as unknown as Record<string, string>).fill });
+            if ('stroke' in node) colorProps.push({ prop: 'stroke', currentValue: (node as unknown as Record<string, string>).stroke });
+            if ('color' in node) colorProps.push({ prop: 'color', currentValue: (node as unknown as Record<string, string>).color });
+            if (colorProps.length === 0 && node.type !== 'text') return null;
+            return (
+              <ThemeTokenBinder
+                theme={activeTheme}
+                bindings={bindings}
+                nodeType={node.type}
+                fontFamily={(node as unknown as Record<string, string>).fontFamily}
+                colorProps={colorProps}
+                onUpdateBindings={(updated) => {
+                  const patch: Record<string, unknown> = { themeBindings: updated };
+                  // Also resolve the hex for each bound property
+                  for (const [prop, token] of Object.entries(updated)) {
+                    if (token && activeTheme.colors[token as keyof typeof activeTheme.colors]) {
+                      patch[prop] = activeTheme.colors[token as keyof typeof activeTheme.colors];
+                    }
+                  }
+                  setSpec(prev => ({
+                    ...prev,
+                    root: updateNode(prev.root, selectedIds[0], patch)
+                  }));
+                }}
+                onUpdateFont={node.type === 'text' ? (fontFamily) => {
+                  setSpec(prev => ({
+                    ...prev,
+                    root: updateNode(prev.root, selectedIds[0], { fontFamily })
+                  }));
+                } : undefined}
+              />
+            );
+          })()}
 
 
         </>

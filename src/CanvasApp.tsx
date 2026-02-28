@@ -10,7 +10,7 @@ import { useLibraryState } from './hooks/canvas/useLibraryState';
 import { useProposalState } from './hooks/canvas/useProposalState';
 import { logger } from "./utils/logger";
 import { DialogManager } from "./components/dialogs/DialogManager";
-import { findNode } from './utils/specUtils';
+import { findNode, updateNode } from './utils/specUtils';
 import { dashArrayToInput } from './utils/paint';
 import { applyProposalOperations } from './utils/proposalHelpers';
 import CanvasStage from "./canvas/CanvasStage.tsx";
@@ -34,6 +34,7 @@ import { LeftToolbar } from './components/canvas/LeftToolbar';
 import { AttributesSidebar } from './components/canvas/AttributesSidebar';
 import { AgentPanel } from './components/canvas/AgentPanel';
 import { ThemePanel } from './components/ThemePanel';
+import { KulrsPalettePanel } from './components/KulrsPalettePanel';
 import { ToolSettingsBar } from './components/canvas/ToolSettingsBar';
 import { ChooseModeModal } from './roblox/ChooseModeModal';
 import type { DesignMode } from './roblox/ChooseModeModal';
@@ -1143,7 +1144,11 @@ export default function CanvasApp() {
   const applyTemplate = useCallback((templateId: string) => {
     const template = TEMPLATES.find(t => t.id === templateId);
     if (template) {
-      const newSpec = template.build();
+      let newSpec = template.build();
+      // Apply the active theme (colors + fonts) to the new template
+      if (activeTheme) {
+        newSpec = bindAndApplyTheme(newSpec, activeTheme);
+      }
       setSpec(newSpec);
       setSelection([]);
       // Clear canvas ID — this is a brand new design, not yet saved to cloud
@@ -1160,7 +1165,7 @@ export default function CanvasApp() {
       logger.info(`Applied template: ${template.name}`);
     }
     setNewDialogOpen(false);
-  }, [setSpec, setSelection, isCollaborative, setCurrentCanvasId]);
+  }, [setSpec, setSelection, isCollaborative, setCurrentCanvasId, activeTheme]);
 
   // Handle Choose Design Mode selection (#142)
   const onChooseMode = useCallback((chosen: DesignMode) => {
@@ -1516,38 +1521,6 @@ export default function CanvasApp() {
             <button
               onClick={() => {
                 setSidebarVisible(true);
-                setPanelMode('agent');
-              }}
-              className={`fixed right-0 z-10 h-32 shadow-md transition-colors flex items-center justify-center ${
-                panelMode === 'agent'
-                  ? 'bg-gradient-to-b from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700'
-                  : 'bg-gradient-to-b from-gray-300 to-gray-400 hover:from-gray-400 hover:to-gray-500'
-              }`}
-              title="Show Agent Control"
-              style={{ 
-                padding: 0,
-                width: '20px',
-                top: '300px',
-                borderRadius: '8px 0 0 8px',
-                borderLeft: `1px solid ${panelMode === 'agent' ? '#0d9488' : '#9ca3af'}`,
-                borderTop: `1px solid ${panelMode === 'agent' ? '#0d9488' : '#9ca3af'}`,
-                borderBottom: `1px solid ${panelMode === 'agent' ? '#0d9488' : '#9ca3af'}`
-              }}
-            >
-              <span
-                className={`text-[10px] font-semibold ${panelMode === 'agent' ? 'text-white' : 'text-gray-700'}`}
-                style={{ 
-                  transform: 'rotate(-90deg)',
-                  whiteSpace: 'nowrap',
-                  letterSpacing: '0.5px'
-                }}
-              >
-                AGENT
-              </span>
-            </button>
-            <button
-              onClick={() => {
-                setSidebarVisible(true);
                 setPanelMode('theme');
               }}
               className={`fixed right-0 z-10 h-32 shadow-md transition-colors flex items-center justify-center ${
@@ -1559,7 +1532,7 @@ export default function CanvasApp() {
               style={{
                 padding: 0,
                 width: '20px',
-                top: '432px',
+                top: '300px',
                 borderRadius: '8px 0 0 8px',
                 borderLeft: `1px solid ${panelMode === 'theme' ? '#0d9488' : '#9ca3af'}`,
                 borderTop: `1px solid ${panelMode === 'theme' ? '#0d9488' : '#9ca3af'}`,
@@ -1575,6 +1548,38 @@ export default function CanvasApp() {
                 }}
               >
                 THEME
+              </span>
+            </button>
+            <button
+              onClick={() => {
+                setSidebarVisible(true);
+                setPanelMode('agent');
+              }}
+              className={`fixed right-0 z-10 h-32 shadow-md transition-colors flex items-center justify-center ${
+                panelMode === 'agent'
+                  ? 'bg-gradient-to-b from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700'
+                  : 'bg-gradient-to-b from-gray-300 to-gray-400 hover:from-gray-400 hover:to-gray-500'
+              }`}
+              title="Show Agent Control"
+              style={{ 
+                padding: 0,
+                width: '20px',
+                top: '432px',
+                borderRadius: '8px 0 0 8px',
+                borderLeft: `1px solid ${panelMode === 'agent' ? '#0d9488' : '#9ca3af'}`,
+                borderTop: `1px solid ${panelMode === 'agent' ? '#0d9488' : '#9ca3af'}`,
+                borderBottom: `1px solid ${panelMode === 'agent' ? '#0d9488' : '#9ca3af'}`
+              }}
+            >
+              <span
+                className={`text-[10px] font-semibold ${panelMode === 'agent' ? 'text-white' : 'text-gray-700'}`}
+                style={{ 
+                  transform: 'rotate(-90deg)',
+                  whiteSpace: 'nowrap',
+                  letterSpacing: '0.5px'
+                }}
+              >
+                AGENT
               </span>
             </button>
           </>
@@ -1630,36 +1635,6 @@ export default function CanvasApp() {
               </span>
             </button>
             <button
-              onClick={() => setPanelMode('agent')}
-              className={`fixed z-10 h-32 shadow-md transition-colors flex items-center justify-center ${
-                panelMode === 'agent'
-                  ? 'bg-gradient-to-b from-teal-500 to-teal-600'
-                  : 'bg-gradient-to-b from-gray-300 to-gray-400 hover:from-gray-400 hover:to-gray-500'
-              }`}
-              title="Agent Control"
-              style={{ 
-                padding: 0,
-                width: '20px',
-                top: '300px',
-                right: '288px',
-                borderRadius: '8px 0 0 8px',
-                borderLeft: `1px solid ${panelMode === 'agent' ? '#0d9488' : '#9ca3af'}`,
-                borderTop: `1px solid ${panelMode === 'agent' ? '#0d9488' : '#9ca3af'}`,
-                borderBottom: `1px solid ${panelMode === 'agent' ? '#0d9488' : '#9ca3af'}`
-              }}
-            >
-              <span
-                className={`text-[10px] font-semibold ${panelMode === 'agent' ? 'text-white' : 'text-gray-700'}`}
-                style={{ 
-                  transform: 'rotate(-90deg)',
-                  whiteSpace: 'nowrap',
-                  letterSpacing: '0.5px'
-                }}
-              >
-                AGENT
-              </span>
-            </button>
-            <button
               onClick={() => setPanelMode('theme')}
               className={`fixed z-10 h-32 shadow-md transition-colors flex items-center justify-center ${
                 panelMode === 'theme'
@@ -1670,7 +1645,7 @@ export default function CanvasApp() {
               style={{
                 padding: 0,
                 width: '20px',
-                top: '432px',
+                top: '300px',
                 right: '288px',
                 borderRadius: '8px 0 0 8px',
                 borderLeft: `1px solid ${panelMode === 'theme' ? '#0d9488' : '#9ca3af'}`,
@@ -1687,6 +1662,36 @@ export default function CanvasApp() {
                 }}
               >
                 THEME
+              </span>
+            </button>
+            <button
+              onClick={() => setPanelMode('agent')}
+              className={`fixed z-10 h-32 shadow-md transition-colors flex items-center justify-center ${
+                panelMode === 'agent'
+                  ? 'bg-gradient-to-b from-teal-500 to-teal-600'
+                  : 'bg-gradient-to-b from-gray-300 to-gray-400 hover:from-gray-400 hover:to-gray-500'
+              }`}
+              title="Agent Control"
+              style={{ 
+                padding: 0,
+                width: '20px',
+                top: '432px',
+                right: '288px',
+                borderRadius: '8px 0 0 8px',
+                borderLeft: `1px solid ${panelMode === 'agent' ? '#0d9488' : '#9ca3af'}`,
+                borderTop: `1px solid ${panelMode === 'agent' ? '#0d9488' : '#9ca3af'}`,
+                borderBottom: `1px solid ${panelMode === 'agent' ? '#0d9488' : '#9ca3af'}`
+              }}
+            >
+              <span
+                className={`text-[10px] font-semibold ${panelMode === 'agent' ? 'text-white' : 'text-gray-700'}`}
+                style={{ 
+                  transform: 'rotate(-90deg)',
+                  whiteSpace: 'nowrap',
+                  letterSpacing: '0.5px'
+                }}
+              >
+                AGENT
               </span>
             </button>
             <div className="p-4 border-b border-gray-200 flex items-center gap-2">
@@ -1747,12 +1752,33 @@ export default function CanvasApp() {
                   updateSelection={updateSelection}
                   blockCanvasClicksRef={blockCanvasClicksRef}
                   skipNormalizationRef={skipNormalizationRef}
-                  onApplyPaletteAsTheme={handleApplyPaletteAsTheme}
+                  activeTheme={activeTheme}
                 />
               )}
 
               {/* Theme Panel Content */}
               {panelMode === 'theme' && (
+                <>
+                <KulrsPalettePanel
+                  onPickColor={(hex) => pushRecent(hex)}
+                  onApplyFill={selectedIds.length === 1 ? (hex) => {
+                    setSpec(prev => ({
+                      ...prev,
+                      root: updateNode(prev.root, selectedIds[0], { fill: hex, fillGradient: undefined })
+                    }));
+                    pushRecent(hex);
+                  } : undefined}
+                  onApplyStroke={selectedIds.length === 1 ? (hex) => {
+                    setSpec(prev => ({
+                      ...prev,
+                      root: updateNode(prev.root, selectedIds[0], { stroke: hex })
+                    }));
+                    pushRecent(hex);
+                  } : undefined}
+                  spec={spec}
+                  setSpec={setSpec}
+                  onApplyAsTheme={handleApplyPaletteAsTheme}
+                />
                 <ThemePanel
                   theme={activeTheme}
                   onUpdateTokenColor={updateTokenColor}
@@ -1790,6 +1816,7 @@ export default function CanvasApp() {
                     handlePickThemeColor(hex, token);
                   }}
                 />
+                </>
               )}
 
               {/* Agent Panel Content */}

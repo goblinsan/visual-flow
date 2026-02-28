@@ -241,36 +241,59 @@ export const KNOWN_COLOR_BINDINGS: Record<string, ColorTokenName> = {
   '#7c3aed': 'color.accent.primary',
   '#2563eb': 'color.accent.primary',
   '#1d4ed8': 'color.accent.primary',
+  '#1877f2': 'color.accent.primary',    // facebook blue
+  '#4285f4': 'color.accent.primary',    // google blue
   // Secondary fills → accent secondary
   '#06b6d4': 'color.accent.secondary',
   '#059669': 'color.accent.secondary',
+  '#10b981': 'color.accent.secondary',
   // Light backgrounds
   '#dbeafe': 'color.background.secondary',
+  '#e0f2fe': 'color.background.secondary',
   '#e2e8f0': 'color.border.primary',
   '#f1f5f9': 'color.background.secondary',
   '#f3f4f6': 'color.background.secondary',
+  '#f8fafc': 'color.background.secondary',
   '#f9fafb': 'color.background.secondary',
-  // White → background primary  (for fill/stroke; text-color uses text.inverse)
+  '#e5e7eb': 'color.border.primary',
+  // White → background primary (for fill/stroke; text-color uses text.inverse)
   '#ffffff': 'color.background.primary',
-  // Dark text colours
+  // Dark backgrounds → background inverse
+  '#000000': 'color.background.inverse',
   '#111827': 'color.text.primary',
+  '#1a202c': 'color.background.inverse',
+  '#1e1b2e': 'color.background.inverse',
+  '#1e293b': 'color.background.inverse',
+  '#24292e': 'color.background.inverse',
+  '#2d3748': 'color.background.inverse',
+  '#2a2640': 'color.surface.overlay',
+  // Dark text colours
   '#0f172a': 'color.text.primary',
+  '#0c4a6e': 'color.text.primary',
   '#1f2937': 'color.text.primary',
   '#334155': 'color.text.primary',
   '#374151': 'color.text.secondary',
   // Secondary text
+  '#0369a1': 'color.text.link',
   '#64748b': 'color.text.secondary',
   '#6b7280': 'color.text.secondary',
   '#94a3b8': 'color.text.secondary',
   '#9ca3af': 'color.text.secondary',
+  '#a0aec0': 'color.text.secondary',
+  '#d1d5db': 'color.border.primary',
   // Borders
   '#cbd5f5': 'color.border.primary',
-  '#d1d5db': 'color.border.primary',
-  '#e5e7eb': 'color.border.primary',
+  '#4b5563': 'color.border.secondary',
+  // Card surfaces
+  '#4a4563': 'color.surface.card',
   // Status
   '#ef4444': 'color.status.error',
   '#22c55e': 'color.status.success',
   '#eab308': 'color.status.warning',
+  '#fbbf24': 'color.status.warning',
+  '#f8d97a': 'color.status.warning',
+  // Info / link
+  '#0ea5e9': 'color.status.info',
 };
 
 /**
@@ -357,10 +380,19 @@ export function bindAndApplyTheme(spec: LayoutSpec, theme: DesignTheme): LayoutS
     // ── Infer bindings for props that don't already have one ──────────
     const norm = (h: string) => h.toLowerCase();
 
+    // Dark fills used as backgrounds should map to background.inverse, not text.primary
+    const FILL_OVERRIDES: Record<string, ColorTokenName> = {
+      '#111827': 'color.background.inverse',
+      '#0f172a': 'color.background.inverse',
+      '#1f2937': 'color.background.inverse',
+      '#334155': 'color.surface.overlay',
+    };
+
     if (!inferred.fill && 'fill' in node) {
       const v = (node as { fill?: string }).fill;
       if (typeof v === 'string') {
-        const token = KNOWN_COLOR_BINDINGS[norm(v)];
+        const n = norm(v);
+        const token = FILL_OVERRIDES[n] ?? KNOWN_COLOR_BINDINGS[n];
         if (token) { inferred.fill = token; changed = true; }
       }
     }
