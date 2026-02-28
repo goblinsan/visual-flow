@@ -11,7 +11,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { loadGoogleFont } from '../utils/googleFonts';
+import { ThemeQuickPicker, PRESET_PALETTES, FONT_PAIRS } from '../components/ThemeQuickPicker';
 
 export type DesignMode = "general" | "roblox";
 
@@ -28,24 +28,6 @@ export type WelcomeAction =
   | { type: 'blank' }
   | { type: 'explore' }
   | { type: 'template'; category: string; templateId: string; palette?: string[]; fonts?: { heading: string; body: string } };
-
-// ── Preset palettes for quick-start ────────────────────────────────────────
-const PRESET_PALETTES: { id: string; name: string; colors: string[] }[] = [
-  { id: 'none', name: 'None', colors: [] },
-  { id: 'ocean', name: 'Ocean', colors: ['#0f172a', '#1e3a5f', '#3b82f6', '#93c5fd', '#f0f9ff'] },
-  { id: 'sunset', name: 'Sunset', colors: ['#7c2d12', '#ea580c', '#fb923c', '#fde68a', '#fffbeb'] },
-  { id: 'forest', name: 'Forest', colors: ['#14532d', '#16a34a', '#4ade80', '#bbf7d0', '#f0fdf4'] },
-  { id: 'slate', name: 'Slate', colors: ['#0f172a', '#334155', '#64748b', '#cbd5e1', '#f8fafc'] },
-  { id: 'berry', name: 'Berry', colors: ['#4a044e', '#a21caf', '#e879f9', '#f5d0fe', '#fdf4ff'] },
-];
-
-// ── Font pair presets ──────────────────────────────────────────────────────
-const FONT_PAIRS: { id: string; heading: string; body: string; label: string; style: string }[] = [
-  { id: 'default', heading: 'Inter', body: 'Inter', label: 'Clean', style: 'Modern sans-serif' },
-  { id: 'elegant', heading: 'Playfair Display', body: 'Inter', label: 'Elegant', style: 'Serif + sans' },
-  { id: 'modern', heading: 'Space Grotesk', body: 'DM Sans', label: 'Techy', style: 'Geometric sans' },
-  { id: 'friendly', heading: 'Poppins', body: 'Open Sans', label: 'Friendly', style: 'Rounded sans' },
-];
 
 // ── Category definitions ───────────────────────────────────────────────────
 const TEMPLATE_CATEGORIES = [
@@ -76,7 +58,6 @@ const TEMPLATE_CATEGORIES = [
 ];
 
 // ── Helper: ensure a Google Font is loaded for preview ─────────────────────
-const ensureFont = (name: string) => loadGoogleFont(name, [400, 600, 700]);
 
 export function ChooseModeModal({
   onSelect,
@@ -102,14 +83,6 @@ export function ChooseModeModal({
       setSelectedTemplate(categoryTemplates[0].id);
     }
   }, [selectedCategory, categoryTemplates, selectedTemplate]);
-
-  // Preload font pair fonts
-  useEffect(() => {
-    FONT_PAIRS.forEach(fp => {
-      ensureFont(fp.heading);
-      ensureFont(fp.body);
-    });
-  }, []);
 
   const handleStartCategory = (category: string) => {
     // If no templates provided, immediately fire the action (legacy / EditorApp path)
@@ -247,59 +220,14 @@ export function ChooseModeModal({
               </div>
             </div>
 
-            {/* Palette picker */}
-            <div>
-              <p className="text-[11px] font-semibold text-white/40 uppercase tracking-wider mb-2 px-1">Color Palette</p>
-              <div className="flex gap-2 flex-wrap">
-                {PRESET_PALETTES.map((pal) => (
-                  <button
-                    key={pal.id}
-                    onClick={() => setSelectedPalette(pal.id)}
-                    className={`rounded-lg border transition-all duration-200 p-2 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 min-w-[80px] ${
-                      selectedPalette === pal.id
-                        ? 'bg-white/15 border-cyan-400/70 ring-1 ring-cyan-400/40'
-                        : 'bg-white/[0.04] border-white/10 hover:bg-white/[0.08] hover:border-white/20'
-                    }`}
-                    title={pal.name}
-                  >
-                    {pal.colors.length > 0 ? (
-                      <div className="flex h-5 rounded overflow-hidden mb-1.5">
-                        {pal.colors.map((c, i) => (
-                          <div key={i} className="flex-1 h-full" style={{ backgroundColor: c }} />
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="flex h-5 rounded overflow-hidden mb-1.5 border border-dashed border-white/20 items-center justify-center">
-                        <i className="fa-solid fa-ban text-[8px] text-white/25" />
-                      </div>
-                    )}
-                    <div className={`text-[10px] text-center ${selectedPalette === pal.id ? 'text-white/80' : 'text-white/40'}`}>{pal.name}</div>
-                  </button>
-                ))}
-              </div>
-              <p className="text-[9px] text-white/30 mt-1.5 px-1 italic">Browse more palettes in the Theme panel after starting.</p>
-            </div>
-
-            {/* Font pair picker */}
-            <div>
-              <p className="text-[11px] font-semibold text-white/40 uppercase tracking-wider mb-2 px-1">Font Pairing</p>
-              <div className="grid grid-cols-4 gap-2">
-                {FONT_PAIRS.map((fp) => (
-                  <button
-                    key={fp.id}
-                    onClick={() => setSelectedFontPair(fp.id)}
-                    className={`rounded-lg border transition-all duration-200 p-2.5 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 text-left ${
-                      selectedFontPair === fp.id
-                        ? 'bg-white/15 border-cyan-400/70 ring-1 ring-cyan-400/40'
-                        : 'bg-white/[0.04] border-white/10 hover:bg-white/[0.08] hover:border-white/20'
-                    }`}
-                  >
-                    <div className="text-[13px] font-semibold text-white/80 mb-0.5 truncate" style={{ fontFamily: fp.heading }}>{fp.label}</div>
-                    <div className="text-[10px] text-white/35 truncate" style={{ fontFamily: fp.body }}>{fp.style}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
+            {/* Palette + Font picker (shared component) */}
+            <ThemeQuickPicker
+              selectedPalette={selectedPalette}
+              onSelectPalette={setSelectedPalette}
+              selectedFontPair={selectedFontPair}
+              onSelectFontPair={setSelectedFontPair}
+              variant="dark"
+            />
 
             {/* Preview bar + Start button */}
             <div className="flex items-center justify-between pt-2">

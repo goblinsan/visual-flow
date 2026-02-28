@@ -139,7 +139,7 @@ describe('DialogManager', () => {
     render(<DialogManager {...defaultProps} newDialogOpen={true} />);
     const templateButton = screen.getByText(/Blank Canvas/);
     fireEvent.click(templateButton);
-    expect(mockOnApplyTemplate).toHaveBeenCalledWith('blank');
+    expect(mockOnApplyTemplate).toHaveBeenCalledWith('blank', undefined);
   });
 
   it('renders open design dialog with empty state', () => {

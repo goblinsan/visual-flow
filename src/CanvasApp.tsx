@@ -427,12 +427,32 @@ export default function CanvasApp() {
   }, [setSpec, setSelection, isCollaborative]);
 
   // Apply a template from the New dialog
-  const applyTemplate = useCallback((templateId: string) => {
+  const applyTemplate = useCallback((templateId: string, themeOptions?: { palette?: string[]; fonts?: { heading: string; body: string } }) => {
     const template = TEMPLATES.find(t => t.id === templateId);
     if (template) {
       let newSpec = template.build();
-      // Apply the active theme (colors + fonts) to the new template
-      if (activeTheme) {
+      const isBlank = templateId === 'blank';
+      // Apply theme from options if provided, otherwise fall back to activeTheme.
+      // Skip theme application for blank canvases — users expect a truly empty canvas.
+      if (!isBlank && themeOptions?.palette) {
+        const newTheme = applyPalette(themeOptions.palette, 'light', { name: 'Quick Start' });
+        if (themeOptions.fonts) {
+          updateTypography({ headingFont: themeOptions.fonts.heading, bodyFont: themeOptions.fonts.body });
+        }
+        newSpec = bindAndApplyTheme(newSpec, {
+          ...newTheme,
+          typography: {
+            ...newTheme.typography,
+            ...(themeOptions.fonts ?? {}),
+          },
+        });
+      } else if (!isBlank && themeOptions?.fonts) {
+        updateTypography({ headingFont: themeOptions.fonts.heading, bodyFont: themeOptions.fonts.body });
+        if (activeTheme) {
+          newSpec = bindAndApplyTheme(newSpec, activeTheme);
+        }
+      } else if (!isBlank && activeTheme) {
+        // No explicit theme options — apply the active theme
         newSpec = bindAndApplyTheme(newSpec, activeTheme);
       }
       setSpec(newSpec);
@@ -451,7 +471,7 @@ export default function CanvasApp() {
       logger.info(`Applied template: ${template.name}`);
     }
     setNewDialogOpen(false);
-  }, [setSpec, setSelection, isCollaborative, setCurrentCanvasId, activeTheme]);
+  }, [setSpec, setSelection, isCollaborative, setCurrentCanvasId, activeTheme, applyPalette, updateTypography]);
 
   // Handle Welcome modal selection (#142)
   const onWelcomeSelect = useCallback((action: WelcomeAction) => {

@@ -6,6 +6,7 @@ import { getSavedDesigns } from "../../utils/persistence";
 import { COMPONENT_LIBRARY, ICON_LIBRARY } from "../../library";
 import { ExportDialog } from "../ExportDialog";
 import type { DesignTheme } from "../../theme/types";
+import { ThemeQuickPicker, PRESET_PALETTES, FONT_PAIRS } from "../ThemeQuickPicker";
 
 const COMPONENT_CATEGORIES = [
   { key: "all", label: "All" },
@@ -79,7 +80,7 @@ export interface DialogManagerProps {
   appVersion: string;
   
   // Callbacks
-  onApplyTemplate: (templateId: string) => void;
+  onApplyTemplate: (templateId: string, themeOptions?: { palette?: string[]; fonts?: { heading: string; body: string } }) => void;
   onLoadDesign: (design: SavedDesign) => void;
   onStartCollaborativeSession: () => void;
   onLeaveCollaborativeSession: () => void;
@@ -275,6 +276,85 @@ function TemplateBrowser({
           <p>No templates match your search.</p>
         </div>
       )}
+    </>
+  );
+}
+
+/** Inner component for New Design dialog — keeps palette/font state local */
+function NewDesignDialogContent({
+  templates,
+  activeTheme,
+  onApplyTemplate,
+  onClose,
+}: {
+  templates: DialogManagerProps['templates'];
+  activeTheme: DesignTheme | null;
+  onApplyTemplate: DialogManagerProps['onApplyTemplate'];
+  onClose: () => void;
+}) {
+  const [selectedPalette, setSelectedPalette] = useState('current');
+  const [selectedFontPair, setSelectedFontPair] = useState('current');
+
+  const handleApply = (templateId: string) => {
+    const palette = PRESET_PALETTES.find(p => p.id === selectedPalette);
+    const fontPair = FONT_PAIRS.find(f => f.id === selectedFontPair);
+
+    const themeOptions: { palette?: string[]; fonts?: { heading: string; body: string } } = {};
+    if (palette && palette.colors.length > 0) {
+      themeOptions.palette = palette.colors;
+    }
+    if (fontPair && fontPair.id !== 'current') {
+      themeOptions.fonts = { heading: fontPair.heading, body: fontPair.body };
+    }
+
+    onApplyTemplate(templateId, Object.keys(themeOptions).length > 0 ? themeOptions : undefined);
+    onClose();
+  };
+
+  return (
+    <>
+      <p className="text-sm text-gray-600 mb-4">Choose a template to get started:</p>
+      <div className="grid grid-cols-2 gap-3 max-h-[40vh] overflow-y-auto pr-1 mb-5">
+        {templates.map((template) => {
+          const iconBg = activeTheme
+            ? `linear-gradient(135deg, ${activeTheme.colors['color.accent.primary'] ?? '#3b82f6'}, ${activeTheme.colors['color.accent.secondary'] ?? '#06b6d4'})`
+            : undefined;
+          const iconTextColor = activeTheme
+            ? (activeTheme.colors['color.text.inverse'] ?? '#ffffff')
+            : '#ffffff';
+          return (
+            <button
+              key={template.id}
+              onClick={() => handleApply(template.id)}
+              className="flex flex-col items-start p-4 rounded-lg border border-gray-200 bg-white hover:border-blue-400 hover:bg-blue-50 transition-all duration-150 text-left group"
+            >
+              <div className="flex items-center gap-3 mb-2">
+                <div
+                  className={`w-10 h-10 rounded-lg flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform ${!activeTheme ? 'bg-gradient-to-br from-blue-500 to-cyan-500' : ''}`}
+                  style={activeTheme ? { background: iconBg, color: iconTextColor } : { color: '#ffffff' }}
+                >
+                  <i className={`${template.icon} text-lg`} />
+                </div>
+                <span className="font-medium text-gray-900">{template.name}</span>
+              </div>
+              <p className="text-xs text-gray-500 leading-relaxed">{template.description}</p>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Theme options */}
+      <div className="border-t border-gray-200 pt-4">
+        <p className="text-xs font-semibold text-gray-500 mb-3">Theme Options <span className="font-normal text-gray-400">(applied to the new design)</span></p>
+        <ThemeQuickPicker
+          selectedPalette={selectedPalette}
+          onSelectPalette={setSelectedPalette}
+          selectedFontPair={selectedFontPair}
+          onSelectFontPair={setSelectedFontPair}
+          variant="light"
+          showCurrentOption
+        />
+      </div>
     </>
   );
 }
@@ -770,35 +850,12 @@ export function DialogManager({
 
       {/* New Design Template Dialog */}
       <Modal open={newDialogOpen} onClose={() => setNewDialogOpen(false)} title="Create New Design" size="lg" variant="light">
-        <p className="text-sm text-gray-600 mb-4">Choose a template to get started:</p>
-        <div className="grid grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto pr-1">
-          {templates.map((template) => {
-            const iconBg = activeTheme
-              ? `linear-gradient(135deg, ${activeTheme.colors['color.accent.primary'] ?? '#3b82f6'}, ${activeTheme.colors['color.accent.secondary'] ?? '#06b6d4'})`
-              : undefined;
-            const iconTextColor = activeTheme
-              ? (activeTheme.colors['color.text.inverse'] ?? '#ffffff')
-              : '#ffffff';
-            return (
-              <button
-                key={template.id}
-                onClick={() => onApplyTemplate(template.id)}
-                className="flex flex-col items-start p-4 rounded-lg border border-gray-200 bg-white hover:border-blue-400 hover:bg-blue-50 transition-all duration-150 text-left group"
-              >
-                <div className="flex items-center gap-3 mb-2">
-                  <div
-                    className={`w-10 h-10 rounded-lg flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform ${!activeTheme ? 'bg-gradient-to-br from-blue-500 to-cyan-500' : ''}`}
-                    style={activeTheme ? { background: iconBg, color: iconTextColor } : { color: '#ffffff' }}
-                  >
-                    <i className={`${template.icon} text-lg`} />
-                  </div>
-                  <span className="font-medium text-gray-900">{template.name}</span>
-                </div>
-                <p className="text-xs text-gray-500 leading-relaxed">{template.description}</p>
-              </button>
-            );
-          })}
-        </div>
+        <NewDesignDialogContent
+          templates={templates}
+          activeTheme={activeTheme}
+          onApplyTemplate={onApplyTemplate}
+          onClose={() => setNewDialogOpen(false)}
+        />
       </Modal>
 
       {/* Open Design Dialog */}
