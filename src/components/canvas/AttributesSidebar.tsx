@@ -706,6 +706,8 @@ export function AttributesSidebar({
               }));
               pushRecent(hex);
             } : undefined}
+            spec={spec}
+            setSpec={setSpec}
           />
         </>
       )}
