@@ -250,11 +250,11 @@ describe('resolveThemeBindings', () => {
     expect(resolved.color).toBe(theme.colors['color.text.primary']);
   });
 
-  it('replaces root background with theme background', () => {
+  it('preserves root background unchanged', () => {
     const spec = makeSpec();
     spec.root.background = '#fff';
     const result = resolveThemeBindings(spec, theme);
-    expect(result.root.background).toBe(theme.colors['color.background.primary']);
+    expect(result.root.background).toBe('#fff');
   });
 
   it('preserves nodes without bindings', () => {
@@ -413,10 +413,10 @@ describe('bindAndApplyTheme', () => {
     expect(frame.children[0].themeBindings.color).toBe('color.text.primary');
   });
 
-  it('updates root background to theme primary', () => {
+  it('does not inject root background', () => {
     const spec = makeSpec();
     const result = bindAndApplyTheme(spec, theme);
-    expect(result.root.background).toBe(theme.colors['color.background.primary']);
+    expect(result.root.background).toBeUndefined();
   });
 
   it('assigns body text nodes to bodyFont', () => {

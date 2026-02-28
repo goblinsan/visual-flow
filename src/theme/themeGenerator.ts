@@ -353,14 +353,10 @@ export function resolveThemeBindings(spec: LayoutSpec, theme: DesignTheme): Layo
     return { ...node, ...patched, ...(children ? { children } : {}) } as LayoutNode;
   }
 
-  // Also resolve root background if bound
-  const rootBg = theme.colors['color.background.primary'];
-
   return {
     ...spec,
     root: {
       ...spec.root,
-      background: rootBg ?? spec.root.background,
       children: spec.root.children.map(resolveNode),
     },
   };
@@ -484,13 +480,10 @@ export function bindAndApplyTheme(spec: LayoutSpec, theme: DesignTheme): LayoutS
     return { ...node, ...patched, ...(children ? { children } : {}) } as LayoutNode;
   }
 
-  const rootBg = theme.colors['color.background.primary'];
-
   return {
     ...spec,
     root: {
       ...spec.root,
-      background: rootBg ?? spec.root.background,
       children: spec.root.children.map(processNode),
     },
   };
