@@ -205,7 +205,6 @@ function applyThemeToSpec(spec: LayoutSpec, theme: ThemeColors): LayoutSpec {
     ...spec,
     root: {
       ...spec.root,
-      background: remap(spec.root.background) ?? spec.root.background,
       children: spec.root.children.map(walkNode),
     },
   };

@@ -66,7 +66,17 @@ export default function CanvasApp() {
   const [viewport, setViewport] = useState<{ scale: number; x: number; y: number }>({ scale: 1, x: 0, y: 0 });
 
   // Local persistence (used when NOT in collaborative mode)
-  const localPersistence = useDesignPersistence({ buildInitial: buildInitialSpec });
+  const localPersistence = useDesignPersistence({
+    buildInitial: buildInitialSpec,
+    // Strip stale root.background that was injected by earlier theme code
+    migrate: (raw) => {
+      const spec = raw as LayoutSpec;
+      if (spec.root?.background) {
+        return { ...spec, root: { ...spec.root, background: undefined } };
+      }
+      return spec;
+    },
+  });
 
   // Real-time collaboration (used when in collaborative mode)
   const realtimeCanvas = useRealtimeCanvas({
