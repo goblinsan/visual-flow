@@ -21,6 +21,7 @@ import { dashArrayToInput } from './utils/paint';
 import { applyProposalOperations } from './utils/proposalHelpers';
 import CanvasStage from "./canvas/CanvasStage.tsx";
 import type {
+  LayoutSpec,
   LayoutNode,
   FrameNode,
 } from "./layout-schema.ts";
