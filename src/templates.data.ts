@@ -1,4 +1,4 @@
-import type { LayoutSpec } from "./layout-schema";
+import type { LayoutSpec, LayoutNode } from "./layout-schema";
 
 export interface CanvasTemplate {
   id: string;
@@ -235,7 +235,7 @@ export const TEMPLATES: CanvasTemplate[] = [
           { id: "logo", type: "text", text: "Dashboard", variant: "h2", position: { x: 32, y: 18 }, size: { width: 200, height: 28 }, color: "#ffffff",
             themeBindings: { color: "color.text.inverse" } },
           // Stat cards (4 across)
-          ...([0, 1, 2, 3].map(i => {
+          ...([0, 1, 2, 3].map((i): LayoutNode[] => {
             const x = 40 + i * 340;
             const accentTokens = ["color.action.primary", "color.action.secondary", "color.action.primary", "color.action.secondary"] as const;
             const labels = ['Users', 'Revenue', 'Orders', 'Growth'];
@@ -257,7 +257,7 @@ export const TEMPLATES: CanvasTemplate[] = [
           { id: "chart-title", type: "text", text: "Performance Overview", variant: "h2", position: { x: 72, y: 292 }, size: { width: 300, height: 28 }, color: "#0f172a",
             themeBindings: { color: "color.text.primary" } },
           // Chart bars cycling through accent tokens
-          ...([0, 1, 2, 3, 4, 5, 6].map(i => {
+          ...([0, 1, 2, 3, 4, 5, 6].map((i): LayoutNode => {
             const barTokens = ["color.action.primary", "color.action.secondary", "color.action.primary", "color.action.secondary",
               "color.action.primary", "color.action.secondary", "color.action.primary"] as const;
             const h = 80 + Math.round(Math.sin(i * 0.8) * 120 + 120);
@@ -274,7 +274,7 @@ export const TEMPLATES: CanvasTemplate[] = [
             themeBindings: { fill: "color.surface.card", stroke: "color.border.primary" } },
           { id: "side-title", type: "text", text: "Recent Activity", variant: "h2", position: { x: 992, y: 292 }, size: { width: 300, height: 28 }, color: "#0f172a",
             themeBindings: { color: "color.text.primary" } },
-          ...([0, 1, 2, 3, 4].map(i => ({
+          ...([0, 1, 2, 3, 4].map((i): LayoutNode => ({
             id: `activity-${i}`, type: "rect" as const,
             position: { x: 976, y: 340 + i * 60 }, size: { width: 408, height: 48 },
             fill: i === 0 ? "#ede9fe" : "#f8fafc", stroke: "#e2e8f0", strokeWidth: 1, radius: 8, opacity: 1,
@@ -329,7 +329,7 @@ export const TEMPLATES: CanvasTemplate[] = [
           { id: "features-title", type: "text", text: "Why Choose Us", variant: "h1", position: { x: 560, y: 600 }, size: { width: 320, height: 48 }, color: "#0f172a",
             themeBindings: { color: "color.text.primary" } },
           // Feature cards (3)
-          ...([0, 1, 2].map(i => {
+          ...([0, 1, 2].map((i): LayoutNode[] => {
             const x = 120 + i * 400;
             const iconTokens = ["color.action.primary", "color.action.secondary", "color.action.primary"] as const;
             const labels = ["Fast & Reliable", "Easy to Use", "Fully Scalable"];
