@@ -110,9 +110,13 @@ export function generateThemeFromPalette(
   const accent2 = bySat[1] ?? bySat[0] ?? (isDark ? '#34d399' : '#059669');
 
   // Background tones
-  const bgPrimary = isDark ? darkest : lightest;
-  const bgSecondary = isDark ? lighten(darkest, 0.06) : darken(lightest, 0.03);
-  const bgTertiary = isDark ? lighten(darkest, 0.12) : darken(lightest, 0.06);
+  // Light mode: palette colors are used as accent tints, not raw backgrounds.
+  // Heavily lighten the lightest palette color toward near-white, matching the
+  // Kulrs preview approach (heroTint = lighten(color, 0.85)) so that page
+  // backgrounds are near-neutral and palette tones appear as subtle section tints.
+  const bgPrimary = isDark ? darkest : lighten(lightest, 0.90);
+  const bgSecondary = isDark ? lighten(darkest, 0.06) : lighten(lightest, 0.72);
+  const bgTertiary = isDark ? lighten(darkest, 0.12) : lighten(lightest, 0.55);
   const bgInverse = isDark ? lightest : darkest;
 
   // Text tones
@@ -120,9 +124,10 @@ export function generateThemeFromPalette(
   const textSecondary = isDark ? darken(lightest, 0.35) : lighten(darkest, 0.35);
   const textInverse = isDark ? darkest : lightest;
 
-  // Border tones
-  const borderPrimary = isDark ? lighten(darkest, 0.2) : darken(lightest, 0.15);
-  const borderSecondary = isDark ? lighten(darkest, 0.1) : darken(lightest, 0.08);
+  // Border tones — in light mode, derive from the near-white bgPrimary so
+  // borders feel part of the same tonal family without being overly tinted.
+  const borderPrimary = isDark ? lighten(darkest, 0.2) : darken(bgPrimary, 0.12);
+  const borderSecondary = isDark ? lighten(darkest, 0.1) : darken(bgPrimary, 0.06);
 
   // Action colors from accents
   const actionPrimary = accent1;
@@ -247,15 +252,18 @@ export const KNOWN_COLOR_BINDINGS: Record<string, ColorTokenName> = {
   '#06b6d4': 'color.accent.secondary',
   '#059669': 'color.accent.secondary',
   '#10b981': 'color.accent.secondary',
-  // Light backgrounds
+  // Light backgrounds — tinted/hero-level → background secondary
   '#dbeafe': 'color.background.secondary',
   '#e0f2fe': 'color.background.secondary',
   '#e2e8f0': 'color.border.primary',
   '#f1f5f9': 'color.background.secondary',
   '#f3f4f6': 'color.background.secondary',
-  '#f8fafc': 'color.background.secondary',
-  '#f9fafb': 'color.background.secondary',
   '#e5e7eb': 'color.border.primary',
+  // Near-white neutrals → background primary (page backgrounds)
+  // These should resolve to the near-white bgPrimary token, not bgSecondary,
+  // so page backgrounds remain light when palette colors are applied as tints.
+  '#f8fafc': 'color.background.primary',
+  '#f9fafb': 'color.background.primary',
   // White → background primary (for fill/stroke; text-color uses text.inverse)
   '#ffffff': 'color.background.primary',
   // Dark backgrounds → background inverse
