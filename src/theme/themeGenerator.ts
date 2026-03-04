@@ -165,16 +165,17 @@ export function generateThemeFromPalette(
   const accent2 = bySat[1] ?? bySat[0] ?? (isDark ? '#34d399' : '#059669');
 
   // Background tones
-  // bgPrimary = the Kulrs bg slot (near-white/black with hue tint — use as-is)
-  // bgSecondary = a tint of the primary brand color (matches fromKulrsPage heroTint approach)
-  // bgTertiary  = a tint of the secondary brand color
+  // bgPrimary   = the Kulrs bg slot (near-white/black with hue tint — use as-is)
+  // bgSecondary = heroTint of accent2 (palette[1] equiv.) — matches fromKulrsPage's
+  //               heroTint(safe(c, 1)) = lighten(palette[1], 0.85)
+  // bgTertiary  = heroTint of accent1 (palette[0] equiv.)
   const bgPrimary   = bgBase;
   const bgSecondary = isDark
-    ? lighten(bgBase, 0.06)
-    : lighten(mainColors[0] ?? bgBase, 0.88);
+    ? darken(accent2, 0.6)
+    : lighten(accent2, 0.85);
   const bgTertiary  = isDark
-    ? lighten(bgBase, 0.12)
-    : lighten(mainColors[1] ?? mainColors[0] ?? bgBase, 0.90);
+    ? darken(accent1, 0.6)
+    : lighten(accent1, 0.88);
   const bgInverse   = textBase;
 
   // Text tones

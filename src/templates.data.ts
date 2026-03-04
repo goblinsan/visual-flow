@@ -9,6 +9,14 @@ export interface CanvasTemplate {
   build: () => LayoutSpec;
 }
 
+// ---------------------------------------------------------------------------
+// themeBindings helper — each property maps a visual prop to a token name so
+// that applying a palette instantly recolours the whole design.
+// ---------------------------------------------------------------------------
+// The default hex values below are the Kulrs-neutral fallbacks (same palette
+// the fromKulrsPage uses for its light-mode previews).  Once a palette is
+// applied these are overwritten by the resolved token values.
+
 export const TEMPLATES: CanvasTemplate[] = [
   {
     id: 'blank',
@@ -20,6 +28,12 @@ export const TEMPLATES: CanvasTemplate[] = [
       root: { id: "root", type: "frame", size: { width: 1600, height: 1200 }, background: undefined, children: [] }
     }),
   },
+
+  // ── Top-Nav Website ─────────────────────────────────────────────────────
+  // Mirrors fromKulrsPage buildTopNav exactly.
+  // c[0] → action.primary (nav bar)
+  // c[1] → background.secondary tint (hero) + action.secondary (hero text/CTA)
+  // c[2] → action.primary (CTA button, same token as nav — dominant accent)
   {
     id: 'top-nav',
     name: 'Top Nav Website',
@@ -30,20 +44,44 @@ export const TEMPLATES: CanvasTemplate[] = [
       root: {
         id: "root", type: "frame", size: { width: 1440, height: 900 }, background: undefined,
         children: [
-          { id: "bg", type: "rect", position: { x: 0, y: 0 }, size: { width: 1440, height: 900 }, fill: "#f9fafb", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1 },
-          { id: "nav", type: "rect", position: { x: 0, y: 0 }, size: { width: 1440, height: 64 }, fill: "#1e293b", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1 },
-          { id: "nav-logo", type: "text", text: "Logo", variant: "h2", position: { x: 32, y: 18 }, size: { width: 100, height: 28 }, color: "#ffffff" },
-          { id: "nav-link1", type: "text", text: "Home", variant: "body", position: { x: 200, y: 22 }, size: { width: 60, height: 20 }, color: "#94a3b8" },
-          { id: "nav-link2", type: "text", text: "Features", variant: "body", position: { x: 280, y: 22 }, size: { width: 70, height: 20 }, color: "#94a3b8" },
-          { id: "nav-link3", type: "text", text: "Pricing", variant: "body", position: { x: 370, y: 22 }, size: { width: 60, height: 20 }, color: "#94a3b8" },
-          { id: "hero", type: "rect", position: { x: 0, y: 64 }, size: { width: 1440, height: 400 }, fill: "#e0f2fe", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1 },
-          { id: "hero-title", type: "text", text: "Welcome to Our Platform", variant: "h1", position: { x: 120, y: 180 }, size: { width: 500, height: 48 }, color: "#0c4a6e" },
-          { id: "hero-subtitle", type: "text", text: "Build amazing things with our tools", variant: "body", position: { x: 120, y: 240 }, size: { width: 400, height: 24 }, color: "#0369a1" },
-          { id: "content", type: "rect", position: { x: 120, y: 520 }, size: { width: 1200, height: 320 }, fill: "#ffffff", stroke: "#e5e7eb", strokeWidth: 1, radius: 12, opacity: 1 },
+          { id: "bg", type: "rect", position: { x: 0, y: 0 }, size: { width: 1440, height: 900 }, fill: "#f9fafb", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1,
+            themeBindings: { fill: "color.background.primary" } },
+          { id: "nav", type: "rect", position: { x: 0, y: 0 }, size: { width: 1440, height: 64 }, fill: "#6366f1", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1,
+            themeBindings: { fill: "color.action.primary" } },
+          { id: "nav-logo", type: "text", text: "Brand", variant: "h2", position: { x: 32, y: 18 }, size: { width: 120, height: 28 }, color: "#ffffff",
+            themeBindings: { color: "color.text.inverse" } },
+          { id: "nav-link1", type: "text", text: "Home", variant: "body", position: { x: 200, y: 22 }, size: { width: 60, height: 20 }, color: "#ffffff",
+            themeBindings: { color: "color.text.inverse" } },
+          { id: "nav-link2", type: "text", text: "Features", variant: "body", position: { x: 280, y: 22 }, size: { width: 70, height: 20 }, color: "#ffffff",
+            themeBindings: { color: "color.text.inverse" } },
+          { id: "nav-link3", type: "text", text: "Pricing", variant: "body", position: { x: 370, y: 22 }, size: { width: 60, height: 20 }, color: "#ffffff",
+            themeBindings: { color: "color.text.inverse" } },
+          { id: "nav-link4", type: "text", text: "About", variant: "body", position: { x: 450, y: 22 }, size: { width: 60, height: 20 }, color: "#ffffff",
+            themeBindings: { color: "color.text.inverse" } },
+          // Hero section — light tint of accent2 (c[1] equiv.)
+          { id: "hero", type: "rect", position: { x: 0, y: 64 }, size: { width: 1440, height: 400 }, fill: "#e0f2fe", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1,
+            themeBindings: { fill: "color.background.secondary" } },
+          { id: "hero-title", type: "text", text: "Welcome to Our Platform", variant: "h1", position: { x: 120, y: 180 }, size: { width: 500, height: 48 }, color: "#0369a1",
+            themeBindings: { color: "color.action.secondary" } },
+          { id: "hero-subtitle", type: "text", text: "Build amazing things with our tools", variant: "body", position: { x: 120, y: 240 }, size: { width: 400, height: 24 }, color: "#0369a1",
+            themeBindings: { color: "color.action.secondary" } },
+          // CTA button — dominant accent (action.primary)
+          { id: "hero-cta", type: "rect", position: { x: 120, y: 290 }, size: { width: 160, height: 44 }, fill: "#6366f1", stroke: undefined, strokeWidth: 0, radius: 8, opacity: 1,
+            themeBindings: { fill: "color.action.primary" } },
+          { id: "hero-cta-text", type: "text", text: "Get Started", variant: "body", position: { x: 142, y: 302 }, size: { width: 120, height: 20 }, color: "#ffffff",
+            themeBindings: { color: "color.text.inverse" } },
+          // Content card
+          { id: "content", type: "rect", position: { x: 120, y: 520 }, size: { width: 1200, height: 320 }, fill: "#ffffff", stroke: "#e5e7eb", strokeWidth: 1, radius: 12, opacity: 1,
+            themeBindings: { fill: "color.surface.card", stroke: "color.border.primary" } },
+          { id: "content-title", type: "text", text: "Featured Content", variant: "h2", position: { x: 152, y: 548 }, size: { width: 300, height: 28 }, color: "#0f172a",
+            themeBindings: { color: "color.text.primary" } },
         ],
       }
     }),
   },
+
+  // ── Left-Nav / Dashboard ────────────────────────────────────────────────
+  // Mirrors fromKulrsPage buildLeftNav.
   {
     id: 'left-nav',
     name: 'Left Nav Website',
@@ -54,23 +92,44 @@ export const TEMPLATES: CanvasTemplate[] = [
       root: {
         id: "root", type: "frame", size: { width: 1440, height: 900 }, background: undefined,
         children: [
-          { id: "bg", type: "rect", position: { x: 0, y: 0 }, size: { width: 1440, height: 900 }, fill: "#f1f5f9", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1 },
-          { id: "sidebar", type: "rect", position: { x: 0, y: 0 }, size: { width: 240, height: 900 }, fill: "#1e293b", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1 },
-          { id: "sidebar-logo", type: "text", text: "Dashboard", variant: "h2", position: { x: 24, y: 24 }, size: { width: 180, height: 28 }, color: "#ffffff" },
-          { id: "nav-item1", type: "rect", position: { x: 12, y: 80 }, size: { width: 216, height: 40 }, fill: "#334155", stroke: undefined, strokeWidth: 0, radius: 8, opacity: 1 },
-          { id: "nav-text1", type: "text", text: "Overview", variant: "body", position: { x: 24, y: 90 }, size: { width: 150, height: 20 }, color: "#ffffff" },
-          { id: "nav-text2", type: "text", text: "Analytics", variant: "body", position: { x: 24, y: 140 }, size: { width: 150, height: 20 }, color: "#94a3b8" },
-          { id: "nav-text3", type: "text", text: "Settings", variant: "body", position: { x: 24, y: 180 }, size: { width: 150, height: 20 }, color: "#94a3b8" },
-          { id: "header", type: "rect", position: { x: 240, y: 0 }, size: { width: 1200, height: 64 }, fill: "#ffffff", stroke: "#e2e8f0", strokeWidth: 1, radius: 0, opacity: 1 },
-          { id: "header-title", type: "text", text: "Overview", variant: "h2", position: { x: 272, y: 18 }, size: { width: 200, height: 28 }, color: "#0f172a" },
-          { id: "card1", type: "rect", position: { x: 272, y: 96 }, size: { width: 280, height: 160 }, fill: "#ffffff", stroke: "#e2e8f0", strokeWidth: 1, radius: 12, opacity: 1 },
-          { id: "card2", type: "rect", position: { x: 576, y: 96 }, size: { width: 280, height: 160 }, fill: "#ffffff", stroke: "#e2e8f0", strokeWidth: 1, radius: 12, opacity: 1 },
-          { id: "card3", type: "rect", position: { x: 880, y: 96 }, size: { width: 280, height: 160 }, fill: "#ffffff", stroke: "#e2e8f0", strokeWidth: 1, radius: 12, opacity: 1 },
-          { id: "main-content", type: "rect", position: { x: 272, y: 280 }, size: { width: 888, height: 580 }, fill: "#ffffff", stroke: "#e2e8f0", strokeWidth: 1, radius: 12, opacity: 1 },
+          { id: "bg", type: "rect", position: { x: 0, y: 0 }, size: { width: 1440, height: 900 }, fill: "#f9fafb", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1,
+            themeBindings: { fill: "color.background.primary" } },
+          { id: "sidebar", type: "rect", position: { x: 0, y: 0 }, size: { width: 240, height: 900 }, fill: "#6366f1", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1,
+            themeBindings: { fill: "color.action.primary" } },
+          { id: "sidebar-logo", type: "text", text: "Dashboard", variant: "h2", position: { x: 24, y: 24 }, size: { width: 180, height: 28 }, color: "#ffffff",
+            themeBindings: { color: "color.text.inverse" } },
+          { id: "nav-active", type: "rect", position: { x: 12, y: 80 }, size: { width: 216, height: 40 }, fill: "#818cf8", stroke: undefined, strokeWidth: 0, radius: 8, opacity: 1,
+            themeBindings: { fill: "color.action.primaryHover" } },
+          { id: "nav-text1", type: "text", text: "Overview", variant: "body", position: { x: 24, y: 90 }, size: { width: 150, height: 20 }, color: "#ffffff",
+            themeBindings: { color: "color.text.inverse" } },
+          { id: "nav-text2", type: "text", text: "Analytics", variant: "body", position: { x: 24, y: 140 }, size: { width: 150, height: 20 }, color: "#ffffff",
+            themeBindings: { color: "color.text.inverse" } },
+          { id: "nav-text3", type: "text", text: "Settings", variant: "body", position: { x: 24, y: 180 }, size: { width: 150, height: 20 }, color: "#ffffff",
+            themeBindings: { color: "color.text.inverse" } },
+          { id: "header", type: "rect", position: { x: 240, y: 0 }, size: { width: 1200, height: 64 }, fill: "#ffffff", stroke: "#e2e8f0", strokeWidth: 1, radius: 0, opacity: 1,
+            themeBindings: { fill: "color.surface.card", stroke: "color.border.primary" } },
+          { id: "header-title", type: "text", text: "Overview", variant: "h2", position: { x: 272, y: 18 }, size: { width: 200, height: 28 }, color: "#0f172a",
+            themeBindings: { color: "color.text.primary" } },
+          { id: "card1", type: "rect", position: { x: 272, y: 96 }, size: { width: 280, height: 160 }, fill: "#ffffff", stroke: "#e2e8f0", strokeWidth: 1, radius: 12, opacity: 1,
+            themeBindings: { fill: "color.surface.card", stroke: "color.border.primary" } },
+          { id: "card1-accent", type: "rect", position: { x: 272, y: 96 }, size: { width: 280, height: 4 }, fill: "#6366f1", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1,
+            themeBindings: { fill: "color.action.primary" } },
+          { id: "card2", type: "rect", position: { x: 576, y: 96 }, size: { width: 280, height: 160 }, fill: "#ffffff", stroke: "#e2e8f0", strokeWidth: 1, radius: 12, opacity: 1,
+            themeBindings: { fill: "color.surface.card", stroke: "color.border.primary" } },
+          { id: "card2-accent", type: "rect", position: { x: 576, y: 96 }, size: { width: 280, height: 4 }, fill: "#a5b4fc", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1,
+            themeBindings: { fill: "color.action.secondary" } },
+          { id: "card3", type: "rect", position: { x: 880, y: 96 }, size: { width: 280, height: 160 }, fill: "#ffffff", stroke: "#e2e8f0", strokeWidth: 1, radius: 12, opacity: 1,
+            themeBindings: { fill: "color.surface.card", stroke: "color.border.primary" } },
+          { id: "card3-accent", type: "rect", position: { x: 880, y: 96 }, size: { width: 280, height: 4 }, fill: "#c7d2fe", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1,
+            themeBindings: { fill: "color.accent.secondary" } },
+          { id: "main-content", type: "rect", position: { x: 272, y: 280 }, size: { width: 888, height: 580 }, fill: "#ffffff", stroke: "#e2e8f0", strokeWidth: 1, radius: 12, opacity: 1,
+            themeBindings: { fill: "color.surface.card", stroke: "color.border.primary" } },
         ],
       }
     }),
   },
+
+  // ── 3-Column Grid ───────────────────────────────────────────────────────
   {
     id: '3-column',
     name: '3 Column Grid',
@@ -81,19 +140,31 @@ export const TEMPLATES: CanvasTemplate[] = [
       root: {
         id: "root", type: "frame", size: { width: 1200, height: 800 }, background: undefined,
         children: [
-          { id: "bg", type: "rect", position: { x: 0, y: 0 }, size: { width: 1200, height: 800 }, fill: "#ffffff", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1 },
-          { id: "header", type: "rect", position: { x: 0, y: 0 }, size: { width: 1200, height: 80 }, fill: "#f8fafc", stroke: "#e2e8f0", strokeWidth: 1, radius: 0, opacity: 1 },
-          { id: "title", type: "text", text: "Page Title", variant: "h1", position: { x: 40, y: 24 }, size: { width: 300, height: 32 }, color: "#0f172a" },
-          { id: "col1", type: "rect", position: { x: 40, y: 120 }, size: { width: 360, height: 640 }, fill: "#f1f5f9", stroke: "#e2e8f0", strokeWidth: 1, radius: 8, opacity: 1 },
-          { id: "col1-title", type: "text", text: "Column 1", variant: "h2", position: { x: 60, y: 140 }, size: { width: 200, height: 24 }, color: "#334155" },
-          { id: "col2", type: "rect", position: { x: 420, y: 120 }, size: { width: 360, height: 640 }, fill: "#f1f5f9", stroke: "#e2e8f0", strokeWidth: 1, radius: 8, opacity: 1 },
-          { id: "col2-title", type: "text", text: "Column 2", variant: "h2", position: { x: 440, y: 140 }, size: { width: 200, height: 24 }, color: "#334155" },
-          { id: "col3", type: "rect", position: { x: 800, y: 120 }, size: { width: 360, height: 640 }, fill: "#f1f5f9", stroke: "#e2e8f0", strokeWidth: 1, radius: 8, opacity: 1 },
-          { id: "col3-title", type: "text", text: "Column 3", variant: "h2", position: { x: 820, y: 140 }, size: { width: 200, height: 24 }, color: "#334155" },
+          { id: "bg", type: "rect", position: { x: 0, y: 0 }, size: { width: 1200, height: 800 }, fill: "#f9fafb", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1,
+            themeBindings: { fill: "color.background.primary" } },
+          { id: "header", type: "rect", position: { x: 0, y: 0 }, size: { width: 1200, height: 80 }, fill: "#ffffff", stroke: "#e2e8f0", strokeWidth: 1, radius: 0, opacity: 1,
+            themeBindings: { fill: "color.surface.card", stroke: "color.border.primary" } },
+          { id: "title", type: "text", text: "Page Title", variant: "h1", position: { x: 40, y: 24 }, size: { width: 300, height: 32 }, color: "#0f172a",
+            themeBindings: { color: "color.text.primary" } },
+          { id: "col1", type: "rect", position: { x: 40, y: 120 }, size: { width: 360, height: 640 }, fill: "#e0f2fe", stroke: "#e2e8f0", strokeWidth: 1, radius: 8, opacity: 1,
+            themeBindings: { fill: "color.background.secondary", stroke: "color.border.secondary" } },
+          { id: "col1-title", type: "text", text: "Column 1", variant: "h2", position: { x: 60, y: 140 }, size: { width: 200, height: 24 }, color: "#0369a1",
+            themeBindings: { color: "color.action.secondary" } },
+          { id: "col2", type: "rect", position: { x: 420, y: 120 }, size: { width: 360, height: 640 }, fill: "#e0f2fe", stroke: "#e2e8f0", strokeWidth: 1, radius: 8, opacity: 1,
+            themeBindings: { fill: "color.background.secondary", stroke: "color.border.secondary" } },
+          { id: "col2-title", type: "text", text: "Column 2", variant: "h2", position: { x: 440, y: 140 }, size: { width: 200, height: 24 }, color: "#0369a1",
+            themeBindings: { color: "color.action.secondary" } },
+          { id: "col3", type: "rect", position: { x: 800, y: 120 }, size: { width: 360, height: 640 }, fill: "#e0f2fe", stroke: "#e2e8f0", strokeWidth: 1, radius: 8, opacity: 1,
+            themeBindings: { fill: "color.background.secondary", stroke: "color.border.secondary" } },
+          { id: "col3-title", type: "text", text: "Column 3", variant: "h2", position: { x: 820, y: 140 }, size: { width: 200, height: 24 }, color: "#0369a1",
+            themeBindings: { color: "color.action.secondary" } },
         ],
       }
     }),
   },
+
+  // ── Mobile UI Layout ────────────────────────────────────────────────────
+  // Mirrors fromKulrsPage buildMobile.
   {
     id: 'mobile-ui',
     name: 'Mobile UI Layout',
@@ -104,21 +175,183 @@ export const TEMPLATES: CanvasTemplate[] = [
       root: {
         id: "root", type: "frame", size: { width: 800, height: 1000 }, background: undefined,
         children: [
-          { id: "bg", type: "rect", position: { x: 0, y: 0 }, size: { width: 800, height: 1000 }, fill: "#e5e7eb", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1 },
-          { id: "phone-frame", type: "rect", position: { x: 200, y: 40 }, size: { width: 390, height: 844 }, fill: "#ffffff", stroke: "#d1d5db", strokeWidth: 2, radius: 48, opacity: 1 },
-          { id: "status-bar", type: "rect", position: { x: 200, y: 40 }, size: { width: 390, height: 44 }, fill: "#f9fafb", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1 },
-          { id: "status-time", type: "text", text: "9:41", variant: "body", position: { x: 220, y: 52 }, size: { width: 50, height: 20 }, color: "#111827" },
-          { id: "nav-bar", type: "rect", position: { x: 200, y: 84 }, size: { width: 390, height: 56 }, fill: "#ffffff", stroke: "#e5e7eb", strokeWidth: 1, radius: 0, opacity: 1 },
-          { id: "nav-title", type: "text", text: "Home", variant: "h2", position: { x: 340, y: 100 }, size: { width: 100, height: 24 }, color: "#111827" },
-          { id: "content-card1", type: "rect", position: { x: 216, y: 160 }, size: { width: 358, height: 120 }, fill: "#f3f4f6", stroke: "#e5e7eb", strokeWidth: 1, radius: 16, opacity: 1 },
-          { id: "content-card2", type: "rect", position: { x: 216, y: 300 }, size: { width: 358, height: 120 }, fill: "#f3f4f6", stroke: "#e5e7eb", strokeWidth: 1, radius: 16, opacity: 1 },
-          { id: "content-card3", type: "rect", position: { x: 216, y: 440 }, size: { width: 358, height: 120 }, fill: "#f3f4f6", stroke: "#e5e7eb", strokeWidth: 1, radius: 16, opacity: 1 },
-          { id: "tab-bar", type: "rect", position: { x: 200, y: 800 }, size: { width: 390, height: 84 }, fill: "#ffffff", stroke: "#e5e7eb", strokeWidth: 1, radius: 0, opacity: 1 },
-          { id: "home-indicator", type: "rect", position: { x: 340, y: 860 }, size: { width: 120, height: 5 }, fill: "#1f2937", stroke: undefined, strokeWidth: 0, radius: 3, opacity: 1 },
+          { id: "bg", type: "rect", position: { x: 0, y: 0 }, size: { width: 800, height: 1000 }, fill: "#f9fafb", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1,
+            themeBindings: { fill: "color.background.primary" } },
+          { id: "phone", type: "rect", position: { x: 200, y: 40 }, size: { width: 390, height: 844 }, fill: "#ffffff", stroke: "#e2e8f0", strokeWidth: 2, radius: 48, opacity: 1,
+            themeBindings: { fill: "color.surface.card", stroke: "color.border.secondary" } },
+          { id: "status-bar", type: "rect", position: { x: 200, y: 40 }, size: { width: 390, height: 44 }, fill: "#6366f1", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1,
+            themeBindings: { fill: "color.action.primary" } },
+          { id: "status-time", type: "text", text: "9:41", variant: "body", position: { x: 220, y: 52 }, size: { width: 50, height: 20 }, color: "#ffffff",
+            themeBindings: { color: "color.text.inverse" } },
+          { id: "nav-bar", type: "rect", position: { x: 200, y: 84 }, size: { width: 390, height: 56 }, fill: "#6366f1", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1,
+            themeBindings: { fill: "color.action.primary" } },
+          { id: "nav-title", type: "text", text: "Home", variant: "h2", position: { x: 340, y: 100 }, size: { width: 100, height: 24 }, color: "#ffffff",
+            themeBindings: { color: "color.text.inverse" } },
+          // Card 1 — tint of accent2 (background.secondary)
+          { id: "card1", type: "rect", position: { x: 216, y: 160 }, size: { width: 358, height: 120 }, fill: "#e0f2fe", stroke: "#bfdbfe", strokeWidth: 1, radius: 16, opacity: 1,
+            themeBindings: { fill: "color.background.secondary", stroke: "color.border.secondary" } },
+          { id: "card1-bar", type: "rect", position: { x: 216, y: 160 }, size: { width: 6, height: 120 }, fill: "#a5b4fc", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1,
+            themeBindings: { fill: "color.action.secondary" } },
+          // Card 2 — tint of accent1 (background.tertiary)
+          { id: "card2", type: "rect", position: { x: 216, y: 300 }, size: { width: 358, height: 120 }, fill: "#ede9fe", stroke: "#c4b5fd", strokeWidth: 1, radius: 16, opacity: 1,
+            themeBindings: { fill: "color.background.tertiary", stroke: "color.border.secondary" } },
+          { id: "card2-bar", type: "rect", position: { x: 216, y: 300 }, size: { width: 6, height: 120 }, fill: "#6366f1", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1,
+            themeBindings: { fill: "color.action.primary" } },
+          // Card 3 — tint of accent2 again
+          { id: "card3", type: "rect", position: { x: 216, y: 440 }, size: { width: 358, height: 120 }, fill: "#e0f2fe", stroke: "#bfdbfe", strokeWidth: 1, radius: 16, opacity: 1,
+            themeBindings: { fill: "color.background.secondary", stroke: "color.border.secondary" } },
+          { id: "card3-bar", type: "rect", position: { x: 216, y: 440 }, size: { width: 6, height: 120 }, fill: "#a5b4fc", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1,
+            themeBindings: { fill: "color.action.secondary" } },
+          // FAB
+          { id: "fab", type: "ellipse", position: { x: 500, y: 740 }, size: { width: 56, height: 56 }, fill: "#6366f1", stroke: undefined, strokeWidth: 0, radius: undefined, opacity: 1,
+            themeBindings: { fill: "color.action.primary" } },
+          { id: "tab-bar", type: "rect", position: { x: 200, y: 800 }, size: { width: 390, height: 84 }, fill: "#ffffff", stroke: "#e2e8f0", strokeWidth: 1, radius: 0, opacity: 1,
+            themeBindings: { fill: "color.surface.card", stroke: "color.border.primary" } },
+          { id: "tab-active", type: "rect", position: { x: 252, y: 810 }, size: { width: 40, height: 3 }, fill: "#6366f1", stroke: undefined, strokeWidth: 0, radius: 2, opacity: 1,
+            themeBindings: { fill: "color.action.primary" } },
+          { id: "home-ind", type: "rect", position: { x: 340, y: 860 }, size: { width: 120, height: 5 }, fill: "#0f172a", stroke: undefined, strokeWidth: 0, radius: 3, opacity: 1,
+            themeBindings: { fill: "color.text.primary" } },
         ],
       }
     }),
   },
+
+  // ── Dashboard ───────────────────────────────────────────────────────────
+  // Mirrors fromKulrsPage buildDashboard.
+  {
+    id: 'dashboard',
+    name: 'Dashboard',
+    icon: 'fa-solid fa-chart-line',
+    description: 'Admin dashboard with header, stat cards, and chart area',
+    category: 'web',
+    build: () => ({
+      root: {
+        id: "root", type: "frame", size: { width: 1440, height: 900 }, background: undefined,
+        children: [
+          { id: "bg", type: "rect", position: { x: 0, y: 0 }, size: { width: 1440, height: 900 }, fill: "#f9fafb", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1,
+            themeBindings: { fill: "color.background.primary" } },
+          { id: "header", type: "rect", position: { x: 0, y: 0 }, size: { width: 1440, height: 64 }, fill: "#6366f1", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1,
+            themeBindings: { fill: "color.action.primary" } },
+          { id: "logo", type: "text", text: "Dashboard", variant: "h2", position: { x: 32, y: 18 }, size: { width: 200, height: 28 }, color: "#ffffff",
+            themeBindings: { color: "color.text.inverse" } },
+          // Stat cards (4 across)
+          ...([0, 1, 2, 3].map(i => {
+            const x = 40 + i * 340;
+            const accentTokens = ["color.action.primary", "color.action.secondary", "color.action.primary", "color.action.secondary"] as const;
+            const labels = ['Users', 'Revenue', 'Orders', 'Growth'];
+            const vals = ['1,234', '2,468', '3,702', '4,936'];
+            return [
+              { id: `stat-${i}`, type: "rect" as const, position: { x, y: 96 }, size: { width: 320, height: 140 }, fill: "#ffffff", stroke: "#e2e8f0", strokeWidth: 1, radius: 12, opacity: 1,
+                themeBindings: { fill: "color.surface.card", stroke: "color.border.primary" } },
+              { id: `stat-${i}-top`, type: "rect" as const, position: { x, y: 96 }, size: { width: 320, height: 4 }, fill: "#6366f1", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1,
+                themeBindings: { fill: accentTokens[i] } },
+              { id: `stat-${i}-val`, type: "text" as const, text: vals[i], variant: "h1" as const, position: { x: x + 24, y: 120 }, size: { width: 200, height: 36 }, color: "#6366f1",
+                themeBindings: { color: accentTokens[i] } },
+              { id: `stat-${i}-lbl`, type: "text" as const, text: labels[i], variant: "body" as const, position: { x: x + 24, y: 166 }, size: { width: 200, height: 20 }, color: "#64748b",
+                themeBindings: { color: "color.text.secondary" } },
+            ];
+          })).flat(),
+          // Chart area
+          { id: "chart-area", type: "rect", position: { x: 40, y: 268 }, size: { width: 900, height: 400 }, fill: "#ffffff", stroke: "#e2e8f0", strokeWidth: 1, radius: 12, opacity: 1,
+            themeBindings: { fill: "color.surface.card", stroke: "color.border.primary" } },
+          { id: "chart-title", type: "text", text: "Performance Overview", variant: "h2", position: { x: 72, y: 292 }, size: { width: 300, height: 28 }, color: "#0f172a",
+            themeBindings: { color: "color.text.primary" } },
+          // Chart bars cycling through accent tokens
+          ...([0, 1, 2, 3, 4, 5, 6].map(i => {
+            const barTokens = ["color.action.primary", "color.action.secondary", "color.action.primary", "color.action.secondary",
+              "color.action.primary", "color.action.secondary", "color.action.primary"] as const;
+            const h = 80 + Math.round(Math.sin(i * 0.8) * 120 + 120);
+            return {
+              id: `bar-${i}`, type: "rect" as const,
+              position: { x: 100 + i * 110, y: 620 - h },
+              size: { width: 60, height: h },
+              fill: "#6366f1", stroke: undefined, strokeWidth: 0, radius: 4, opacity: 0.85,
+              themeBindings: { fill: barTokens[i] },
+            };
+          })),
+          // Side panel
+          { id: "side-panel", type: "rect", position: { x: 960, y: 268 }, size: { width: 440, height: 400 }, fill: "#ffffff", stroke: "#e2e8f0", strokeWidth: 1, radius: 12, opacity: 1,
+            themeBindings: { fill: "color.surface.card", stroke: "color.border.primary" } },
+          { id: "side-title", type: "text", text: "Recent Activity", variant: "h2", position: { x: 992, y: 292 }, size: { width: 300, height: 28 }, color: "#0f172a",
+            themeBindings: { color: "color.text.primary" } },
+          ...([0, 1, 2, 3, 4].map(i => ({
+            id: `activity-${i}`, type: "rect" as const,
+            position: { x: 976, y: 340 + i * 60 }, size: { width: 408, height: 48 },
+            fill: i === 0 ? "#ede9fe" : "#f8fafc", stroke: "#e2e8f0", strokeWidth: 1, radius: 8, opacity: 1,
+            themeBindings: { fill: i === 0 ? "color.background.tertiary" as const : "color.background.primary" as const, stroke: "color.border.secondary" as const },
+          }))),
+        ],
+      }
+    }),
+  },
+
+  // ── Landing Page ────────────────────────────────────────────────────────
+  // Mirrors fromKulrsPage buildLanding.
+  {
+    id: 'landing',
+    name: 'Landing Page',
+    icon: 'fa-solid fa-rocket',
+    description: 'Marketing landing page with hero and feature sections',
+    category: 'web',
+    build: () => ({
+      root: {
+        id: "root", type: "frame", size: { width: 1440, height: 1200 }, background: undefined,
+        children: [
+          { id: "bg", type: "rect", position: { x: 0, y: 0 }, size: { width: 1440, height: 1200 }, fill: "#f9fafb", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1,
+            themeBindings: { fill: "color.background.primary" } },
+          // Nav
+          { id: "nav", type: "rect", position: { x: 0, y: 0 }, size: { width: 1440, height: 72 }, fill: "#ffffff", stroke: "#e2e8f0", strokeWidth: 1, radius: 0, opacity: 1,
+            themeBindings: { fill: "color.surface.card", stroke: "color.border.primary" } },
+          { id: "nav-brand", type: "text", text: "Brand", variant: "h2", position: { x: 60, y: 22 }, size: { width: 120, height: 28 }, color: "#6366f1",
+            themeBindings: { color: "color.action.primary" } },
+          { id: "nav-cta", type: "rect", position: { x: 1280, y: 18 }, size: { width: 120, height: 36 }, fill: "#6366f1", stroke: undefined, strokeWidth: 0, radius: 8, opacity: 1,
+            themeBindings: { fill: "color.action.primary" } },
+          { id: "nav-cta-text", type: "text", text: "Sign Up", variant: "body", position: { x: 1305, y: 26 }, size: { width: 80, height: 20 }, color: "#ffffff",
+            themeBindings: { color: "color.text.inverse" } },
+          // Hero
+          { id: "hero-bg", type: "rect", position: { x: 0, y: 72 }, size: { width: 1440, height: 480 }, fill: "#e0f2fe", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1,
+            themeBindings: { fill: "color.background.secondary" } },
+          { id: "hero-h1", type: "text", text: "Build Something Amazing", variant: "h1", position: { x: 200, y: 200 }, size: { width: 600, height: 56 }, color: "#0369a1", fontSize: 48,
+            themeBindings: { color: "color.action.secondary" } },
+          { id: "hero-p", type: "text", text: "The all-in-one platform for creators, designers,\nand developers to bring their ideas to life.", variant: "body", position: { x: 200, y: 280 }, size: { width: 500, height: 48 }, color: "#64748b",
+            themeBindings: { color: "color.text.secondary" } },
+          { id: "hero-btn1", type: "rect", position: { x: 200, y: 350 }, size: { width: 160, height: 48 }, fill: "#6366f1", stroke: undefined, strokeWidth: 0, radius: 10, opacity: 1,
+            themeBindings: { fill: "color.action.primary" } },
+          { id: "hero-btn1-t", type: "text", text: "Get Started", variant: "body", position: { x: 228, y: 364 }, size: { width: 120, height: 20 }, color: "#ffffff",
+            themeBindings: { color: "color.text.inverse" } },
+          { id: "hero-btn2", type: "rect", position: { x: 380, y: 350 }, size: { width: 160, height: 48 }, fill: "#ffffff", stroke: "#6366f1", strokeWidth: 2, radius: 10, opacity: 1,
+            themeBindings: { fill: "color.surface.card", stroke: "color.action.primary" } },
+          { id: "hero-btn2-t", type: "text", text: "Learn More", variant: "body", position: { x: 408, y: 364 }, size: { width: 120, height: 20 }, color: "#6366f1",
+            themeBindings: { color: "color.action.primary" } },
+          // Features section
+          { id: "features-bg", type: "rect", position: { x: 0, y: 552 }, size: { width: 1440, height: 480 }, fill: "#f9fafb", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1,
+            themeBindings: { fill: "color.background.primary" } },
+          { id: "features-title", type: "text", text: "Why Choose Us", variant: "h1", position: { x: 560, y: 600 }, size: { width: 320, height: 48 }, color: "#0f172a",
+            themeBindings: { color: "color.text.primary" } },
+          // Feature cards (3)
+          ...([0, 1, 2].map(i => {
+            const x = 120 + i * 400;
+            const iconTokens = ["color.action.primary", "color.action.secondary", "color.action.primary"] as const;
+            const labels = ["Fast & Reliable", "Easy to Use", "Fully Scalable"];
+            const descs = ["Built for performance at any scale.", "Intuitive design, zero learning curve.", "Grows with your team and ambitions."];
+            return [
+              { id: `feat-${i}`, type: "rect" as const, position: { x, y: 680 }, size: { width: 360, height: 280 }, fill: "#ffffff", stroke: "#e2e8f0", strokeWidth: 1, radius: 16, opacity: 1,
+                themeBindings: { fill: "color.surface.card", stroke: "color.border.primary" } },
+              { id: `feat-${i}-icon`, type: "rect" as const, position: { x: x + 24, y: 708 }, size: { width: 48, height: 48 }, fill: "#e0f2fe", stroke: undefined, strokeWidth: 0, radius: 12, opacity: 1,
+                themeBindings: { fill: i % 2 === 0 ? "color.background.secondary" as const : "color.background.tertiary" as const } },
+              { id: `feat-${i}-title`, type: "text" as const, text: labels[i], variant: "h2" as const, position: { x: x + 24, y: 780 }, size: { width: 300, height: 32 }, color: "#0f172a",
+                themeBindings: { color: "color.text.primary" } },
+              { id: `feat-${i}-body`, type: "text" as const, text: descs[i], variant: "body" as const, position: { x: x + 24, y: 824 }, size: { width: 300, height: 40 }, color: "#64748b",
+                themeBindings: { color: "color.text.secondary" } },
+              { id: `feat-${i}-link`, type: "text" as const, text: "Learn more →", variant: "body" as const, position: { x: x + 24, y: 900 }, size: { width: 120, height: 20 }, color: "#6366f1",
+                themeBindings: { color: iconTokens[i] } },
+            ];
+          })).flat(),
+        ],
+      }
+    }),
+  },
+
   {
     id: 'ecommerce',
     name: 'E-Commerce Layout',
