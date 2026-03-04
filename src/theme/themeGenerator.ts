@@ -60,10 +60,6 @@ function mix(a: string, b: string, ratio: number): string {
   );
 }
 
-/** Sort palette colors by brightness (dark → light) */
-function sortByBrightness(colors: string[]): string[] {
-  return [...colors].sort((a, b) => brightness(a) - brightness(b));
-}
 
 /** Pick the color with the highest saturation as the "accent" */
 function saturation(hex: string): number {
@@ -74,19 +70,60 @@ function saturation(hex: string): number {
   return (max - min) / max;
 }
 
+/**
+ * Derive a near-white background with a faint hue tint from a source color.
+ * Approximates the Kulrs OKLCH derivation: { l: 0.97, c: first.c * 0.1, h: first.h }
+ * Strategy: desaturate heavily (retain only 12% of chroma), then push 92% toward white.
+ */
+function deriveKulrsBg(sourceColor: string): string {
+  const [r, g, b] = hexToRgb(sourceColor);
+  const lum = Math.round(brightness(sourceColor));
+  // Desaturate to 12% of original chroma (mix strongly with its grey equivalent)
+  const desatR = r + (lum - r) * 0.88;
+  const desatG = g + (lum - g) * 0.88;
+  const desatB = b + (lum - b) * 0.88;
+  // Then push 92% toward white
+  return rgbToHex(
+    desatR + (255 - desatR) * 0.92,
+    desatG + (255 - desatG) * 0.92,
+    desatB + (255 - desatB) * 0.92,
+  );
+}
+
+/**
+ * Derive a near-black text color with a faint hue tint from a source color.
+ * Approximates the Kulrs OKLCH derivation: { l: 0.10, c: first.c * 0.15, h: first.h }
+ * Strategy: desaturate heavily (retain only 18% of chroma), then push 88% toward black.
+ */
+function deriveKulrsText(sourceColor: string): string {
+  const [r, g, b] = hexToRgb(sourceColor);
+  const lum = Math.round(brightness(sourceColor));
+  // Desaturate to 18% of original chroma
+  const desatR = r + (lum - r) * 0.82;
+  const desatG = g + (lum - g) * 0.82;
+  const desatB = b + (lum - b) * 0.82;
+  // Then push 88% toward black
+  return rgbToHex(
+    desatR * 0.12,
+    desatG * 0.12,
+    desatB * 0.12,
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Theme generation from palette
 // ---------------------------------------------------------------------------
 
 /**
  * Generate a full DesignTheme from a palette of hex colors.
- * 
- * Strategy:
- * - Sort colors by brightness
- * - In dark mode: darkest → backgrounds, lightest → text
- * - In light mode: lightest → backgrounds, darkest → text  
- * - Most saturated → action/accent
- * - Derive status colors (success, warning, error, info) from palette with hue-shifting
+ *
+ * Follows the Kulrs 7-color palette convention:
+ *   palette[0..4] — main brand / accent colors
+ *   palette[5]    — BACKGROUND (Kulrs-derived near-white with hue tint)
+ *   palette[6]    — TEXT      (Kulrs-derived near-black with hue tint)
+ *
+ * For palettes with fewer than 7 colors the bg and text slots are derived
+ * algorithmically using the same OKLCH-inspired approach Kulrs uses.
  */
 export function generateThemeFromPalette(
   paletteColors: string[],
@@ -97,37 +134,57 @@ export function generateThemeFromPalette(
     typography?: Partial<ThemeTypography>;
   },
 ): DesignTheme {
-  const sorted = sortByBrightness(paletteColors);
   const isDark = mode === 'dark';
 
-  // Pick roles from brightness-sorted array
-  const darkest = sorted[0];
-  const lightest = sorted[sorted.length - 1];
+  // ---------------------------------------------------------------------------
+  // Kulrs 7-color palette convention:
+  //   palette[0..4] — main brand/accent colors (navigation, CTAs, highlights)
+  //   palette[5]    — BACKGROUND: a near-white (light mode) or near-black (dark mode)
+  //                   color derived by Kulrs from the first color's hue
+  //   palette[6]    — TEXT: the high-contrast counterpart to palette[5]
+  //
+  // For palettes with fewer than 7 colors, derive bg and text algorithmically
+  // using the same Kulrs OKLCH-inspired approach (near-white/black with hue tint).
+  // ---------------------------------------------------------------------------
 
-  // Find the most saturated color for accent/action
-  const bySat = [...paletteColors].sort((a, b) => saturation(b) - saturation(a));
+  // Separate out the main brand colors (never use bg/text slots for accents)
+  const mainColors = paletteColors.length >= 6 ? paletteColors.slice(0, 5) : paletteColors;
+  const firstColor = mainColors[0] ?? '#888888';
+
+  // Resolve the Kulrs bg and text slot values
+  const kulrsBg   = paletteColors.length >= 6 ? paletteColors[5] : deriveKulrsBg(firstColor);
+  const kulrsText = paletteColors.length >= 7 ? paletteColors[6] : deriveKulrsText(firstColor);
+
+  // In dark mode the bg/text roles are inverted
+  const bgBase   = isDark ? kulrsText : kulrsBg;
+  const textBase = isDark ? kulrsBg   : kulrsText;
+
+  // Find the most saturated color for accent/action — from main brand colors only
+  const bySat = [...mainColors].sort((a, b) => saturation(b) - saturation(a));
   const accent1 = bySat[0] ?? (isDark ? '#60a5fa' : '#2563eb');
   const accent2 = bySat[1] ?? bySat[0] ?? (isDark ? '#34d399' : '#059669');
 
   // Background tones
-  // Light mode: palette colors are used as accent tints, not raw backgrounds.
-  // Heavily lighten the lightest palette color toward near-white, matching the
-  // Kulrs preview approach (heroTint = lighten(color, 0.85)) so that page
-  // backgrounds are near-neutral and palette tones appear as subtle section tints.
-  const bgPrimary = isDark ? darkest : lighten(lightest, 0.90);
-  const bgSecondary = isDark ? lighten(darkest, 0.06) : lighten(lightest, 0.72);
-  const bgTertiary = isDark ? lighten(darkest, 0.12) : lighten(lightest, 0.55);
-  const bgInverse = isDark ? lightest : darkest;
+  // bgPrimary = the Kulrs bg slot (near-white/black with hue tint — use as-is)
+  // bgSecondary = a tint of the primary brand color (matches fromKulrsPage heroTint approach)
+  // bgTertiary  = a tint of the secondary brand color
+  const bgPrimary   = bgBase;
+  const bgSecondary = isDark
+    ? lighten(bgBase, 0.06)
+    : lighten(mainColors[0] ?? bgBase, 0.88);
+  const bgTertiary  = isDark
+    ? lighten(bgBase, 0.12)
+    : lighten(mainColors[1] ?? mainColors[0] ?? bgBase, 0.90);
+  const bgInverse   = textBase;
 
   // Text tones
-  const textPrimary = isDark ? lightest : darkest;
-  const textSecondary = isDark ? darken(lightest, 0.35) : lighten(darkest, 0.35);
-  const textInverse = isDark ? darkest : lightest;
+  const textPrimary   = textBase;
+  const textSecondary = isDark ? darken(textBase, 0.35) : lighten(textBase, 0.35);
+  const textInverse   = bgBase;
 
-  // Border tones — in light mode, derive from the near-white bgPrimary so
-  // borders feel part of the same tonal family without being overly tinted.
-  const borderPrimary = isDark ? lighten(darkest, 0.2) : darken(bgPrimary, 0.12);
-  const borderSecondary = isDark ? lighten(darkest, 0.1) : darken(bgPrimary, 0.06);
+  // Border tones — derive from bg to stay in the same tonal family
+  const borderPrimary   = isDark ? lighten(bgBase, 0.2)  : darken(bgBase, 0.12);
+  const borderSecondary = isDark ? lighten(bgBase, 0.1)  : darken(bgBase, 0.06);
 
   // Action colors from accents
   const actionPrimary = accent1;
@@ -135,17 +192,17 @@ export function generateThemeFromPalette(
   const actionSecondary = accent2;
   const actionSecondaryHover = isDark ? lighten(accent2, 0.12) : darken(accent2, 0.12);
 
-  // Status colors — derive from palette or use sensible defaults
-  const statusSuccess = findClosestHue(paletteColors, 140) ?? '#22c55e';
-  const statusWarning = findClosestHue(paletteColors, 40) ?? '#eab308';
-  const statusError = findClosestHue(paletteColors, 0) ?? '#ef4444';
-  const statusInfo = findClosestHue(paletteColors, 210) ?? '#3b82f6';
+  // Status colors — search only main brand colors (bg/text slots are not semantic status colors)
+  const statusSuccess = findClosestHue(mainColors, 140) ?? '#22c55e';
+  const statusWarning = findClosestHue(mainColors, 40) ?? '#eab308';
+  const statusError = findClosestHue(mainColors, 0) ?? '#ef4444';
+  const statusInfo = findClosestHue(mainColors, 210) ?? '#3b82f6';
 
   // Surface
-  const cardSurface = isDark ? lighten(darkest, 0.08) : '#ffffff';
+  const cardSurface = isDark ? lighten(bgBase, 0.08) : '#ffffff';
   const overlaySurface = isDark
-    ? `${darken(darkest, 0.3)}`
-    : mix(darkest, lightest, 0.15);
+    ? darken(bgBase, 0.3)
+    : mix(textBase, bgBase, 0.15);
 
   const colors: Record<ColorTokenName, string> = {
     'color.background.primary': bgPrimary,
