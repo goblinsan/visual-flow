@@ -25,7 +25,7 @@ import type {
   LayoutNode,
   FrameNode,
 } from "./layout-schema.ts";
-import { saveNamedDesign, getCurrentDesignName, setCurrentDesignName, type SavedDesign } from './utils/persistence';
+import { saveNamedDesign, getCurrentDesignName, setCurrentDesignName, type SavedDesign, userOwnsSavedPalette, saveUserPalette } from './utils/persistence';
 import useElementSize from './hooks/useElementSize';
 // Collaboration imports
 import { useRealtimeCanvas } from './collaboration';
@@ -225,7 +225,7 @@ export default function CanvasApp() {
   const skipNormalizationRef = useRef(false);
   const appVersion = import.meta.env.VITE_APP_VERSION ?? '0.0.0';
 
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
 
   // Toast notification for save feedback
   const [toast, setToast] = useState<{ message: string; type: 'info' | 'success' | 'warning' } | null>(null);
@@ -436,6 +436,17 @@ export default function CanvasApp() {
     }
     logger.info(`Loaded design: ${design.name}`);
   }, [setSpec, setSelection, isCollaborative]);
+
+  // Save the active palette to the user's saved palette list
+  const handleSavePalette = useCallback((mode: 'overwrite' | 'new') => {
+    if (!isAuthenticated || !user || !activeTheme) return;
+    saveUserPalette(user.id, activeTheme, mode);
+    showToast(
+      mode === 'overwrite' ? 'Palette updated in your list' : 'Palette saved to your list',
+      'success',
+    );
+    logger.info(`Saved palette (${mode}): ${activeTheme.name}`);
+  }, [isAuthenticated, user, activeTheme, showToast]);
 
   // Apply a template from the New dialog
   const applyTemplate = useCallback((templateId: string, themeOptions?: { palette?: string[]; fonts?: { heading: string; body: string } }) => {
@@ -1105,6 +1116,13 @@ export default function CanvasApp() {
                   onUpdatePaletteOrder={updatePaletteOrder}
                   onToggleMode={toggleThemeMode}
                   onClearTheme={handleClearTheme}
+                  isAuthenticated={isAuthenticated}
+                  userOwnsPalette={
+                    isAuthenticated && user && activeTheme
+                      ? userOwnsSavedPalette(user.id, activeTheme)
+                      : false
+                  }
+                  onSavePalette={handleSavePalette}
                   onPickThemeColor={(hex, token) => {
                     // Apply to selection fill if something is selected
                     if (selectedIds.length === 1) {

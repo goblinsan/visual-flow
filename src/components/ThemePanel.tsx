@@ -113,6 +113,12 @@ export interface ThemePanelProps {
   onPickThemeColor?: (hex: string, token: ColorTokenName) => void;
   /** Called to clear / remove the active theme */
   onClearTheme?: () => void;
+  /** Whether the current user is authenticated */
+  isAuthenticated?: boolean;
+  /** Whether the user has previously saved this palette (allows overwrite) */
+  userOwnsPalette?: boolean;
+  /** Save the current palette — mode: 'overwrite' replaces existing, 'new' creates a copy */
+  onSavePalette?: (mode: 'overwrite' | 'new') => void;
 }
 
 export function ThemePanel({
@@ -123,6 +129,9 @@ export function ThemePanel({
   onToggleMode,
   onPickThemeColor,
   onClearTheme,
+  isAuthenticated,
+  userOwnsPalette,
+  onSavePalette,
 }: ThemePanelProps) {
   const [fontCategory, setFontCategory] = useState<FontCategory>('all');
   const [fontSearchHeading, setFontSearchHeading] = useState('');
@@ -315,7 +324,62 @@ export function ThemePanel({
             <i className="fa-solid fa-circle-half-stroke text-[9px]" />
             Reset to Neutral
           </button>
-        )}      </div>
+        )}
+        {/* Save palette button (auth-gated) and Kulrs.com palette details link */}
+        <div className="mt-2 space-y-1.5">
+          {onSavePalette && (
+            isAuthenticated ? (
+              <div className="flex gap-1">
+                {userOwnsPalette && (
+                  <button
+                    type="button"
+                    onClick={() => onSavePalette('overwrite')}
+                    className="flex-1 flex items-center justify-center gap-1 text-[10px] px-2 py-1.5 rounded bg-teal-600 text-white hover:bg-teal-700 transition-colors font-medium"
+                    title="Overwrite your saved version of this palette"
+                  >
+                    <i className="fa-solid fa-floppy-disk text-[9px]" />
+                    Overwrite
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => onSavePalette('new')}
+                  className="flex-1 flex items-center justify-center gap-1 text-[10px] px-2 py-1.5 rounded bg-teal-50 text-teal-700 border border-teal-200 hover:bg-teal-100 transition-colors font-medium"
+                  title="Save as a new palette in your list"
+                >
+                  <i className="fa-solid fa-plus text-[9px]" />
+                  Save as New
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 text-[10px] text-gray-500 bg-gray-50 rounded px-2 py-1.5 border border-gray-200">
+                <i className="fa-solid fa-lock text-[9px] text-gray-400" />
+                <span>
+                  <a
+                    href="/api/auth/login"
+                    className="text-teal-600 hover:text-teal-700 underline"
+                  >
+                    Sign in
+                  </a>
+                  {' '}to save this palette
+                </span>
+              </div>
+            )
+          )}
+          {theme.kulrsPaletteId && (
+            <a
+              href={`https://kulrs.com/palette/${theme.kulrsPaletteId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 text-[10px] text-teal-600 hover:text-teal-700 transition-colors"
+              title="View this palette's details on Kulrs.com"
+            >
+              <i className="fa-solid fa-arrow-up-right-from-square text-[8px]" />
+              View Palette Details on Kulrs.com
+            </a>
+          )}
+        </div>
+      </div>
 
       {/* \u2500\u2500\u2500 Light / Dark mode \u2500\u2500\u2500 */}
       <div className="flex items-center gap-2">
