@@ -1,4 +1,10 @@
-import type { LayoutSpec, LayoutNode } from "./layout-schema";
+import type { LayoutSpec } from "./layout-schema";
+import {
+  buildTopNav, buildLeftNav, buildMobile, buildDashboard, buildLanding,
+  withThemeBindings, DEFAULT_PALETTE, DEFAULT_LIGHT_THEME,
+  TOP_NAV_BINDINGS, LEFT_NAV_BINDINGS, MOBILE_BINDINGS,
+  DASHBOARD_BINDINGS, LANDING_BINDINGS,
+} from "./canvas/kulrsBuilders";
 
 export interface CanvasTemplate {
   id: string;
@@ -30,103 +36,25 @@ export const TEMPLATES: CanvasTemplate[] = [
   },
 
   // ── Top-Nav Website ─────────────────────────────────────────────────────
-  // Mirrors fromKulrsPage buildTopNav exactly.
-  // c[0] → action.primary (nav bar)
-  // c[1] → background.secondary tint (hero) + action.secondary (hero text/CTA)
-  // c[2] → action.primary (CTA button, same token as nav — dominant accent)
+  // Uses the same builder function as FromKulrsPage.
   {
     id: 'top-nav',
     name: 'Top Nav Website',
     icon: 'fa-solid fa-window-maximize',
     description: 'Website layout with top navigation bar',
     category: 'web',
-    build: () => ({
-      root: {
-        id: "root", type: "frame", size: { width: 1440, height: 900 }, background: undefined,
-        children: [
-          { id: "bg", type: "rect", position: { x: 0, y: 0 }, size: { width: 1440, height: 900 }, fill: "#f9fafb", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1,
-            themeBindings: { fill: "color.background.primary" } },
-          { id: "nav", type: "rect", position: { x: 0, y: 0 }, size: { width: 1440, height: 64 }, fill: "#6366f1", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1,
-            themeBindings: { fill: "color.action.primary" } },
-          { id: "nav-logo", type: "text", text: "Brand", variant: "h2", position: { x: 32, y: 18 }, size: { width: 120, height: 28 }, color: "#ffffff",
-            themeBindings: { color: "color.text.inverse" } },
-          { id: "nav-link1", type: "text", text: "Home", variant: "body", position: { x: 200, y: 22 }, size: { width: 60, height: 20 }, color: "#ffffff",
-            themeBindings: { color: "color.text.inverse" } },
-          { id: "nav-link2", type: "text", text: "Features", variant: "body", position: { x: 280, y: 22 }, size: { width: 70, height: 20 }, color: "#ffffff",
-            themeBindings: { color: "color.text.inverse" } },
-          { id: "nav-link3", type: "text", text: "Pricing", variant: "body", position: { x: 370, y: 22 }, size: { width: 60, height: 20 }, color: "#ffffff",
-            themeBindings: { color: "color.text.inverse" } },
-          { id: "nav-link4", type: "text", text: "About", variant: "body", position: { x: 450, y: 22 }, size: { width: 60, height: 20 }, color: "#ffffff",
-            themeBindings: { color: "color.text.inverse" } },
-          // Hero section — light tint of accent2 (c[1] equiv.)
-          { id: "hero", type: "rect", position: { x: 0, y: 64 }, size: { width: 1440, height: 400 }, fill: "#e0f2fe", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1,
-            themeBindings: { fill: "color.background.secondary" } },
-          { id: "hero-title", type: "text", text: "Welcome to Our Platform", variant: "h1", position: { x: 120, y: 180 }, size: { width: 500, height: 48 }, color: "#0369a1",
-            themeBindings: { color: "color.action.secondary" } },
-          { id: "hero-subtitle", type: "text", text: "Build amazing things with our tools", variant: "body", position: { x: 120, y: 240 }, size: { width: 400, height: 24 }, color: "#0369a1",
-            themeBindings: { color: "color.action.secondary" } },
-          // CTA button — 3rd palette color (accent.primary = c[2] in fromKulrsPage)
-          { id: "hero-cta", type: "rect", position: { x: 120, y: 290 }, size: { width: 160, height: 44 }, fill: "#ec4899", stroke: undefined, strokeWidth: 0, radius: 8, opacity: 1,
-            themeBindings: { fill: "color.accent.primary" } },
-          { id: "hero-cta-text", type: "text", text: "Get Started", variant: "body", position: { x: 142, y: 302 }, size: { width: 120, height: 20 }, color: "#ffffff",
-            themeBindings: { color: "color.text.inverse" } },
-          // Content card
-          { id: "content", type: "rect", position: { x: 120, y: 520 }, size: { width: 1200, height: 320 }, fill: "#ffffff", stroke: "#e5e7eb", strokeWidth: 1, radius: 12, opacity: 1,
-            themeBindings: { fill: "color.surface.card", stroke: "color.border.primary" } },
-          { id: "content-title", type: "text", text: "Featured Content", variant: "h2", position: { x: 152, y: 548 }, size: { width: 300, height: 28 }, color: "#0f172a",
-            themeBindings: { color: "color.text.primary" } },
-        ],
-      }
-    }),
+    build: () => withThemeBindings(buildTopNav(DEFAULT_PALETTE, 'Inter', 'Inter', DEFAULT_LIGHT_THEME), TOP_NAV_BINDINGS),
   },
 
   // ── Left-Nav / Dashboard ────────────────────────────────────────────────
-  // Mirrors fromKulrsPage buildLeftNav.
+  // Uses the same builder function as FromKulrsPage.
   {
     id: 'left-nav',
     name: 'Left Nav Website',
     icon: 'fa-solid fa-table-columns',
     description: 'Dashboard-style layout with left sidebar',
     category: 'web',
-    build: () => ({
-      root: {
-        id: "root", type: "frame", size: { width: 1440, height: 900 }, background: undefined,
-        children: [
-          { id: "bg", type: "rect", position: { x: 0, y: 0 }, size: { width: 1440, height: 900 }, fill: "#f9fafb", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1,
-            themeBindings: { fill: "color.background.primary" } },
-          { id: "sidebar", type: "rect", position: { x: 0, y: 0 }, size: { width: 240, height: 900 }, fill: "#6366f1", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1,
-            themeBindings: { fill: "color.action.primary" } },
-          { id: "sidebar-logo", type: "text", text: "Dashboard", variant: "h2", position: { x: 24, y: 24 }, size: { width: 180, height: 28 }, color: "#ffffff",
-            themeBindings: { color: "color.text.inverse" } },
-          { id: "nav-active", type: "rect", position: { x: 12, y: 80 }, size: { width: 216, height: 40 }, fill: "#818cf8", stroke: undefined, strokeWidth: 0, radius: 8, opacity: 1,
-            themeBindings: { fill: "color.action.primaryHover" } },
-          { id: "nav-text1", type: "text", text: "Overview", variant: "body", position: { x: 24, y: 90 }, size: { width: 150, height: 20 }, color: "#ffffff",
-            themeBindings: { color: "color.text.inverse" } },
-          { id: "nav-text2", type: "text", text: "Analytics", variant: "body", position: { x: 24, y: 140 }, size: { width: 150, height: 20 }, color: "#ffffff",
-            themeBindings: { color: "color.text.inverse" } },
-          { id: "nav-text3", type: "text", text: "Settings", variant: "body", position: { x: 24, y: 180 }, size: { width: 150, height: 20 }, color: "#ffffff",
-            themeBindings: { color: "color.text.inverse" } },
-          { id: "header", type: "rect", position: { x: 240, y: 0 }, size: { width: 1200, height: 64 }, fill: "#ffffff", stroke: "#e2e8f0", strokeWidth: 1, radius: 0, opacity: 1,
-            themeBindings: { fill: "color.surface.card", stroke: "color.border.primary" } },
-          { id: "header-title", type: "text", text: "Overview", variant: "h2", position: { x: 272, y: 18 }, size: { width: 200, height: 28 }, color: "#0f172a",
-            themeBindings: { color: "color.text.primary" } },
-          { id: "card1", type: "rect", position: { x: 272, y: 96 }, size: { width: 280, height: 160 }, fill: "#ffffff", stroke: "#e2e8f0", strokeWidth: 1, radius: 12, opacity: 1,
-            themeBindings: { fill: "color.surface.card", stroke: "color.border.primary" } },
-          { id: "card1-accent", type: "rect", position: { x: 272, y: 96 }, size: { width: 280, height: 4 }, fill: "#6366f1", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1,
-            themeBindings: { fill: "color.action.primary" } },
-          { id: "card2", type: "rect", position: { x: 576, y: 96 }, size: { width: 280, height: 160 }, fill: "#ffffff", stroke: "#e2e8f0", strokeWidth: 1, radius: 12, opacity: 1,
-            themeBindings: { fill: "color.surface.card", stroke: "color.border.primary" } },
-          { id: "card2-accent", type: "rect", position: { x: 576, y: 96 }, size: { width: 280, height: 4 }, fill: "#a5b4fc", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1,
-            themeBindings: { fill: "color.action.secondary" } },
-          { id: "card3", type: "rect", position: { x: 880, y: 96 }, size: { width: 280, height: 160 }, fill: "#ffffff", stroke: "#e2e8f0", strokeWidth: 1, radius: 12, opacity: 1,
-            themeBindings: { fill: "color.surface.card", stroke: "color.border.primary" } },
-          { id: "card3-accent", type: "rect", position: { x: 880, y: 96 }, size: { width: 280, height: 4 }, fill: "#c7d2fe", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1,
-            themeBindings: { fill: "color.accent.secondary" } },
-          { id: "main-content", type: "rect", position: { x: 272, y: 280 }, size: { width: 888, height: 580 }, fill: "#ffffff", stroke: "#e2e8f0", strokeWidth: 1, radius: 12, opacity: 1,
-            themeBindings: { fill: "color.surface.card", stroke: "color.border.primary" } },
-        ],
-      }
-    }),
+    build: () => withThemeBindings(buildLeftNav(DEFAULT_PALETTE, 'Inter', 'Inter', DEFAULT_LIGHT_THEME), LEFT_NAV_BINDINGS),
   },
 
   // ── 3-Column Grid ───────────────────────────────────────────────────────
@@ -164,202 +92,36 @@ export const TEMPLATES: CanvasTemplate[] = [
   },
 
   // ── Mobile UI Layout ────────────────────────────────────────────────────
-  // Mirrors fromKulrsPage buildMobile.
+  // Uses the same builder function as FromKulrsPage.
   {
     id: 'mobile-ui',
     name: 'Mobile UI Layout',
     icon: 'fa-solid fa-mobile-screen',
     description: 'Mobile app screen layout',
     category: 'mobile',
-    build: () => ({
-      root: {
-        id: "root", type: "frame", size: { width: 800, height: 1000 }, background: undefined,
-        children: [
-          { id: "bg", type: "rect", position: { x: 0, y: 0 }, size: { width: 800, height: 1000 }, fill: "#f9fafb", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1,
-            themeBindings: { fill: "color.background.primary" } },
-          { id: "phone", type: "rect", position: { x: 200, y: 40 }, size: { width: 390, height: 844 }, fill: "#ffffff", stroke: "#e2e8f0", strokeWidth: 2, radius: 48, opacity: 1,
-            themeBindings: { fill: "color.surface.card", stroke: "color.border.secondary" } },
-          { id: "status-bar", type: "rect", position: { x: 200, y: 40 }, size: { width: 390, height: 44 }, fill: "#6366f1", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1,
-            themeBindings: { fill: "color.action.primary" } },
-          { id: "status-time", type: "text", text: "9:41", variant: "body", position: { x: 220, y: 52 }, size: { width: 50, height: 20 }, color: "#ffffff",
-            themeBindings: { color: "color.text.inverse" } },
-          { id: "nav-bar", type: "rect", position: { x: 200, y: 84 }, size: { width: 390, height: 56 }, fill: "#6366f1", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1,
-            themeBindings: { fill: "color.action.primary" } },
-          { id: "nav-title", type: "text", text: "Home", variant: "h2", position: { x: 340, y: 100 }, size: { width: 100, height: 24 }, color: "#ffffff",
-            themeBindings: { color: "color.text.inverse" } },
-          // Card 1 — tint of c[2] (accent.primary / background.tertiary)
-          { id: "card1", type: "rect", position: { x: 216, y: 160 }, size: { width: 358, height: 120 }, fill: "#ede9fe", stroke: "#c4b5fd", strokeWidth: 1, radius: 16, opacity: 1,
-            themeBindings: { fill: "color.background.tertiary", stroke: "color.border.secondary" } },
-          { id: "card1-bar", type: "rect", position: { x: 216, y: 160 }, size: { width: 6, height: 120 }, fill: "#ec4899", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1,
-            themeBindings: { fill: "color.accent.primary" } },
-          // Card 2 — tint of c[1] (action.secondary / background.secondary)
-          { id: "card2", type: "rect", position: { x: 216, y: 300 }, size: { width: 358, height: 120 }, fill: "#e0f2fe", stroke: "#bfdbfe", strokeWidth: 1, radius: 16, opacity: 1,
-            themeBindings: { fill: "color.background.secondary", stroke: "color.border.secondary" } },
-          { id: "card2-bar", type: "rect", position: { x: 216, y: 300 }, size: { width: 6, height: 120 }, fill: "#a5b4fc", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1,
-            themeBindings: { fill: "color.action.secondary" } },
-          // Card 3 — tint of c[3] (accent.secondary)
-          { id: "card3", type: "rect", position: { x: 216, y: 440 }, size: { width: 358, height: 120 }, fill: "#fef3c7", stroke: "#fde68a", strokeWidth: 1, radius: 16, opacity: 1,
-            themeBindings: { fill: "color.background.secondary", stroke: "color.border.secondary" } },
-          { id: "card3-bar", type: "rect", position: { x: 216, y: 440 }, size: { width: 6, height: 120 }, fill: "#f59e0b", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1,
-            themeBindings: { fill: "color.accent.secondary" } },
-          // FAB — accent (c[1] in fromKulrsPage)
-          { id: "fab", type: "ellipse", position: { x: 500, y: 740 }, size: { width: 56, height: 56 }, fill: "#a5b4fc", stroke: undefined, strokeWidth: 0, radius: undefined, opacity: 1,
-            themeBindings: { fill: "color.action.secondary" } },
-          { id: "tab-bar", type: "rect", position: { x: 200, y: 800 }, size: { width: 390, height: 84 }, fill: "#ffffff", stroke: "#e2e8f0", strokeWidth: 1, radius: 0, opacity: 1,
-            themeBindings: { fill: "color.surface.card", stroke: "color.border.primary" } },
-          { id: "tab-active", type: "rect", position: { x: 252, y: 810 }, size: { width: 40, height: 3 }, fill: "#6366f1", stroke: undefined, strokeWidth: 0, radius: 2, opacity: 1,
-            themeBindings: { fill: "color.action.primary" } },
-          { id: "home-ind", type: "rect", position: { x: 340, y: 860 }, size: { width: 120, height: 5 }, fill: "#0f172a", stroke: undefined, strokeWidth: 0, radius: 3, opacity: 1,
-            themeBindings: { fill: "color.text.primary" } },
-        ],
-      }
-    }),
+    build: () => withThemeBindings(buildMobile(DEFAULT_PALETTE, 'Inter', 'Inter', DEFAULT_LIGHT_THEME), MOBILE_BINDINGS),
   },
 
   // ── Dashboard ───────────────────────────────────────────────────────────
-  // Mirrors fromKulrsPage buildDashboard.
+  // Uses the same builder function as FromKulrsPage.
   {
     id: 'dashboard',
     name: 'Dashboard',
     icon: 'fa-solid fa-chart-line',
     description: 'Admin dashboard with header, stat cards, and chart area',
     category: 'web',
-    build: () => ({
-      root: {
-        id: "root", type: "frame", size: { width: 1440, height: 900 }, background: undefined,
-        children: [
-          { id: "bg", type: "rect", position: { x: 0, y: 0 }, size: { width: 1440, height: 900 }, fill: "#f9fafb", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1,
-            themeBindings: { fill: "color.background.primary" } },
-          { id: "header", type: "rect", position: { x: 0, y: 0 }, size: { width: 1440, height: 64 }, fill: "#6366f1", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1,
-            themeBindings: { fill: "color.action.primary" } },
-          { id: "logo", type: "text", text: "Dashboard", variant: "h2", position: { x: 32, y: 18 }, size: { width: 200, height: 28 }, color: "#ffffff",
-            themeBindings: { color: "color.text.inverse" } },
-          // Stat cards (4 across) — each uses a different palette color, matching safe(c, i)
-          ...([0, 1, 2, 3].map((i): LayoutNode[] => {
-            const x = 40 + i * 340;
-            const accentTokens = ["color.action.primary", "color.action.secondary", "color.accent.primary", "color.accent.secondary"] as const;
-            const labels = ['Users', 'Revenue', 'Orders', 'Growth'];
-            const vals = ['1,234', '2,468', '3,702', '4,936'];
-            return [
-              { id: `stat-${i}`, type: "rect" as const, position: { x, y: 96 }, size: { width: 320, height: 140 }, fill: "#ffffff", stroke: "#e2e8f0", strokeWidth: 1, radius: 12, opacity: 1,
-                themeBindings: { fill: "color.surface.card", stroke: "color.border.primary" } },
-              { id: `stat-${i}-top`, type: "rect" as const, position: { x, y: 96 }, size: { width: 320, height: 4 }, fill: "#6366f1", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1,
-                themeBindings: { fill: accentTokens[i] } },
-              { id: `stat-${i}-val`, type: "text" as const, text: vals[i], variant: "h1" as const, position: { x: x + 24, y: 120 }, size: { width: 200, height: 36 }, color: "#6366f1",
-                themeBindings: { color: accentTokens[i] } },
-              { id: `stat-${i}-lbl`, type: "text" as const, text: labels[i], variant: "body" as const, position: { x: x + 24, y: 166 }, size: { width: 200, height: 20 }, color: "#64748b",
-                themeBindings: { color: "color.text.secondary" } },
-            ];
-          })).flat(),
-          // Chart area
-          { id: "chart-area", type: "rect", position: { x: 40, y: 268 }, size: { width: 900, height: 400 }, fill: "#ffffff", stroke: "#e2e8f0", strokeWidth: 1, radius: 12, opacity: 1,
-            themeBindings: { fill: "color.surface.card", stroke: "color.border.primary" } },
-          { id: "chart-title", type: "text", text: "Performance Overview", variant: "h2", position: { x: 72, y: 292 }, size: { width: 300, height: 28 }, color: "#0f172a",
-            themeBindings: { color: "color.text.primary" } },
-          // Chart bars cycling through all 4 palette positions, matching safe(c, i % c.length)
-          ...([0, 1, 2, 3, 4, 5, 6].map((i): LayoutNode => {
-            const barTokens = ["color.action.primary", "color.action.secondary", "color.accent.primary", "color.accent.secondary",
-              "color.action.primary", "color.action.secondary", "color.accent.primary"] as const;
-            const h = 80 + Math.round(Math.sin(i * 0.8) * 120 + 120);
-            return {
-              id: `bar-${i}`, type: "rect" as const,
-              position: { x: 100 + i * 110, y: 620 - h },
-              size: { width: 60, height: h },
-              fill: "#6366f1", stroke: undefined, strokeWidth: 0, radius: 4, opacity: 0.85,
-              themeBindings: { fill: barTokens[i] },
-            };
-          })),
-          // Side panel
-          { id: "side-panel", type: "rect", position: { x: 960, y: 268 }, size: { width: 440, height: 400 }, fill: "#ffffff", stroke: "#e2e8f0", strokeWidth: 1, radius: 12, opacity: 1,
-            themeBindings: { fill: "color.surface.card", stroke: "color.border.primary" } },
-          { id: "side-title", type: "text", text: "Recent Activity", variant: "h2", position: { x: 992, y: 292 }, size: { width: 300, height: 28 }, color: "#0f172a",
-            themeBindings: { color: "color.text.primary" } },
-          ...([0, 1, 2, 3, 4].map((i): LayoutNode => ({
-            id: `activity-${i}`, type: "rect" as const,
-            position: { x: 976, y: 340 + i * 60 }, size: { width: 408, height: 48 },
-            fill: i === 0 ? "#ede9fe" : "#f8fafc", stroke: "#e2e8f0", strokeWidth: 1, radius: 8, opacity: 1,
-            themeBindings: { fill: i === 0 ? "color.background.tertiary" as const : "color.background.primary" as const, stroke: "color.border.secondary" as const },
-          }))),
-        ],
-      }
-    }),
+    build: () => withThemeBindings(buildDashboard(DEFAULT_PALETTE, 'Inter', 'Inter', DEFAULT_LIGHT_THEME), DASHBOARD_BINDINGS),
   },
 
   // ── Landing Page ────────────────────────────────────────────────────────
-  // Mirrors fromKulrsPage buildLanding.
+  // Uses the same builder function as FromKulrsPage.
   {
     id: 'landing',
     name: 'Landing Page',
     icon: 'fa-solid fa-rocket',
     description: 'Marketing landing page with hero and feature sections',
     category: 'web',
-    build: () => ({
-      root: {
-        id: "root", type: "frame", size: { width: 1440, height: 1200 }, background: undefined,
-        children: [
-          { id: "bg", type: "rect", position: { x: 0, y: 0 }, size: { width: 1440, height: 1200 }, fill: "#f9fafb", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1,
-            themeBindings: { fill: "color.background.primary" } },
-          // Nav
-          { id: "nav", type: "rect", position: { x: 0, y: 0 }, size: { width: 1440, height: 72 }, fill: "#ffffff", stroke: "#e2e8f0", strokeWidth: 1, radius: 0, opacity: 1,
-            themeBindings: { fill: "color.surface.card", stroke: "color.border.primary" } },
-          { id: "nav-brand", type: "text", text: "Brand", variant: "h2", position: { x: 60, y: 22 }, size: { width: 120, height: 28 }, color: "#6366f1",
-            themeBindings: { color: "color.action.primary" } },
-          { id: "nav-cta", type: "rect", position: { x: 1280, y: 18 }, size: { width: 120, height: 36 }, fill: "#6366f1", stroke: undefined, strokeWidth: 0, radius: 8, opacity: 1,
-            themeBindings: { fill: "color.action.primary" } },
-          { id: "nav-cta-text", type: "text", text: "Sign Up", variant: "body", position: { x: 1305, y: 26 }, size: { width: 80, height: 20 }, color: "#ffffff",
-            themeBindings: { color: "color.text.inverse" } },
-          // Hero
-          { id: "hero-bg", type: "rect", position: { x: 0, y: 72 }, size: { width: 1440, height: 480 }, fill: "#e0f2fe", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1,
-            themeBindings: { fill: "color.background.secondary" } },
-          { id: "hero-h1", type: "text", text: "Build Something Amazing", variant: "h1", position: { x: 200, y: 200 }, size: { width: 600, height: 56 }, color: "#0369a1", fontSize: 48,
-            themeBindings: { color: "color.action.secondary" } },
-          { id: "hero-p", type: "text", text: "The all-in-one platform for creators, designers,\nand developers to bring their ideas to life.", variant: "body", position: { x: 200, y: 280 }, size: { width: 500, height: 48 }, color: "#64748b",
-            themeBindings: { color: "color.text.secondary" } },
-          { id: "hero-btn1", type: "rect", position: { x: 200, y: 350 }, size: { width: 160, height: 48 }, fill: "#6366f1", stroke: undefined, strokeWidth: 0, radius: 10, opacity: 1,
-            themeBindings: { fill: "color.action.primary" } },
-          { id: "hero-btn1-t", type: "text", text: "Get Started", variant: "body", position: { x: 228, y: 364 }, size: { width: 120, height: 20 }, color: "#ffffff",
-            themeBindings: { color: "color.text.inverse" } },
-          { id: "hero-btn2", type: "rect", position: { x: 380, y: 350 }, size: { width: 160, height: 48 }, fill: "transparent", stroke: "#6366f1", strokeWidth: 2, radius: 10, opacity: 1,
-            themeBindings: { stroke: "color.action.primary" } },
-          { id: "hero-btn2-t", type: "text", text: "Learn More", variant: "body", position: { x: 410, y: 364 }, size: { width: 120, height: 20 }, color: "#6366f1",
-            themeBindings: { color: "color.action.primary" } },
-          // Features section
-          // Features section
-          { id: "features-bg", type: "rect", position: { x: 0, y: 552 }, size: { width: 1440, height: 480 }, fill: "#f9fafb", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1,
-            themeBindings: { fill: "color.background.primary" } },
-          { id: "features-title", type: "text", text: "Features", variant: "h1", position: { x: 580, y: 600 }, size: { width: 280, height: 40 }, color: "#0f172a",
-            themeBindings: { color: "color.text.primary" } },
-          // Feature cards (3) — matches fromKulrsPage buildLanding exactly
-          ...([0, 1, 2].map((i): LayoutNode[] => {
-            const x = 120 + i * 420;
-            const dotTokens = ["color.action.primary", "color.action.secondary", "color.accent.primary"] as const;
-            const iconBgTokens = ["color.background.secondary", "color.background.tertiary", "color.background.secondary"] as const;
-            const labels = ["Fast", "Secure", "Scalable"];
-            return [
-              { id: `feat-${i}`, type: "rect" as const, position: { x, y: 680 }, size: { width: 380, height: 240 }, fill: "#ffffff", stroke: "#e2e8f0", strokeWidth: 1, radius: 16, opacity: 1,
-                themeBindings: { fill: "color.surface.card", stroke: "color.border.primary" } },
-              { id: `feat-${i}-icon`, type: "rect" as const, position: { x: x + 24, y: 704 }, size: { width: 48, height: 48 }, fill: "#e0f2fe", stroke: undefined, strokeWidth: 0, radius: 12, opacity: 1,
-                themeBindings: { fill: iconBgTokens[i] } },
-              { id: `feat-${i}-dot`, type: "ellipse" as const, position: { x: x + 36, y: 716 }, size: { width: 24, height: 24 }, fill: "#6366f1", stroke: undefined, strokeWidth: 0, opacity: 1,
-                themeBindings: { fill: dotTokens[i] } },
-              { id: `feat-${i}-h`, type: "text" as const, text: labels[i], variant: "h2" as const, position: { x: x + 24, y: 770 }, size: { width: 300, height: 28 }, color: "#0f172a",
-                themeBindings: { color: "color.text.primary" } },
-              { id: `feat-${i}-p`, type: "text" as const, text: "Lorem ipsum dolor sit amet, consectetur adipiscing elit.", variant: "body" as const, position: { x: x + 24, y: 810 }, size: { width: 332, height: 40 }, color: "#64748b",
-                themeBindings: { color: "color.text.secondary" } },
-            ];
-          })).flat(),
-          // Bottom CTA banner — primary-colored rounded section
-          { id: "cta-bg", type: "rect", position: { x: 120, y: 980 }, size: { width: 1200, height: 180 }, fill: "#6366f1", stroke: undefined, strokeWidth: 0, radius: 20, opacity: 1,
-            themeBindings: { fill: "color.action.primary" } },
-          { id: "cta-h", type: "text", text: "Ready to get started?", variant: "h1", position: { x: 200, y: 1020 }, size: { width: 500, height: 40 }, color: "#ffffff",
-            themeBindings: { color: "color.text.inverse" } },
-          { id: "cta-btn", type: "rect", position: { x: 200, y: 1080 }, size: { width: 180, height: 48 }, fill: "#ffffff", stroke: undefined, strokeWidth: 0, radius: 10, opacity: 1,
-            themeBindings: { fill: "color.surface.card" } },
-          { id: "cta-btn-t", type: "text", text: "Start Free Trial", variant: "body", position: { x: 224, y: 1094 }, size: { width: 140, height: 20 }, color: "#6366f1",
-            themeBindings: { color: "color.action.primary" } },
-        ],
-      }
-    }),
+    build: () => withThemeBindings(buildLanding(DEFAULT_PALETTE, 'Inter', 'Inter', DEFAULT_LIGHT_THEME), LANDING_BINDINGS),
   },
 
   {
