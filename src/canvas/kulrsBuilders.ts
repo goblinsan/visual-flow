@@ -73,45 +73,79 @@ export const DEFAULT_LIGHT_THEME = resolveTheme('light');
 // ── Builder functions ─────────────────────────────────────────────────────
 
 export function buildTopNav(c: string[], hf: string, bf: string, t: ThemeColors): LayoutSpec {
-  // Canvas is 1200×860 — matches the HTML preview container exactly (no scaling distortion).
-  // HTML nav: height 56, padding 0 32px. Hero: padding 64px 80px. Content: padding 48px 80px.
+  // Canvas matches the HTML preview container (1200px wide).
+  // HTML nav: height 56, padding 0 32px.
+  // Hero section: padding 64px 80px, height 320.
+  // Content section: padding 48px 80px wrapping the card; card padding 32px.
   const nav = safe(c, 0);
   const hero = safe(c, 1);
   const accent = safe(c, 2);
-  // card swatches: ~80px tall, 3 columns in a 1040px inner area (minus 32px padding each side)
-  const swatchW = Math.floor((1040 - 32) / 3);  // ~336
+
+  // Swatch grid: 3 columns, gap 16, content width = 1040px - 32px*2 padding = 976px inner
+  // But swatches use inner card padding (32px each side within 1040px card):
+  // swatch area width = 1040 - 64 = 976px; 3 cols with 2×16px gaps: (976 - 32) / 3 ≈ 314px
+  const swatchAreaW = 1040 - 64;  // 976
+  const swatchW = Math.floor((swatchAreaW - 32) / 3);  // 314
+  const swatchGap = 16;
+
+  // Card layout from HTML:
+  //   section padding-top=48 → card top y = 56+320+48 = 424
+  //   card padding=32 → title y = 424+32 = 456
+  //   title height=28, marginTop grid=20 → row1 y = 456+28+20 = 504
+  //   numRows = ceil(c.length/3); rowsH = numRows*80 + (numRows-1)*16
+  //   card height = 32+28+20+rowsH+32
+  const numColors = Math.max(c.length, 1);
+  const numRows = Math.ceil(numColors / 3);
+  const rowsH = numRows * 80 + (numRows - 1) * swatchGap;
+  const cardH = 32 + 28 + 20 + rowsH + 32;  // ~288 for 5 colors
+
+  const sectionY = 56 + 320;  // 376
+  const cardY = sectionY + 48;  // 424
+  const titleY = cardY + 32;   // 456
+  const row1Y = titleY + 28 + 20;  // 504
+  const canvasH = cardY + cardH + 48 + 20;  // section padding-bottom 48 + breathing room
+
+  // All swatches — mirrors HTML: colors.map(c => swatch)
+  const swatches = c.flatMap((cc, i) => {
+    const col = i % 3;
+    const row = Math.floor(i / 3);
+    return [{
+      id: `swatch-${i}`, type: 'rect' as const,
+      position: { x: 112 + col * (swatchW + swatchGap), y: row1Y + row * (80 + swatchGap) },
+      size: { width: swatchW, height: 80 },
+      fill: cardTint(cc, t.isDark), stroke: borderTint(cc, t.isDark), strokeWidth: 1, radius: 8, opacity: 1,
+    }];
+  });
+
   return {
     root: {
-      id: 'root', type: 'frame', size: { width: 1200, height: 860 }, background: undefined,
+      id: 'root', type: 'frame', size: { width: 1200, height: canvasH }, background: undefined,
       children: [
         // Page background
-        { id: 'bg', type: 'rect', position: { x: 0, y: 0 }, size: { width: 1200, height: 860 }, fill: t.pageBg, stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1 },
+        { id: 'bg', type: 'rect', position: { x: 0, y: 0 }, size: { width: 1200, height: canvasH }, fill: t.pageBg, stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1 },
         // Nav bar — 56px tall, full width
         { id: 'nav', type: 'rect', position: { x: 0, y: 0 }, size: { width: 1200, height: 56 }, fill: nav, stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1 },
         // Brand text — vertically centred in 56px bar: (56-20)/2 = 18
         { id: 'nav-logo', type: 'text', text: 'Brand', variant: 'h2', fontSize: 20, fontWeight: 700, position: { x: 32, y: 18 }, size: { width: 80, height: 22 }, color: textOn(nav), fontFamily: hf },
-        // Nav links — gap: 32px, start after brand ~160; text centred at (56-14)/2 = 21
+        // Nav links
         { id: 'nav-link1', type: 'text', text: 'Home',     variant: 'body', fontSize: 14, position: { x: 160, y: 21 }, size: { width: 50, height: 16 }, color: textOn(nav), opacity: 0.8, fontFamily: bf },
         { id: 'nav-link2', type: 'text', text: 'Features', variant: 'body', fontSize: 14, position: { x: 242, y: 21 }, size: { width: 64, height: 16 }, color: textOn(nav), opacity: 0.8, fontFamily: bf },
         { id: 'nav-link3', type: 'text', text: 'Pricing',  variant: 'body', fontSize: 14, position: { x: 338, y: 21 }, size: { width: 54, height: 16 }, color: textOn(nav), opacity: 0.8, fontFamily: bf },
         { id: 'nav-link4', type: 'text', text: 'About',    variant: 'body', fontSize: 14, position: { x: 424, y: 21 }, size: { width: 44, height: 16 }, color: textOn(nav), opacity: 0.8, fontFamily: bf },
-        // Hero section — padding 64px 80px; starts at y=56
+        // Hero section — padding 64px 80px; starts at y=56, height 320
         { id: 'hero', type: 'rect', position: { x: 0, y: 56 }, size: { width: 1200, height: 320 }, fill: heroTint(hero, t.isDark), stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1 },
-        // h1 40px — top of section (56+64=120)
+        // h1 40px — 56+64=120
         { id: 'hero-title', type: 'text', text: 'Welcome to Our Platform', variant: 'h1', fontSize: 40, fontWeight: 700, position: { x: 80, y: 120 }, size: { width: 700, height: 48 }, color: t.isDark ? lighten(hero, 0.3) : darken(hero, 0.3), fontFamily: hf },
-        // subtitle 18px — marginTop 12 after h1 (120+48+12=180)
+        // subtitle 18px — marginTop 12 → 120+48+12=180
         { id: 'hero-subtitle', type: 'text', text: 'Build amazing things with our tools', variant: 'body', fontSize: 18, position: { x: 80, y: 180 }, size: { width: 500, height: 24 }, color: t.isDark ? lighten(hero, 0.5) : hero, fontFamily: bf },
-        // CTA button — padding 12px 28px → height 14+14+12+12=~42 → use 44; marginTop 24 (180+24+24=228)
+        // CTA button — marginTop 24 → 180+24+24=228 (24 margin + 24 text line-height adjust)
         { id: 'hero-cta', type: 'rect', position: { x: 80, y: 228 }, size: { width: 152, height: 44 }, fill: accent, stroke: undefined, strokeWidth: 0, radius: 8, opacity: 1 },
         { id: 'hero-cta-text', type: 'text', text: 'Get Started', variant: 'body', fontSize: 15, fontWeight: 600, position: { x: 108, y: 240 }, size: { width: 100, height: 20 }, color: textOn(accent), fontFamily: bf },
-        // Content section — starts at y=376 (56+320), padding 48px 80px
-        { id: 'content', type: 'rect', position: { x: 80, y: 376 }, size: { width: 1040, height: 436 }, fill: t.cardBg, stroke: t.border, strokeWidth: 1, radius: 12, opacity: 1 },
-        // Content title — 22px h2; y=376+32=408
-        { id: 'content-title', type: 'text', text: 'Featured Content', variant: 'h2', fontSize: 22, fontWeight: 600, position: { x: 112, y: 408 }, size: { width: 280, height: 28 }, color: t.textPrimary, fontFamily: hf },
-        // 3 colour swatches — 80px tall, marginTop 20 from title (408+28+20=456), gap 16
-        { id: 'swatch-0', type: 'rect', position: { x: 112, y: 456 }, size: { width: swatchW, height: 80 }, fill: cardTint(safe(c, 0), t.isDark), stroke: borderTint(safe(c, 0), t.isDark), strokeWidth: 1, radius: 8, opacity: 1 },
-        { id: 'swatch-1', type: 'rect', position: { x: 112 + swatchW + 16, y: 456 }, size: { width: swatchW, height: 80 }, fill: cardTint(safe(c, 1), t.isDark), stroke: borderTint(safe(c, 1), t.isDark), strokeWidth: 1, radius: 8, opacity: 1 },
-        { id: 'swatch-2', type: 'rect', position: { x: 112 + (swatchW + 16) * 2, y: 456 }, size: { width: swatchW, height: 80 }, fill: cardTint(safe(c, 2), t.isDark), stroke: borderTint(safe(c, 2), t.isDark), strokeWidth: 1, radius: 8, opacity: 1 },
+        // Content card — section padding 48px; card at y=424
+        { id: 'content', type: 'rect', position: { x: 80, y: cardY }, size: { width: 1040, height: cardH }, fill: t.cardBg, stroke: t.border, strokeWidth: 1, radius: 12, opacity: 1 },
+        { id: 'content-title', type: 'text', text: 'Featured Content', variant: 'h2', fontSize: 22, fontWeight: 600, position: { x: 112, y: titleY }, size: { width: 280, height: 28 }, color: t.textPrimary, fontFamily: hf },
+        // All palette swatches in 3-column grid rows (mirrors HTML colors.map)
+        ...swatches,
       ] as LayoutNode[],
     },
   };
