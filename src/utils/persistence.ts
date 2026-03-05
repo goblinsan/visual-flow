@@ -158,3 +158,89 @@ export function setCurrentDesignName(name: string | null): void {
 
 // Note: Disabled fill/stroke (represented as undefined) are NOT explicitly persisted yet.
 // A future phase may introduce explicit boolean flags or sentinel values for disabled states.
+
+// --- User Saved Palettes (per-user, keyed by userId) ---
+
+import type { DesignTheme } from '../theme/types';
+
+export interface SavedPalette {
+  /** Theme ID */
+  id: string;
+  /** Human-readable name */
+  name: string;
+  /** Kulrs palette source ID (if derived from Kulrs) */
+  kulrsPaletteId?: string;
+  /** Raw palette hex colors */
+  paletteColors: string[];
+  /** Theme mode */
+  mode: 'light' | 'dark';
+  /** When the palette was saved */
+  savedAt: number;
+}
+
+function savedPalettesKey(userId: string): string {
+  return `vizail_saved_palettes_${userId}`;
+}
+
+/** Get all palettes saved by this user */
+export function getSavedPalettes(userId: string): SavedPalette[] {
+  try {
+    const raw = localStorage.getItem(savedPalettesKey(userId));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Check whether the user has previously saved a palette with the given kulrsPaletteId or theme id */
+export function userOwnsSavedPalette(userId: string, theme: DesignTheme): boolean {
+  const saved = getSavedPalettes(userId);
+  return saved.some(
+    (p) =>
+      p.id === theme.id ||
+      (theme.kulrsPaletteId !== undefined && p.kulrsPaletteId === theme.kulrsPaletteId),
+  );
+}
+
+/** Save or overwrite a palette in the user's list */
+export function saveUserPalette(userId: string, theme: DesignTheme, mode: 'overwrite' | 'new'): SavedPalette {
+  const list = getSavedPalettes(userId);
+  const entry: SavedPalette = {
+    id: theme.id,
+    name: theme.name,
+    kulrsPaletteId: theme.kulrsPaletteId,
+    paletteColors: theme.paletteColors,
+    mode: theme.mode,
+    savedAt: Date.now(),
+  };
+
+  let updated: SavedPalette[];
+  let saved: SavedPalette;
+  if (mode === 'overwrite') {
+    // Replace any entry matching by theme id or kulrsPaletteId
+    const idx = list.findIndex(
+      (p) =>
+        p.id === theme.id ||
+        (theme.kulrsPaletteId !== undefined && p.kulrsPaletteId === theme.kulrsPaletteId),
+    );
+    if (idx >= 0) {
+      updated = [...list];
+      updated[idx] = entry;
+    } else {
+      updated = [...list, entry];
+    }
+    saved = entry;
+  } else {
+    // Save as new: always append with a unique id
+    const newEntry: SavedPalette = { ...entry, id: `${theme.id}_${Date.now()}` };
+    updated = [...list, newEntry];
+    saved = newEntry;
+  }
+
+  try {
+    localStorage.setItem(savedPalettesKey(userId), JSON.stringify(updated));
+  } catch { /* ignore */ }
+  return saved;
+}

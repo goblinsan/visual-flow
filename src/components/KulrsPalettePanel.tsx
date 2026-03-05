@@ -501,6 +501,16 @@ export function KulrsPalettePanel({
                   Use as Theme
                 </button>
               )}
+              <a
+                href={`https://kulrs.com/palette/${searchResult.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-1 flex items-center justify-center gap-1 text-[10px] text-teal-600 hover:text-teal-700 transition-colors"
+                title="View palette details on Kulrs.com"
+              >
+                <i className="fa-solid fa-arrow-up-right-from-square text-[8px]" />
+                View Palette Details on Kulrs.com
+              </a>
             </div>
           )}
 
@@ -584,6 +594,17 @@ export function KulrsPalettePanel({
                         Use as Theme
                       </button>
                     )}
+                    <a
+                      href={`https://kulrs.com/palette/${palette.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-1.5 py-0.5 rounded text-[9px] bg-gray-50 text-gray-500 hover:bg-gray-100 border border-gray-200 transition-colors opacity-0 group-hover/palette:opacity-100 flex items-center gap-0.5"
+                      title="View palette details on Kulrs.com"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <i className="fa-solid fa-arrow-up-right-from-square text-[7px]" />
+                      Details
+                    </a>
                     <span>{new Date(palette.createdAt).toLocaleDateString()}</span>
                   </div>
                 </div>
