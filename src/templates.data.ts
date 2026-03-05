@@ -1,9 +1,7 @@
 import type { LayoutSpec } from "./layout-schema";
 import {
   buildTopNav, buildLeftNav, buildMobile, buildDashboard, buildLanding,
-  withThemeBindings, DEFAULT_PALETTE, DEFAULT_LIGHT_THEME,
-  TOP_NAV_BINDINGS, LEFT_NAV_BINDINGS, MOBILE_BINDINGS,
-  DASHBOARD_BINDINGS, LANDING_BINDINGS,
+  DEFAULT_PALETTE, DEFAULT_LIGHT_THEME,
 } from "./canvas/kulrsBuilders";
 
 export interface CanvasTemplate {
@@ -43,7 +41,7 @@ export const TEMPLATES: CanvasTemplate[] = [
     icon: 'fa-solid fa-window-maximize',
     description: 'Website layout with top navigation bar',
     category: 'web',
-    build: () => withThemeBindings(buildTopNav(DEFAULT_PALETTE, 'Inter', 'Inter', DEFAULT_LIGHT_THEME), TOP_NAV_BINDINGS),
+    build: () => buildTopNav(DEFAULT_PALETTE, 'Inter', 'Inter', DEFAULT_LIGHT_THEME),
   },
 
   // ── Left-Nav / Dashboard ────────────────────────────────────────────────
@@ -54,7 +52,7 @@ export const TEMPLATES: CanvasTemplate[] = [
     icon: 'fa-solid fa-table-columns',
     description: 'Dashboard-style layout with left sidebar',
     category: 'web',
-    build: () => withThemeBindings(buildLeftNav(DEFAULT_PALETTE, 'Inter', 'Inter', DEFAULT_LIGHT_THEME), LEFT_NAV_BINDINGS),
+    build: () => buildLeftNav(DEFAULT_PALETTE, 'Inter', 'Inter', DEFAULT_LIGHT_THEME),
   },
 
   // ── 3-Column Grid ───────────────────────────────────────────────────────
@@ -99,7 +97,7 @@ export const TEMPLATES: CanvasTemplate[] = [
     icon: 'fa-solid fa-mobile-screen',
     description: 'Mobile app screen layout',
     category: 'mobile',
-    build: () => withThemeBindings(buildMobile(DEFAULT_PALETTE, 'Inter', 'Inter', DEFAULT_LIGHT_THEME), MOBILE_BINDINGS),
+    build: () => buildMobile(DEFAULT_PALETTE, 'Inter', 'Inter', DEFAULT_LIGHT_THEME),
   },
 
   // ── Dashboard ───────────────────────────────────────────────────────────
@@ -110,7 +108,7 @@ export const TEMPLATES: CanvasTemplate[] = [
     icon: 'fa-solid fa-chart-line',
     description: 'Admin dashboard with header, stat cards, and chart area',
     category: 'web',
-    build: () => withThemeBindings(buildDashboard(DEFAULT_PALETTE, 'Inter', 'Inter', DEFAULT_LIGHT_THEME), DASHBOARD_BINDINGS),
+    build: () => buildDashboard(DEFAULT_PALETTE, 'Inter', 'Inter', DEFAULT_LIGHT_THEME),
   },
 
   // ── Landing Page ────────────────────────────────────────────────────────
@@ -121,7 +119,7 @@ export const TEMPLATES: CanvasTemplate[] = [
     icon: 'fa-solid fa-rocket',
     description: 'Marketing landing page with hero and feature sections',
     category: 'web',
-    build: () => withThemeBindings(buildLanding(DEFAULT_PALETTE, 'Inter', 'Inter', DEFAULT_LIGHT_THEME), LANDING_BINDINGS),
+    build: () => buildLanding(DEFAULT_PALETTE, 'Inter', 'Inter', DEFAULT_LIGHT_THEME),
   },
 
   {
