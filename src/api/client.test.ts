@@ -336,6 +336,31 @@ describe('ApiClient', () => {
     });
   });
 
+  describe('health', () => {
+    it('should return health status successfully', async () => {
+      const mockHealth = { status: 'ok', timestamp: 1234567890 };
+
+      fetchMock.mockResolvedValueOnce(mockJsonResponse(mockHealth));
+
+      const result = await client.health();
+
+      expect(result.data).toEqual(mockHealth);
+      expect(result.error).toBeUndefined();
+      expect(fetchMock).toHaveBeenCalledWith('/api/health', expect.objectContaining({
+        method: 'GET',
+      }));
+    });
+
+    it('should handle network errors', async () => {
+      fetchMock.mockRejectedValueOnce(new Error('Network error'));
+
+      const result = await client.health();
+
+      expect(result.data).toBeUndefined();
+      expect(result.error).toBe('Network error');
+    });
+  });
+
   describe('proposal operations', () => {
     it('should list proposals', async () => {
       const mockProposals = [
