@@ -9,9 +9,14 @@
  * neutral background, border, and text colors across the spec tree.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { LayoutSpec, LayoutNode } from '../layout-schema';
 import { brightness, lighten } from '../utils/color';
+import {
+  fetchKulrsPalettes,
+  fetchKulrsPaletteById,
+} from '../api/kulrsClient';
+import type { KulrsPalette, KulrsPaletteColor } from '../api/kulrsClient';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -28,62 +33,8 @@ interface ThemeColors {
   isDark: boolean;
 }
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-interface KulrsPaletteColor {
-  id: string;
-  hexValue: string;
-  name: string | null;
-  position: number;
-}
-
-interface KulrsPalette {
-  id: string;
-  name: string;
-  description: string | null;
-  likesCount: number;
-  createdAt: string;
-  colors: KulrsPaletteColor[];
-}
-
-interface BrowseResponse {
-  success: boolean;
-  data: KulrsPalette[];
-}
-
-// ---------------------------------------------------------------------------
-// API Helpers
-// ---------------------------------------------------------------------------
-
-const KULRS_API =
-  import.meta.env.VITE_KULRS_API_URL ??
-  (import.meta.env.DEV
-    ? 'http://localhost:8080'
-    : 'https://kulrs-api-jyedwyfhdq-uc.a.run.app');
-
-async function fetchKulrsPalettes(
-  sort: 'recent' | 'popular' = 'recent',
-  limit = 12
-): Promise<KulrsPalette[]> {
-  const res = await fetch(
-    `${KULRS_API}/palettes?sort=${sort}&limit=${limit}`
-  );
-  if (!res.ok) throw new Error(`Kulrs API ${res.status}`);
-  const json: BrowseResponse = await res.json();
-  return json.data;
-}
-
-async function fetchKulrsPaletteById(
-  id: string
-): Promise<KulrsPalette | null> {
-  const res = await fetch(`${KULRS_API}/palettes/${encodeURIComponent(id)}`);
-  if (res.status === 404) return null;
-  if (!res.ok) throw new Error(`Kulrs API ${res.status}`);
-  const json: { success: boolean; data: KulrsPalette } = await res.json();
-  return json.data;
-}
+// Re-export so callers that previously imported from this module still work.
+export type { KulrsPalette, KulrsPaletteColor };
 
 // ---------------------------------------------------------------------------
 // Theme helpers
@@ -250,6 +201,15 @@ export function KulrsPalettePanel({
   const [searchNotFound, setSearchNotFound] = useState(false);
   const [themeMode, setThemeMode] = useState<ThemeMode>('light');
   const [customBg, setCustomBg] = useState('#ffffff');
+  /** Text typed into the palette-name filter box */
+  const [nameFilter, setNameFilter] = useState('');
+
+  /** Palette list filtered by name (client-side) — supports palette-first flow */
+  const filteredPalettes = useMemo(() => {
+    const q = nameFilter.trim().toLowerCase();
+    if (!q) return palettes;
+    return palettes.filter(p => p.name.toLowerCase().includes(q));
+  }, [palettes, nameFilter]);
 
   /** Apply theme remapping to the current spec whenever themeMode/customBg changes. */
   const handleApplyTheme = useCallback(
@@ -533,6 +493,31 @@ export function KulrsPalettePanel({
             ))}
           </div>
 
+          {/* Palette name filter — palette-first / browse-first flow */}
+          {palettes.length > 0 && (
+            <div className="flex gap-1 items-center">
+              <input
+                type="text"
+                value={nameFilter}
+                onChange={(e) => setNameFilter(e.target.value)}
+                placeholder="Filter by name…"
+                aria-label="Filter palettes by name"
+                className="flex-1 text-[10px] px-2 py-1 rounded border border-gray-200 bg-white focus:outline-none focus:border-teal-400 placeholder:text-gray-300"
+              />
+              {nameFilter && (
+                <button
+                  type="button"
+                  onClick={() => setNameFilter('')}
+                  className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
+                  title="Clear filter"
+                  aria-label="Clear name filter"
+                >
+                  <i className="fa-solid fa-xmark" />
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Error */}
           {error && (
             <div className="text-[10px] text-red-500 flex items-center gap-1">
@@ -553,8 +538,15 @@ export function KulrsPalettePanel({
 
           {/* Palette list */}
           <div className="space-y-2 max-h-64 overflow-y-auto pr-0.5">
-            {palettes.map((palette) => (
+            {filteredPalettes.length === 0 && palettes.length > 0 && nameFilter && (
+              <p className="text-[10px] text-gray-400 italic">No palettes match &ldquo;{nameFilter}&rdquo;</p>
+            )}
+            {filteredPalettes.map((palette) => (
               <div key={palette.id} className="group/palette">
+                {/* Palette name label */}
+                {palette.name && (
+                  <div className="text-[9px] text-gray-400 mb-0.5 truncate">{palette.name}</div>
+                )}
                 {/* Color swatches */}
                 <div className="flex h-7 rounded overflow-hidden border border-gray-200 hover:border-gray-300 transition-colors">
                   {palette.colors
