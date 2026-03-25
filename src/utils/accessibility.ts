@@ -3,7 +3,7 @@
  *
  * Implements WCAG 2.1 contrast ratio calculation and level classification
  * (AA / AAA) for both normal and large text, plus a utility that suggests
- * a safer foreground colour when the original pair fails.
+ * a safer foreground color when the original pair fails.
  *
  * References:
  *  https://www.w3.org/TR/WCAG21/#contrast-minimum (Success Criterion 1.4.3)
@@ -124,14 +124,14 @@ export function checkContrast(fg: string, bg: string): ContrastResult | null {
 // ---------------------------------------------------------------------------
 
 /**
- * Suggest a safer foreground colour for the given background that achieves at
- * least WCAG AA (contrast ≥ 4.5:1).  The algorithm starts from the colour
+ * Suggest a safer foreground color for the given background that achieves at
+ * least WCAG AA (contrast ≥ 4.5:1).  The algorithm starts from the color
  * (black or white) that produces the highest contrast with `bg`, then falls
  * back to adjusting `fgHint` toward that extreme if provided.
  *
  * @param bg      Background color string
  * @param fgHint  Optional starting foreground color; when provided the
- *                algorithm tries to adjust this colour toward a passing value
+ *                algorithm tries to adjust this color toward a passing value
  *                before falling back to pure black or white
  * @returns       A hex string for the adjusted foreground, or null if the
  *                input background cannot be parsed

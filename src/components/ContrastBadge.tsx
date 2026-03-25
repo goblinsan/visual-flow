@@ -2,7 +2,7 @@
  * ContrastBadge
  *
  * Displays the WCAG contrast level (AAA / AA / Fail) for a foreground + background
- * colour pair and surfaces a safer alternative when the pair fails.
+ * color pair and surfaces a safer alternative when the pair fails.
  */
 
 import type { ContrastResult } from '../utils/accessibility';
@@ -13,13 +13,13 @@ import { checkContrast, suggestAccessibleForeground } from '../utils/accessibili
 // ---------------------------------------------------------------------------
 
 export interface ContrastBadgeProps {
-  /** Foreground (text / icon) colour — hex or rgb string */
+  /** Foreground (text / icon) color — hex or rgb string */
   fg: string;
-  /** Background colour — hex or rgb string */
+  /** Background color — hex or rgb string */
   bg: string;
   /** When true, apply the more lenient large-text thresholds */
   largeText?: boolean;
-  /** Called when the user clicks the suggested safer colour */
+  /** Called when the user clicks the suggested safer color */
   onAcceptSuggestion?: (hex: string) => void;
 }
 
@@ -74,7 +74,7 @@ export function ContrastBadge({
     <div className="flex flex-col gap-1">
       {/* Ratio + level row */}
       <div className="flex items-center gap-1.5">
-        {/* Colour preview */}
+        {/* Color preview */}
         <span
           className="inline-flex items-center justify-center w-6 h-6 rounded text-[11px] font-bold border border-gray-200 flex-shrink-0"
           style={{ color: fg, backgroundColor: bg }}
@@ -95,7 +95,7 @@ export function ContrastBadge({
           <i className="fa-solid fa-wand-magic-sparkles text-[9px] flex-shrink-0" />
           <span>Safer alternative:</span>
 
-          {/* Colour chip showing the suggestion */}
+          {/* Color chip showing the suggestion */}
           <span
             className="inline-block w-4 h-4 rounded border border-gray-300 flex-shrink-0"
             style={{ backgroundColor: suggestion }}

@@ -1,14 +1,14 @@
 /**
  * ColorFirstFlow
  *
- * Guides the user from a single starting colour to a full Kulrs palette.
+ * Guides the user from a single starting color to a full Kulrs palette.
  *
  * Flow:
- *  1. User picks (or is given) a seed hex colour.
+ *  1. User picks (or is given) a seed hex color.
  *  2. Component calls `fetchKulrsPalettesByColor` to find palettes that
- *     contain a visually similar colour.
+ *     contain a visually similar color.
  *  3. Results are shown as swatchable rows.
- *  4. The user can pick a swatch colour or apply a whole palette as a theme.
+ *  4. The user can pick a swatch color or apply a whole palette as a theme.
  */
 
 import { useState, useCallback, useEffect } from 'react';
@@ -20,9 +20,9 @@ import { fetchKulrsPalettesByColor } from '../api/kulrsClient';
 // ---------------------------------------------------------------------------
 
 export interface ColorFirstFlowProps {
-  /** Starting seed colour (hex, e.g. "#6366f1"). */
+  /** Starting seed color (hex, e.g. "#6366f1"). */
   seedColor: string;
-  /** Called when the user clicks a single swatch colour. */
+  /** Called when the user clicks a single swatch color. */
   onPickColor: (hex: string) => void;
   /** Called when the user applies a whole palette as a design theme. */
   onApplyPalette?: (colors: string[], paletteId?: string) => void;
@@ -94,7 +94,7 @@ export function ColorFirstFlow({
 
   return (
     <div className="space-y-2">
-      {/* Seed colour row */}
+      {/* Seed color row */}
       <div className="flex items-center gap-2">
         <span
           className="w-6 h-6 rounded border border-gray-300 flex-shrink-0"
@@ -134,7 +134,7 @@ export function ColorFirstFlow({
       {/* Results */}
       {!loading && searched && palettes.length === 0 && (
         <p className="text-[10px] text-gray-400 italic">
-          No palettes found matching this colour. Try adjusting the seed or increasing tolerance.
+          No palettes found matching this color. Try adjusting the seed or increasing tolerance.
         </p>
       )}
 
