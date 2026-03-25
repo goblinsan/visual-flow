@@ -2,6 +2,7 @@
  * StyleFlowShell
  * Phase 1 (#176): Multi-step UI shell with progress indicator, step cards,
  * and preview scaffold.
+ * Phase 3 (#184, #185, #186): Typography, button, and navigation style selection.
  *
  * This component is a controlled shell: callers pass in a StyleFlowStateMachine
  * instance and receive `onClose` when the journey ends or is dismissed.
@@ -24,6 +25,9 @@ import {
 import { StepProgress } from './StepProgress';
 import { StyleCard } from './StyleCard';
 import { PreviewScaffold } from './PreviewScaffold';
+import { TypographyPanel, TYPOGRAPHY_PAIRINGS } from './TypographyPanel';
+import { ButtonStylePanel, BUTTON_STYLES } from './ButtonStylePanel';
+import { NavigationStylePanel, NAVIGATION_STYLES } from './NavigationStylePanel';
 
 // ── Mood & industry options ───────────────────────────────────────────────────
 
@@ -45,6 +49,22 @@ const INDUSTRY_OPTIONS: { value: StyleIndustry; label: string }[] = [
   { value: 'food', label: 'Food & Beverage' },
   { value: 'other', label: 'Other' },
 ];
+
+// ── Token helpers ─────────────────────────────────────────────────────────────
+
+/**
+ * Upsert a design token by name in the given mutable array.
+ * Updates the value in-place if the token already exists, otherwise appends it.
+ */
+function upsertToken(
+  tokens: Array<{ name: string; value: string; description?: string }>,
+  name: string,
+  value: string,
+): void {
+  const existing = tokens.find((t) => t.name === name);
+  if (existing) existing.value = value;
+  else tokens.push({ name, value });
+}
 
 // ── Stub recommendation generator ────────────────────────────────────────────
 // Production: replace with an API call to the recommendation engine.
@@ -238,6 +258,27 @@ export function StyleFlowShell({ machine, onClose }: StyleFlowShellProps) {
     [machine, state.id],
   );
 
+  const handleSelectTypographyPairing = useCallback(
+    (pairingId: string) => {
+      machine.selectTypographyPairing(pairingId);
+    },
+    [machine],
+  );
+
+  const handleSelectButtonStyle = useCallback(
+    (styleId: string) => {
+      machine.selectButtonStyle(styleId);
+    },
+    [machine],
+  );
+
+  const handleSelectNavigationStyle = useCallback(
+    (styleId: string) => {
+      machine.selectNavigationStyle(styleId);
+    },
+    [machine],
+  );
+
   const handleExport = useCallback(
     (format: 'css-variables' | 'json') => {
       const selected = state.recommendations.find(
@@ -245,10 +286,38 @@ export function StyleFlowShell({ machine, onClose }: StyleFlowShellProps) {
       );
       if (!selected) return;
 
+      // Base tokens from recommendation (with any manual overrides applied)
       const tokens = selected.tokens.map((t) => ({
         ...t,
         value: state.selection.tokenOverrides[t.name] ?? t.value,
       }));
+
+      // Merge Phase 3 typography pairing tokens
+      const typoPairing = TYPOGRAPHY_PAIRINGS.find(
+        (p) => p.id === state.selection.typographyPairingId,
+      );
+      if (typoPairing) {
+        upsertToken(tokens, 'font-heading', typoPairing.headingFont);
+        upsertToken(tokens, 'font-body', typoPairing.bodyFont);
+      }
+
+      // Merge Phase 3 button style tokens
+      const btnStyle = BUTTON_STYLES.find(
+        (b) => b.id === state.selection.buttonStyleId,
+      );
+      if (btnStyle) {
+        upsertToken(tokens, 'button-border-radius', btnStyle.borderRadius);
+        upsertToken(tokens, 'button-font-weight', btnStyle.fontWeight);
+        upsertToken(tokens, 'button-padding-x', btnStyle.paddingX);
+      }
+
+      // Merge Phase 3 navigation style token
+      const navStyle = NAVIGATION_STYLES.find(
+        (n) => n.id === state.selection.navigationStyleId,
+      );
+      if (navStyle) {
+        upsertToken(tokens, 'nav-variant', navStyle.variant);
+      }
 
       const outputs: Record<string, string> = {};
       if (format === 'css-variables') outputs['css-variables'] = tokensToCSS(tokens);
@@ -257,7 +326,13 @@ export function StyleFlowShell({ machine, onClose }: StyleFlowShellProps) {
       machine.setExportPackage({
         tokens,
         swatches: selected.swatches,
-        typography: selected.typography,
+        typography: typoPairing
+          ? {
+              ...selected.typography,
+              headingFont: typoPairing.headingFont,
+              bodyFont: typoPairing.bodyFont,
+            }
+          : selected.typography,
         outputs,
         generatedAt: new Date().toISOString(),
         sourceRecommendationId: selected.id,
@@ -278,6 +353,19 @@ export function StyleFlowShell({ machine, onClose }: StyleFlowShellProps) {
   const selectedRec = state.recommendations.find(
     (r) => r.id === state.selection.recommendationId,
   ) ?? null;
+
+  const selectedTypographyPairing =
+    TYPOGRAPHY_PAIRINGS.find((p) => p.id === state.selection.typographyPairingId) ?? null;
+  const selectedButtonStyle =
+    BUTTON_STYLES.find((b) => b.id === state.selection.buttonStyleId) ?? null;
+  const selectedNavigationStyle =
+    NAVIGATION_STYLES.find((n) => n.id === state.selection.navigationStyleId) ?? null;
+
+  // Primary colour used to tint Phase 3 previews
+  const previewPrimary =
+    selectedRec?.swatches.find((s) => s.role === 'primary')?.hex ?? '#06b6d4';
+  const previewAccent =
+    selectedRec?.swatches.find((s) => s.role === 'accent')?.hex ?? previewPrimary;
 
   const canContinue = (() => {
     if (state.currentStepId === 'seeds') return selectedMoods.length > 0;
@@ -425,7 +513,87 @@ export function StyleFlowShell({ machine, onClose }: StyleFlowShellProps) {
             </div>
           )}
 
-          {/* ── Step 3: Customisation ───────────────────────────────────────── */}
+          {/* ── Step 3: Typography ──────────────────────────────────────── */}
+          {state.currentStepId === 'typography' && (
+            <div className="p-6 flex gap-4">
+              <div className="flex-1">
+                <TypographyPanel
+                  selectedId={state.selection.typographyPairingId}
+                  onSelect={handleSelectTypographyPairing}
+                />
+              </div>
+              <div className="w-56 flex-shrink-0">
+                <p className="text-[11px] font-semibold text-white/40 uppercase tracking-wider mb-3">
+                  Preview
+                </p>
+                <PreviewScaffold
+                  recommendation={selectedRec}
+                  typographyPairing={selectedTypographyPairing}
+                  buttonStyle={selectedButtonStyle}
+                  navigationStyle={selectedNavigationStyle}
+                />
+                <p className="text-[9px] text-white/25 mt-2 italic">
+                  This step is optional — continue to use the recommendation's default fonts.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* ── Step 4: Button Style ─────────────────────────────────────── */}
+          {state.currentStepId === 'buttons' && (
+            <div className="p-6 flex gap-4">
+              <div className="flex-1">
+                <ButtonStylePanel
+                  selectedId={state.selection.buttonStyleId}
+                  accentColor={previewAccent}
+                  onSelect={handleSelectButtonStyle}
+                />
+              </div>
+              <div className="w-56 flex-shrink-0">
+                <p className="text-[11px] font-semibold text-white/40 uppercase tracking-wider mb-3">
+                  Preview
+                </p>
+                <PreviewScaffold
+                  recommendation={selectedRec}
+                  typographyPairing={selectedTypographyPairing}
+                  buttonStyle={selectedButtonStyle}
+                  navigationStyle={selectedNavigationStyle}
+                />
+                <p className="text-[9px] text-white/25 mt-2 italic">
+                  This step is optional — continue to use rounded corners by default.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* ── Step 5: Navigation ──────────────────────────────────────── */}
+          {state.currentStepId === 'navigation' && (
+            <div className="p-6 flex gap-4">
+              <div className="flex-1">
+                <NavigationStylePanel
+                  selectedId={state.selection.navigationStyleId}
+                  primaryColor={previewPrimary}
+                  onSelect={handleSelectNavigationStyle}
+                />
+              </div>
+              <div className="w-56 flex-shrink-0">
+                <p className="text-[11px] font-semibold text-white/40 uppercase tracking-wider mb-3">
+                  Preview
+                </p>
+                <PreviewScaffold
+                  recommendation={selectedRec}
+                  typographyPairing={selectedTypographyPairing}
+                  buttonStyle={selectedButtonStyle}
+                  navigationStyle={selectedNavigationStyle}
+                />
+                <p className="text-[9px] text-white/25 mt-2 italic">
+                  This step is optional — continue to use a top-bar layout by default.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* ── Step 6: Customisation ───────────────────────────────────────── */}
           {state.currentStepId === 'customisation' && (
             <div className="p-6 flex gap-4">
               <div className="flex-1 space-y-3">
@@ -474,12 +642,17 @@ export function StyleFlowShell({ machine, onClose }: StyleFlowShellProps) {
                 <p className="text-[11px] font-semibold text-white/40 uppercase tracking-wider mb-3">
                   Preview
                 </p>
-                <PreviewScaffold recommendation={selectedRec} />
+                <PreviewScaffold
+                  recommendation={selectedRec}
+                  typographyPairing={selectedTypographyPairing}
+                  buttonStyle={selectedButtonStyle}
+                  navigationStyle={selectedNavigationStyle}
+                />
               </div>
             </div>
           )}
 
-          {/* ── Step 4: Export ──────────────────────────────────────────────── */}
+          {/* ── Step 7: Export ──────────────────────────────────────────────── */}
           {state.currentStepId === 'export' && (
             <div className="p-6 space-y-4">
               <p className="text-[11px] font-semibold text-white/40 uppercase tracking-wider">

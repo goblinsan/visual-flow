@@ -32,15 +32,36 @@ export const JOURNEY_STEPS: readonly JourneyStep[] = [
     optional: false,
   },
   {
-    id: 'customisation',
+    id: 'typography',
     order: 3,
+    title: 'Typography',
+    description: 'Choose a font pairing for headings and body text.',
+    optional: true,
+  },
+  {
+    id: 'buttons',
+    order: 4,
+    title: 'Button Style',
+    description: 'Pick a button family to define your interactive elements.',
+    optional: true,
+  },
+  {
+    id: 'navigation',
+    order: 5,
+    title: 'Navigation',
+    description: 'Choose a navigation pattern for your layout.',
+    optional: true,
+  },
+  {
+    id: 'customisation',
+    order: 6,
     title: 'Customise',
     description: 'Fine-tune colours, typography, and other tokens.',
     optional: true,
   },
   {
     id: 'export',
-    order: 4,
+    order: 7,
     title: 'Export',
     description: 'Download your design tokens in your preferred format.',
     optional: false,
@@ -70,6 +91,21 @@ function validateCustomisation(): ValidationResult {
   return null;
 }
 
+function validateTypography(): ValidationResult {
+  // Typography selection is optional – always valid
+  return null;
+}
+
+function validateButtons(): ValidationResult {
+  // Button style selection is optional – always valid
+  return null;
+}
+
+function validateNavigation(): ValidationResult {
+  // Navigation style selection is optional – always valid
+  return null;
+}
+
 function validateExport(exportPackage: StyleExportPackage | null): ValidationResult {
   if (!exportPackage) return 'Export package has not been generated yet.';
   return null;
@@ -78,6 +114,9 @@ function validateExport(exportPackage: StyleExportPackage | null): ValidationRes
 const STEP_VALIDATORS: Record<JourneyStepId, (state: JourneyState) => ValidationResult> = {
   seeds: (s) => validateSeeds(s.seeds),
   recommendations: (s) => validateRecommendations(s.selection),
+  typography: () => validateTypography(),
+  buttons: () => validateButtons(),
+  navigation: () => validateNavigation(),
   customisation: () => validateCustomisation(),
   export: (s) => validateExport(s.exportPackage),
 };
@@ -95,7 +134,13 @@ function makeInitialState(id: string): JourneyState {
     completedSteps: [],
     seeds: null,
     recommendations: [],
-    selection: { recommendationId: null, tokenOverrides: {} },
+    selection: {
+      recommendationId: null,
+      tokenOverrides: {},
+      typographyPairingId: null,
+      buttonStyleId: null,
+      navigationStyleId: null,
+    },
     exportPackage: null,
     startedAt: now,
     updatedAt: now,
@@ -258,7 +303,28 @@ export class StyleFlowStateMachine {
     this.update({ selection: { ...this.state.selection, tokenOverrides: overrides } });
   }
 
-  /** Store the generated export package (step 4) */
+  /** Record the user's chosen typography pairing (step 3) */
+  selectTypographyPairing(pairingId: string): void {
+    this.update({
+      selection: { ...this.state.selection, typographyPairingId: pairingId },
+    });
+  }
+
+  /** Record the user's chosen button style (step 4) */
+  selectButtonStyle(styleId: string): void {
+    this.update({
+      selection: { ...this.state.selection, buttonStyleId: styleId },
+    });
+  }
+
+  /** Record the user's chosen navigation style (step 5) */
+  selectNavigationStyle(styleId: string): void {
+    this.update({
+      selection: { ...this.state.selection, navigationStyleId: styleId },
+    });
+  }
+
+  /** Store the generated export package (step 7) */
   setExportPackage(exportPackage: StyleExportPackage): void {
     this.update({ exportPackage });
   }

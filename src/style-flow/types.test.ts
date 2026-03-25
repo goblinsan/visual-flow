@@ -77,17 +77,39 @@ describe('StyleSelection', () => {
     const selection: StyleSelection = {
       recommendationId: null,
       tokenOverrides: {},
+      typographyPairingId: null,
+      buttonStyleId: null,
+      navigationStyleId: null,
     };
     expect(selection.recommendationId).toBeNull();
     expect(Object.keys(selection.tokenOverrides)).toHaveLength(0);
+    expect(selection.typographyPairingId).toBeNull();
+    expect(selection.buttonStyleId).toBeNull();
+    expect(selection.navigationStyleId).toBeNull();
   });
 
   it('allows overriding specific tokens', () => {
     const selection: StyleSelection = {
       recommendationId: 'rec-1',
       tokenOverrides: { 'color-primary': '#FF0000' },
+      typographyPairingId: null,
+      buttonStyleId: null,
+      navigationStyleId: null,
     };
     expect(selection.tokenOverrides['color-primary']).toBe('#FF0000');
+  });
+
+  it('stores Phase 3 style selections', () => {
+    const selection: StyleSelection = {
+      recommendationId: 'rec-1',
+      tokenOverrides: {},
+      typographyPairingId: 'serif-elegance',
+      buttonStyleId: 'pill',
+      navigationStyleId: 'sidebar',
+    };
+    expect(selection.typographyPairingId).toBe('serif-elegance');
+    expect(selection.buttonStyleId).toBe('pill');
+    expect(selection.navigationStyleId).toBe('sidebar');
   });
 });
 
@@ -140,7 +162,13 @@ describe('JourneyState', () => {
       completedSteps: [],
       seeds: null,
       recommendations: [],
-      selection: { recommendationId: null, tokenOverrides: {} },
+      selection: {
+        recommendationId: null,
+        tokenOverrides: {},
+        typographyPairingId: null,
+        buttonStyleId: null,
+        navigationStyleId: null,
+      },
       exportPackage: null,
       startedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -148,5 +176,8 @@ describe('JourneyState', () => {
     expect(state.status).toBe('idle');
     expect(state.completedSteps).toHaveLength(0);
     expect(state.seeds).toBeNull();
+    expect(state.selection.typographyPairingId).toBeNull();
+    expect(state.selection.buttonStyleId).toBeNull();
+    expect(state.selection.navigationStyleId).toBeNull();
   });
 });

@@ -108,6 +108,12 @@ export interface StyleSelection {
    * a recommendation. Keys are token names.
    */
   tokenOverrides: Record<string, string>;
+  /** Selected typography pairing ID (step 3) */
+  typographyPairingId: string | null;
+  /** Selected button style ID (step 4) */
+  buttonStyleId: string | null;
+  /** Selected navigation style ID (step 5) */
+  navigationStyleId: string | null;
 }
 
 // ── Export Package ────────────────────────────────────────────────────────────
@@ -136,10 +142,72 @@ export interface StyleExportPackage {
   sourceRecommendationId: string;
 }
 
+// ── Typography Pairing ────────────────────────────────────────────────────────
+
+/** A curated font pairing option for the typography selection step */
+export interface TypographyPairing {
+  /** Unique identifier */
+  id: string;
+  /** Display name, e.g. "Modern Sans" */
+  name: string;
+  /** Font family for headings */
+  headingFont: string;
+  /** Font family for body text */
+  bodyFont: string;
+  /** Short description of the pairing's character */
+  description: string;
+  /** Mood/style tags, e.g. ['minimal', 'clean'] */
+  tags: string[];
+}
+
+// ── Button Style ──────────────────────────────────────────────────────────────
+
+/** A button style family option */
+export interface ButtonStyle {
+  /** Unique identifier */
+  id: string;
+  /** Display name, e.g. "Pill" */
+  name: string;
+  /** Short description */
+  description: string;
+  /** CSS border-radius value */
+  borderRadius: string;
+  /** CSS font-weight value */
+  fontWeight: string;
+  /** Horizontal padding, e.g. '1rem' */
+  paddingX: string;
+  /** Whether the button uses an outline/border-only style by default */
+  outlined: boolean;
+}
+
+// ── Navigation Style ──────────────────────────────────────────────────────────
+
+/** Navigation layout variant identifier */
+export type NavigationVariant = 'top-bar' | 'sidebar' | 'tab-bar' | 'floating' | 'bottom-bar';
+
+/** A navigation layout style option */
+export interface NavigationStyle {
+  /** Unique identifier */
+  id: string;
+  /** Display name, e.g. "Top Bar" */
+  name: string;
+  /** Short description */
+  description: string;
+  /** Navigation layout variant */
+  variant: NavigationVariant;
+}
+
 // ── Journey ───────────────────────────────────────────────────────────────────
 
 /** Identifiers for each step in the style journey */
-export type JourneyStepId = 'seeds' | 'recommendations' | 'customisation' | 'export';
+export type JourneyStepId =
+  | 'seeds'
+  | 'recommendations'
+  | 'typography'
+  | 'buttons'
+  | 'navigation'
+  | 'customisation'
+  | 'export';
 
 /** Definition of a single step */
 export interface JourneyStep {
