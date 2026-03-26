@@ -1,6 +1,7 @@
 /**
  * Tests for the Style Flow frontend shell components
  * Phase 1 (#176)
+ * Phase 3 (#184, #185, #186): Typography, button, and navigation panels
  */
 
 import { describe, it, expect, vi } from 'vitest';
@@ -11,6 +12,9 @@ import { StyleFlowShell } from './StyleFlowShell';
 import { StepProgress } from './StepProgress';
 import { StyleCard } from './StyleCard';
 import { PreviewScaffold } from './PreviewScaffold';
+import { TypographyPanel, TYPOGRAPHY_PAIRINGS } from './TypographyPanel';
+import { ButtonStylePanel, BUTTON_STYLES } from './ButtonStylePanel';
+import { NavigationStylePanel, NAVIGATION_STYLES } from './NavigationStylePanel';
 import { JOURNEY_STEPS } from '../journey';
 import type { StyleRecommendation } from '../types';
 
@@ -43,6 +47,9 @@ describe('StepProgress', () => {
     );
     expect(screen.getByText('Your Style Seeds')).toBeTruthy();
     expect(screen.getByText('Choose a Style')).toBeTruthy();
+    expect(screen.getByText('Typography')).toBeTruthy();
+    expect(screen.getByText('Button Style')).toBeTruthy();
+    expect(screen.getByText('Navigation')).toBeTruthy();
     expect(screen.getByText('Customise')).toBeTruthy();
     expect(screen.getByText('Export')).toBeTruthy();
   });
@@ -235,5 +242,150 @@ describe('StyleFlowShell', () => {
     render(<StyleFlowShell machine={makeMachine()} onClose={vi.fn()} />);
     const backBtn = screen.getByRole('button', { name: /back/i });
     expect(backBtn).toBeDisabled();
+  });
+});
+
+// ── TypographyPanel ───────────────────────────────────────────────────────────
+
+describe('TypographyPanel', () => {
+  it('renders all typography pairings', () => {
+    render(<TypographyPanel selectedId={null} onSelect={vi.fn()} />);
+    TYPOGRAPHY_PAIRINGS.forEach((p) => {
+      expect(screen.getByText(p.name)).toBeTruthy();
+    });
+  });
+
+  it('calls onSelect with the pairing ID when clicked', () => {
+    const onSelect = vi.fn();
+    render(<TypographyPanel selectedId={null} onSelect={onSelect} />);
+    fireEvent.click(screen.getByText(TYPOGRAPHY_PAIRINGS[0].name));
+    expect(onSelect).toHaveBeenCalledWith(TYPOGRAPHY_PAIRINGS[0].id);
+  });
+
+  it('marks the selected pairing with aria-pressed=true', () => {
+    const pairing = TYPOGRAPHY_PAIRINGS[1];
+    render(<TypographyPanel selectedId={pairing.id} onSelect={vi.fn()} />);
+    const buttons = screen.getAllByRole('button');
+    const selectedBtn = buttons.find((b) => b.getAttribute('aria-pressed') === 'true');
+    expect(selectedBtn).toBeTruthy();
+  });
+
+  it('shows font metadata for each pairing', () => {
+    const { container } = render(<TypographyPanel selectedId={null} onSelect={vi.fn()} />);
+    const monoLabels = container.querySelectorAll('.font-mono');
+    expect(monoLabels.length).toBeGreaterThan(0);
+  });
+});
+
+// ── ButtonStylePanel ──────────────────────────────────────────────────────────
+
+describe('ButtonStylePanel', () => {
+  it('renders all button styles', () => {
+    render(<ButtonStylePanel selectedId={null} onSelect={vi.fn()} />);
+    BUTTON_STYLES.forEach((s) => {
+      expect(screen.getByText(s.name)).toBeTruthy();
+    });
+  });
+
+  it('calls onSelect with the style ID when clicked', () => {
+    const onSelect = vi.fn();
+    render(<ButtonStylePanel selectedId={null} onSelect={onSelect} />);
+    fireEvent.click(screen.getByText(BUTTON_STYLES[0].name));
+    expect(onSelect).toHaveBeenCalledWith(BUTTON_STYLES[0].id);
+  });
+
+  it('marks the selected style with aria-pressed=true', () => {
+    const style = BUTTON_STYLES[2]; // 'sharp'
+    render(<ButtonStylePanel selectedId={style.id} onSelect={vi.fn()} />);
+    const buttons = screen.getAllByRole('button');
+    const selectedBtn = buttons.find((b) => b.getAttribute('aria-pressed') === 'true');
+    expect(selectedBtn).toBeTruthy();
+  });
+
+  it('renders live button previews labelled "Primary" and "Ghost"', () => {
+    render(<ButtonStylePanel selectedId={null} onSelect={vi.fn()} />);
+    const primaryPreviews = screen.getAllByText('Primary');
+    const ghostPreviews = screen.getAllByText('Ghost');
+    expect(primaryPreviews.length).toBe(BUTTON_STYLES.length);
+    expect(ghostPreviews.length).toBe(BUTTON_STYLES.length);
+  });
+});
+
+// ── NavigationStylePanel ──────────────────────────────────────────────────────
+
+describe('NavigationStylePanel', () => {
+  it('renders all navigation styles', () => {
+    render(<NavigationStylePanel selectedId={null} onSelect={vi.fn()} />);
+    NAVIGATION_STYLES.forEach((s) => {
+      expect(screen.getByText(s.name)).toBeTruthy();
+    });
+  });
+
+  it('calls onSelect with the style ID when clicked', () => {
+    const onSelect = vi.fn();
+    render(<NavigationStylePanel selectedId={null} onSelect={onSelect} />);
+    fireEvent.click(screen.getByText(NAVIGATION_STYLES[0].name));
+    expect(onSelect).toHaveBeenCalledWith(NAVIGATION_STYLES[0].id);
+  });
+
+  it('marks the selected style with aria-pressed=true', () => {
+    const style = NAVIGATION_STYLES[1]; // 'sidebar'
+    render(<NavigationStylePanel selectedId={style.id} onSelect={vi.fn()} />);
+    const buttons = screen.getAllByRole('button');
+    const selectedBtn = buttons.find((b) => b.getAttribute('aria-pressed') === 'true');
+    expect(selectedBtn).toBeTruthy();
+  });
+
+  it('renders description text for each navigation style', () => {
+    render(<NavigationStylePanel selectedId={null} onSelect={vi.fn()} />);
+    NAVIGATION_STYLES.forEach((s) => {
+      expect(screen.getByText(s.description)).toBeTruthy();
+    });
+  });
+});
+
+// ── PreviewScaffold (Phase 3 overrides) ──────────────────────────────────────
+
+describe('PreviewScaffold (Phase 3 overrides)', () => {
+  it('applies typography pairing heading font to the heading element', () => {
+    const { container } = render(
+      <PreviewScaffold
+        recommendation={MOCK_RECOMMENDATION}
+        typographyPairing={{
+          id: 'serif-elegance',
+          name: 'Serif Elegance',
+          headingFont: 'Playfair Display',
+          bodyFont: 'Lato',
+          description: 'Editorial',
+          tags: [],
+        }}
+      />,
+    );
+    const heading = container.querySelector('h3');
+    expect(heading?.style.fontFamily).toContain('Playfair Display');
+  });
+
+  it('renders "Call to action" CTA button', () => {
+    render(<PreviewScaffold recommendation={MOCK_RECOMMENDATION} />);
+    expect(screen.getByText('Call to action')).toBeTruthy();
+  });
+
+  it('applies button style border-radius to the CTA button', () => {
+    const { container } = render(
+      <PreviewScaffold
+        recommendation={MOCK_RECOMMENDATION}
+        buttonStyle={{
+          id: 'pill',
+          name: 'Pill',
+          description: 'Fully rounded',
+          borderRadius: '9999px',
+          fontWeight: '600',
+          paddingX: '1.25rem',
+          outlined: false,
+        }}
+      />,
+    );
+    const cta = container.querySelector('[style*="9999px"]');
+    expect(cta).toBeTruthy();
   });
 });

@@ -22,23 +22,31 @@ const MOCK_RECOMMENDATION: StyleRecommendation = {
 };
 
 describe('JOURNEY_STEPS', () => {
-  it('contains exactly 4 steps', () => {
-    expect(JOURNEY_STEPS).toHaveLength(4);
+  it('contains exactly 7 steps', () => {
+    expect(JOURNEY_STEPS).toHaveLength(7);
   });
 
-  it('steps are ordered 1–4', () => {
+  it('steps are ordered 1–7', () => {
     const orders = JOURNEY_STEPS.map((s) => s.order);
-    expect(orders).toEqual([1, 2, 3, 4]);
+    expect(orders).toEqual([1, 2, 3, 4, 5, 6, 7]);
   });
 
-  it('step IDs are seeds → recommendations → customisation → export', () => {
+  it('step IDs are seeds → recommendations → typography → buttons → navigation → customisation → export', () => {
     const ids = JOURNEY_STEPS.map((s) => s.id);
-    expect(ids).toEqual(['seeds', 'recommendations', 'customisation', 'export']);
+    expect(ids).toEqual([
+      'seeds',
+      'recommendations',
+      'typography',
+      'buttons',
+      'navigation',
+      'customisation',
+      'export',
+    ]);
   });
 
-  it('customisation is the only optional step', () => {
+  it('typography, buttons, navigation, and customisation are optional steps', () => {
     const optional = JOURNEY_STEPS.filter((s) => s.optional).map((s) => s.id);
-    expect(optional).toEqual(['customisation']);
+    expect(optional).toEqual(['typography', 'buttons', 'navigation', 'customisation']);
   });
 });
 
@@ -113,11 +121,23 @@ describe('StyleFlowStateMachine', () => {
     expect(machine.getState().currentStepId).toBe('recommendations');
     expect(machine.getState().completedSteps).toContain('seeds');
 
-    // recommendations → customisation
+    // recommendations → typography (always valid since it's optional)
     machine.selectRecommendation('rec-1');
     expect(machine.advance()).toBe(true);
-    expect(machine.getState().currentStepId).toBe('customisation');
+    expect(machine.getState().currentStepId).toBe('typography');
     expect(machine.getState().completedSteps).toContain('recommendations');
+
+    // typography → buttons (always valid since it's optional)
+    expect(machine.advance()).toBe(true);
+    expect(machine.getState().currentStepId).toBe('buttons');
+
+    // buttons → navigation (always valid since it's optional)
+    expect(machine.advance()).toBe(true);
+    expect(machine.getState().currentStepId).toBe('navigation');
+
+    // navigation → customisation (always valid since it's optional)
+    expect(machine.advance()).toBe(true);
+    expect(machine.getState().currentStepId).toBe('customisation');
 
     // customisation → export (always valid since it's optional)
     expect(machine.advance()).toBe(true);
@@ -190,6 +210,21 @@ describe('StyleFlowStateMachine', () => {
     machine.overrideToken('color-primary', '#FF0000');
     machine.clearTokenOverride('color-primary');
     expect(machine.getState().selection.tokenOverrides['color-primary']).toBeUndefined();
+  });
+
+  it('selectTypographyPairing() stores the pairing ID', () => {
+    machine.selectTypographyPairing('serif-elegance');
+    expect(machine.getState().selection.typographyPairingId).toBe('serif-elegance');
+  });
+
+  it('selectButtonStyle() stores the button style ID', () => {
+    machine.selectButtonStyle('pill');
+    expect(machine.getState().selection.buttonStyleId).toBe('pill');
+  });
+
+  it('selectNavigationStyle() stores the navigation style ID', () => {
+    machine.selectNavigationStyle('sidebar');
+    expect(machine.getState().selection.navigationStyleId).toBe('sidebar');
   });
 
   // ── Subscription ──────────────────────────────────────────────────────────
