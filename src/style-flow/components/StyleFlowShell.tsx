@@ -28,6 +28,8 @@ import { PreviewScaffold } from './PreviewScaffold';
 import { TypographyPanel, TYPOGRAPHY_PAIRINGS } from './TypographyPanel';
 import { ButtonStylePanel, BUTTON_STYLES } from './ButtonStylePanel';
 import { NavigationStylePanel, NAVIGATION_STYLES } from './NavigationStylePanel';
+import { ConceptComparisonPanel } from './ConceptComparisonPanel';
+import { generateConcepts } from '../conceptGenerator';
 
 // ── Mood & industry options ───────────────────────────────────────────────────
 
@@ -219,9 +221,12 @@ export function StyleFlowShell({ machine, onClose }: StyleFlowShellProps) {
 
     if (state.currentStepId === 'seeds') {
       machine.updateSeeds({ moods: selectedMoods, industry: selectedIndustry, notes: notes || undefined });
-      // Generate recommendations after seeds step
+      // Generate legacy recommendations (used by individual step previews)
       const recs = generateRecommendations(selectedMoods, selectedIndustry);
       machine.setRecommendations(recs);
+      // Generate Phase 4 full-concept variations
+      const concepts = generateConcepts(selectedMoods, selectedIndustry, { count: 3 });
+      machine.setConcepts(concepts);
     }
 
     const ok = machine.advance();
@@ -257,6 +262,54 @@ export function StyleFlowShell({ machine, onClose }: StyleFlowShellProps) {
     },
     [machine, state.id],
   );
+
+  // ── Phase 4 handlers ────────────────────────────────────────────────────────
+
+  const handleChooseConcept = useCallback(
+    (concept: import('../types').StyleConcept) => {
+      machine.chooseConcept(concept);
+      trackRecommendationSelected(state.id, concept.recommendation.id);
+    },
+    [machine, state.id],
+  );
+
+  const handleReviewConcept = useCallback(
+    (conceptId: string, status: import('../types').ConceptReviewStatus) => {
+      machine.reviewConcept(conceptId, status);
+    },
+    [machine],
+  );
+
+  const handleToggleLock = useCallback(
+    (aspect: import('../types').LockableAspect) => {
+      machine.toggleLockedAspect(aspect);
+    },
+    [machine],
+  );
+
+  const handleRegenerateConcepts = useCallback(() => {
+    if (!state.seeds) return;
+    const lockedValues: Parameters<typeof generateConcepts>[2]['lockedValues'] = {};
+    if (state.selection.lockedAspects.includes('recommendation') && state.selection.recommendationId) {
+      const rec = state.recommendations.find((r) => r.id === state.selection.recommendationId);
+      if (rec) lockedValues.recommendation = rec;
+    }
+    if (state.selection.lockedAspects.includes('typography') && state.selection.typographyPairingId) {
+      lockedValues.typography = state.selection.typographyPairingId;
+    }
+    if (state.selection.lockedAspects.includes('buttons') && state.selection.buttonStyleId) {
+      lockedValues.buttons = state.selection.buttonStyleId;
+    }
+    if (state.selection.lockedAspects.includes('navigation') && state.selection.navigationStyleId) {
+      lockedValues.navigation = state.selection.navigationStyleId;
+    }
+    const concepts = generateConcepts(state.seeds.moods, state.seeds.industry, {
+      count: 3,
+      lockedAspects: state.selection.lockedAspects,
+      lockedValues,
+    });
+    machine.setConcepts(concepts);
+  }, [machine, state]);
 
   const handleSelectTypographyPairing = useCallback(
     (pairingId: string) => {
@@ -366,6 +419,16 @@ export function StyleFlowShell({ machine, onClose }: StyleFlowShellProps) {
     selectedRec?.swatches.find((s) => s.role === 'primary')?.hex ?? '#06b6d4';
   const previewAccent =
     selectedRec?.swatches.find((s) => s.role === 'accent')?.hex ?? previewPrimary;
+
+  // Phase 4: name resolvers for the ConceptComparisonPanel
+  const conceptNameResolvers = {
+    typographyName: (id: string) =>
+      TYPOGRAPHY_PAIRINGS.find((p) => p.id === id)?.name ?? id,
+    buttonName: (id: string) =>
+      BUTTON_STYLES.find((b) => b.id === id)?.name ?? id,
+    navigationName: (id: string) =>
+      NAVIGATION_STYLES.find((n) => n.id === id)?.name ?? id,
+  };
 
   const canContinue = (() => {
     if (state.currentStepId === 'seeds') return selectedMoods.length > 0;
@@ -489,27 +552,26 @@ export function StyleFlowShell({ machine, onClose }: StyleFlowShellProps) {
             </div>
           )}
 
-          {/* ── Step 2: Recommendations ─────────────────────────────────────── */}
+          {/* ── Step 2: Concept Comparison (Phase 4 – #188, #189) ──────────── */}
           {state.currentStepId === 'recommendations' && (
-            <div className="p-6 flex gap-4">
-              {/* Cards */}
-              <div className="flex-1 grid grid-cols-1 gap-3 relative">
-                {state.recommendations.map((rec) => (
-                  <StyleCard
-                    key={rec.id}
-                    recommendation={rec}
-                    isSelected={state.selection.recommendationId === rec.id}
-                    onSelect={handleSelectRecommendation}
-                  />
-                ))}
-              </div>
-              {/* Preview */}
-              <div className="w-56 flex-shrink-0">
-                <p className="text-[11px] font-semibold text-white/40 uppercase tracking-wider mb-3">
-                  Preview
-                </p>
-                <PreviewScaffold recommendation={selectedRec} />
-              </div>
+            <div className="p-6 space-y-2">
+              <p className="text-[11px] font-semibold text-white/40 uppercase tracking-wider">
+                Choose a concept
+              </p>
+              <p className="text-[11px] text-white/30 mb-4">
+                Compare fully styled concepts. Favourite or shortlist options, then choose one to continue.
+              </p>
+              <ConceptComparisonPanel
+                concepts={state.concepts}
+                conceptReviews={state.conceptReviews}
+                chosenConceptId={state.selection.finalConceptId}
+                lockedAspects={state.selection.lockedAspects}
+                resolvers={conceptNameResolvers}
+                onChoose={handleChooseConcept}
+                onReview={handleReviewConcept}
+                onToggleLock={handleToggleLock}
+                onRegenerate={handleRegenerateConcepts}
+              />
             </div>
           )}
 

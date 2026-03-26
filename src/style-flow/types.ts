@@ -114,6 +114,16 @@ export interface StyleSelection {
   buttonStyleId: string | null;
   /** Selected navigation style ID (step 5) */
   navigationStyleId: string | null;
+  /**
+   * The concept chosen from the comparison panel (Phase 4 – #189).
+   * When set, the individual step selections are pre-populated from this concept.
+   */
+  finalConceptId: string | null;
+  /**
+   * Aspects locked before generating new concept variations (Phase 4 – #188).
+   * Locked aspects are held constant across all generated variants.
+   */
+  lockedAspects: LockableAspect[];
 }
 
 // ── Export Package ────────────────────────────────────────────────────────────
@@ -197,6 +207,41 @@ export interface NavigationStyle {
   variant: NavigationVariant;
 }
 
+// ── Concept (Phase 4 – #188) ──────────────────────────────────────────────────
+
+/**
+ * A fully resolved style concept that bundles a colour recommendation with
+ * pre-selected typography, button, and navigation choices.
+ * Multiple distinct concepts are generated from the user's seeds and
+ * presented in the comparison panel.
+ */
+export interface StyleConcept {
+  /** Unique identifier for this concept */
+  id: string;
+  /** Human-readable concept name, e.g. "Ocean Bold" */
+  name: string;
+  /** Short tagline describing the concept's character */
+  tagline: string;
+  /** The colour recommendation that forms the visual base */
+  recommendation: StyleRecommendation;
+  /** Pre-selected typography pairing ID */
+  typographyPairingId: string;
+  /** Pre-selected button style ID */
+  buttonStyleId: string;
+  /** Pre-selected navigation style ID */
+  navigationStyleId: string;
+}
+
+/** Per-concept review status in the comparison panel (Phase 4 – #189) */
+export type ConceptReviewStatus = 'unseen' | 'viewed' | 'favorited' | 'shortlisted';
+
+/**
+ * Aspects of a style that can be "locked" before regenerating concept
+ * variations. Locked aspects remain constant across all generated variants.
+ * Phase 4 – #188
+ */
+export type LockableAspect = 'recommendation' | 'typography' | 'buttons' | 'navigation';
+
 // ── Journey ───────────────────────────────────────────────────────────────────
 
 /** Identifiers for each step in the style journey */
@@ -241,6 +286,17 @@ export interface JourneyState {
   seeds: StyleSeed | null;
   /** Available recommendations derived from seeds */
   recommendations: StyleRecommendation[];
+  /**
+   * Full style concepts generated for the comparison step (Phase 4 – #188).
+   * Each concept bundles a colour recommendation with pre-chosen typography,
+   * button style, and navigation style.
+   */
+  concepts: StyleConcept[];
+  /**
+   * Per-concept review status keyed by concept ID (Phase 4 – #189).
+   * Tracks which concepts have been viewed, favorited, or shortlisted.
+   */
+  conceptReviews: Record<string, ConceptReviewStatus>;
   /** User's current selections */
   selection: StyleSelection;
   /** Final export package (only present after completion) */
