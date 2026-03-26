@@ -129,7 +129,7 @@ export interface StyleSelection {
 // ── Export Package ────────────────────────────────────────────────────────────
 
 /** Format options for the exported style package */
-export type ExportFormat = 'css-variables' | 'json' | 'tailwind-config';
+export type ExportFormat = 'css-variables' | 'json' | 'tailwind-config' | 'react-tailwind';
 
 /**
  * The final exportable artifact produced at the end of the journey.
