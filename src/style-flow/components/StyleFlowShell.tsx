@@ -30,6 +30,10 @@ import { NavigationStylePanel, NAVIGATION_STYLES } from './NavigationStylePanel'
 import { ConceptComparisonPanel } from './ConceptComparisonPanel';
 import { generateConcepts } from '../conceptGenerator';
 import type { ConceptGeneratorOptions } from '../conceptGenerator';
+import { exportConceptAsPng } from '../imageExport';
+import { buildCanvasScene } from '../canvasHandoff';
+import { buildReactTailwindPackage } from '../codeExport';
+import type { LayoutSpec } from '../../layout-schema';
 
 // ── Mood & industry options ───────────────────────────────────────────────────
 
@@ -171,9 +175,15 @@ interface StyleFlowShellProps {
   machine: StyleFlowStateMachine;
   /** Called when the shell should close (journey complete or dismissed) */
   onClose: () => void;
+  /**
+   * Optional callback invoked when the user clicks "Open in Canvas".
+   * Receives the generated LayoutSpec scene derived from the chosen concept.
+   * Phase 5 (#192)
+   */
+  onHandoffToCanvas?: (scene: LayoutSpec) => void;
 }
 
-export function StyleFlowShell({ machine, onClose }: StyleFlowShellProps) {
+export function StyleFlowShell({ machine, onClose, onHandoffToCanvas }: StyleFlowShellProps) {
   const [state, setState] = useState(() => machine.getState());
   const stepStartRef = useRef<number>(Date.now());
   const journeyStartRef = useRef<number>(Date.now());
@@ -387,6 +397,71 @@ export function StyleFlowShell({ machine, onClose }: StyleFlowShellProps) {
     },
     [machine, state],
   );
+
+  // ── Phase 5 handlers ────────────────────────────────────────────────────────
+
+  /** Export the chosen concept's preview as a PNG download. (#191) */
+  const handleExportPng = useCallback(() => {
+    const chosenConcept = state.concepts.find(
+      (c) => c.id === state.selection.finalConceptId,
+    ) ?? state.concepts[0];
+    if (!chosenConcept) return;
+    exportConceptAsPng(chosenConcept);
+    trackExportTriggered(state.id, 'png');
+  }, [state]);
+
+  /** Generate and download a React + Tailwind starter package. (#193) */
+  const handleExportReactTailwind = useCallback(() => {
+    const chosenConcept = state.concepts.find(
+      (c) => c.id === state.selection.finalConceptId,
+    ) ?? state.concepts[0];
+    if (!chosenConcept) return;
+
+    const files = buildReactTailwindPackage(chosenConcept, state.exportPackage);
+    // Download each file as individual text files. In a production build this
+    // would be bundled into a ZIP, but we keep it dependency-free here.
+    Object.entries(files).forEach(([filename, content]) => {
+      const blob = new Blob([content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    // Persist the react-tailwind output in the export package outputs.
+    if (state.exportPackage) {
+      machine.setExportPackage({
+        ...state.exportPackage,
+        outputs: {
+          ...state.exportPackage.outputs,
+          'react-tailwind': Object.entries(files)
+            .map(([fn, c]) => `// ── ${fn} ──\n${c}`)
+            .join('\n\n'),
+        },
+      });
+    }
+
+    trackExportTriggered(state.id, 'react-tailwind');
+  }, [machine, state]);
+
+  /** Translate the chosen concept to a canvas scene and hand off. (#192) */
+  const handleHandoffToCanvas = useCallback(() => {
+    if (!onHandoffToCanvas) return;
+    const chosenConcept = state.concepts.find(
+      (c) => c.id === state.selection.finalConceptId,
+    ) ?? state.concepts[0];
+    if (!chosenConcept) return;
+
+    const btnStyle = BUTTON_STYLES.find((b) => b.id === state.selection.buttonStyleId) ?? null;
+    const navStyle = NAVIGATION_STYLES.find((n) => n.id === state.selection.navigationStyleId) ?? null;
+
+    const scene = buildCanvasScene(chosenConcept, btnStyle, navStyle);
+    onHandoffToCanvas(scene);
+    trackExportTriggered(state.id, 'canvas-handoff');
+    onClose();
+  }, [onHandoffToCanvas, state, onClose]);
 
   const toggleMood = (mood: StyleMood) => {
     setSelectedMoods((prev) =>
@@ -740,7 +815,48 @@ export function StyleFlowShell({ machine, onClose }: StyleFlowShellProps) {
                     </button>
                   );
                 })}
+
+                {/* Phase 5 (#193): React + Tailwind starter package */}
+                <button
+                  type="button"
+                  onClick={handleExportReactTailwind}
+                  disabled={!state.selection.finalConceptId && state.concepts.length === 0}
+                  className="text-left rounded-xl border p-4 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 bg-white/[0.06] border-white/10 hover:bg-white/[0.1] hover:border-white/25 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <i className="fa-brands fa-react text-cyan-400 text-sm" />
+                    <span className="text-sm font-medium text-white">React + Tailwind</span>
+                  </div>
+                  <p className="text-[10px] text-white/40 font-mono">Starter files with design tokens</p>
+                </button>
+
+                {/* Phase 5 (#191): PNG preview export */}
+                <button
+                  type="button"
+                  onClick={handleExportPng}
+                  disabled={!state.selection.finalConceptId && state.concepts.length === 0}
+                  className="text-left rounded-xl border p-4 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 bg-white/[0.06] border-white/10 hover:bg-white/[0.1] hover:border-white/25 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <i className="fa-solid fa-image text-cyan-400 text-sm" />
+                    <span className="text-sm font-medium text-white">Preview PNG</span>
+                  </div>
+                  <p className="text-[10px] text-white/40 font-mono">Download concept as PNG image</p>
+                </button>
               </div>
+
+              {/* Phase 5 (#192): Canvas handoff */}
+              {onHandoffToCanvas && (
+                <button
+                  type="button"
+                  onClick={handleHandoffToCanvas}
+                  disabled={!state.selection.finalConceptId && state.concepts.length === 0}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-white/20 bg-white/[0.06] hover:bg-white/[0.1] text-white text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <i className="fa-solid fa-arrow-up-right-from-square text-cyan-400" />
+                  Open in Canvas
+                </button>
+              )}
 
               {/* Preview of generated output */}
               {state.exportPackage && (
@@ -748,14 +864,16 @@ export function StyleFlowShell({ machine, onClose }: StyleFlowShellProps) {
                   <p className="text-[11px] font-semibold text-white/40 uppercase tracking-wider mb-2">
                     Output preview
                   </p>
-                  {Object.entries(state.exportPackage.outputs).map(([fmt, content]) => (
-                    <pre
-                      key={fmt}
-                      className="bg-black/30 rounded-lg p-3 text-[10px] text-cyan-300 font-mono overflow-auto max-h-48"
-                    >
-                      {content}
-                    </pre>
-                  ))}
+                  {Object.entries(state.exportPackage.outputs)
+                    .filter(([fmt]) => fmt !== 'react-tailwind')
+                    .map(([fmt, content]) => (
+                      <pre
+                        key={fmt}
+                        className="bg-black/30 rounded-lg p-3 text-[10px] text-cyan-300 font-mono overflow-auto max-h-48"
+                      >
+                        {content}
+                      </pre>
+                    ))}
                 </div>
               )}
             </div>
