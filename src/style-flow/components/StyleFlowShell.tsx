@@ -23,13 +23,13 @@ import {
   trackExportTriggered,
 } from '../telemetry';
 import { StepProgress } from './StepProgress';
-import { StyleCard } from './StyleCard';
 import { PreviewScaffold } from './PreviewScaffold';
 import { TypographyPanel, TYPOGRAPHY_PAIRINGS } from './TypographyPanel';
 import { ButtonStylePanel, BUTTON_STYLES } from './ButtonStylePanel';
 import { NavigationStylePanel, NAVIGATION_STYLES } from './NavigationStylePanel';
 import { ConceptComparisonPanel } from './ConceptComparisonPanel';
 import { generateConcepts } from '../conceptGenerator';
+import type { ConceptGeneratorOptions } from '../conceptGenerator';
 
 // ── Mood & industry options ───────────────────────────────────────────────────
 
@@ -255,14 +255,6 @@ export function StyleFlowShell({ machine, onClose }: StyleFlowShellProps) {
     onClose();
   }, [machine, onClose]);
 
-  const handleSelectRecommendation = useCallback(
-    (recId: string) => {
-      machine.selectRecommendation(recId);
-      trackRecommendationSelected(state.id, recId);
-    },
-    [machine, state.id],
-  );
-
   // ── Phase 4 handlers ────────────────────────────────────────────────────────
 
   const handleChooseConcept = useCallback(
@@ -289,7 +281,7 @@ export function StyleFlowShell({ machine, onClose }: StyleFlowShellProps) {
 
   const handleRegenerateConcepts = useCallback(() => {
     if (!state.seeds) return;
-    const lockedValues: Parameters<typeof generateConcepts>[2]['lockedValues'] = {};
+    const lockedValues: ConceptGeneratorOptions['lockedValues'] = {};
     if (state.selection.lockedAspects.includes('recommendation') && state.selection.recommendationId) {
       const rec = state.recommendations.find((r) => r.id === state.selection.recommendationId);
       if (rec) lockedValues.recommendation = rec;
