@@ -8,10 +8,12 @@ import type {
   JourneyStatus,
   JourneyStep,
   JourneyStepId,
+  StyleConcept,
   StyleExportPackage,
   StyleRecommendation,
   StyleSeed,
   StyleSelection,
+  ConceptReviewStatus,
 } from './types';
 
 // ── Step definitions ──────────────────────────────────────────────────────────
@@ -80,8 +82,8 @@ function validateSeeds(seeds: StyleSeed | null): ValidationResult {
 }
 
 function validateRecommendations(selection: StyleSelection): ValidationResult {
-  if (!selection.recommendationId) {
-    return 'Please choose a recommendation before continuing.';
+  if (!selection.finalConceptId && !selection.recommendationId) {
+    return 'Please choose a concept or recommendation before continuing.';
   }
   return null;
 }
@@ -134,12 +136,16 @@ function makeInitialState(id: string): JourneyState {
     completedSteps: [],
     seeds: null,
     recommendations: [],
+    concepts: [],
+    conceptReviews: {},
     selection: {
       recommendationId: null,
       tokenOverrides: {},
       typographyPairingId: null,
       buttonStyleId: null,
       navigationStyleId: null,
+      finalConceptId: null,
+      lockedAspects: [],
     },
     exportPackage: null,
     startedAt: now,
@@ -322,6 +328,52 @@ export class StyleFlowStateMachine {
     this.update({
       selection: { ...this.state.selection, navigationStyleId: styleId },
     });
+  }
+
+  // ── Phase 4: Concept generation & review (#188, #189) ────────────────────
+
+  /** Store generated style concepts for the comparison panel (step 2) */
+  setConcepts(concepts: StyleConcept[]): void {
+    this.update({ concepts });
+  }
+
+  /**
+   * Update the review status of a specific concept.
+   * Use 'favorited' or 'shortlisted' to highlight preferred options,
+   * or 'viewed' to mark a concept as seen.
+   */
+  reviewConcept(conceptId: string, status: ConceptReviewStatus): void {
+    this.update({
+      conceptReviews: { ...this.state.conceptReviews, [conceptId]: status },
+    });
+  }
+
+  /**
+   * Choose a concept as the final selection.
+   * Pre-populates typography, button style, and navigation style from the concept
+   * and sets both `finalConceptId` and `recommendationId` for downstream steps.
+   */
+  chooseConcept(concept: StyleConcept): void {
+    this.update({
+      conceptReviews: { ...this.state.conceptReviews, [concept.id]: 'shortlisted' },
+      selection: {
+        ...this.state.selection,
+        finalConceptId: concept.id,
+        recommendationId: concept.recommendation.id,
+        typographyPairingId: concept.typographyPairingId,
+        buttonStyleId: concept.buttonStyleId,
+        navigationStyleId: concept.navigationStyleId,
+      },
+    });
+  }
+
+  /** Toggle a lockable aspect for concept variation generation (step 2) */
+  toggleLockedAspect(aspect: import('./types').LockableAspect): void {
+    const current = this.state.selection.lockedAspects;
+    const next = current.includes(aspect)
+      ? current.filter((a) => a !== aspect)
+      : [...current, aspect];
+    this.update({ selection: { ...this.state.selection, lockedAspects: next } });
   }
 
   /** Store the generated export package (step 7) */

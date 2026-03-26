@@ -2,6 +2,7 @@
  * Tests for the Style Flow frontend shell components
  * Phase 1 (#176)
  * Phase 3 (#184, #185, #186): Typography, button, and navigation panels
+ * Phase 4 (#188, #189): Concept generation and comparison
  */
 
 import { describe, it, expect, vi } from 'vitest';
@@ -15,8 +16,9 @@ import { PreviewScaffold } from './PreviewScaffold';
 import { TypographyPanel, TYPOGRAPHY_PAIRINGS } from './TypographyPanel';
 import { ButtonStylePanel, BUTTON_STYLES } from './ButtonStylePanel';
 import { NavigationStylePanel, NAVIGATION_STYLES } from './NavigationStylePanel';
+import { ConceptComparisonPanel } from './ConceptComparisonPanel';
 import { JOURNEY_STEPS } from '../journey';
-import type { StyleRecommendation } from '../types';
+import type { StyleRecommendation, StyleConcept } from '../types';
 
 const MOCK_RECOMMENDATION: StyleRecommendation = {
   id: 'rec-1',
@@ -387,5 +389,291 @@ describe('PreviewScaffold (Phase 3 overrides)', () => {
     );
     const cta = container.querySelector('[style*="9999px"]');
     expect(cta).toBeTruthy();
+  });
+});
+
+// ── ConceptComparisonPanel (Phase 4 – #188, #189) ─────────────────────────────
+
+const MOCK_CONCEPT: StyleConcept = {
+  id: 'concept-minimal-technology-0',
+  name: 'Clean Vision',
+  tagline: 'A minimal, technology-focused style.',
+  recommendation: MOCK_RECOMMENDATION,
+  typographyPairingId: 'modern-sans',
+  buttonStyleId: 'rounded',
+  navigationStyleId: 'top-bar',
+};
+
+const MOCK_CONCEPT_2: StyleConcept = {
+  id: 'concept-minimal-technology-1',
+  name: 'Crisp Signal',
+  tagline: 'A minimal, technology-focused style with distinct character.',
+  recommendation: { ...MOCK_RECOMMENDATION, id: 'rec-2', name: 'Crisp Signal', confidence: 0.78 },
+  typographyPairingId: 'display-bold',
+  buttonStyleId: 'pill',
+  navigationStyleId: 'sidebar',
+};
+
+const MOCK_RESOLVERS = {
+  typographyName: (id: string) => id,
+  buttonName: (id: string) => id,
+  navigationName: (id: string) => id,
+};
+
+describe('ConceptComparisonPanel', () => {
+  it('renders all concept names', () => {
+    render(
+      <ConceptComparisonPanel
+        concepts={[MOCK_CONCEPT, MOCK_CONCEPT_2]}
+        conceptReviews={{}}
+        chosenConceptId={null}
+        lockedAspects={[]}
+        resolvers={MOCK_RESOLVERS}
+        onChoose={vi.fn()}
+        onReview={vi.fn()}
+        onToggleLock={vi.fn()}
+        onRegenerate={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('Clean Vision')).toBeTruthy();
+    expect(screen.getByText('Crisp Signal')).toBeTruthy();
+  });
+
+  it('renders a Regenerate button', () => {
+    render(
+      <ConceptComparisonPanel
+        concepts={[MOCK_CONCEPT]}
+        conceptReviews={{}}
+        chosenConceptId={null}
+        lockedAspects={[]}
+        resolvers={MOCK_RESOLVERS}
+        onChoose={vi.fn()}
+        onReview={vi.fn()}
+        onToggleLock={vi.fn()}
+        onRegenerate={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('button', { name: /regenerate/i })).toBeTruthy();
+  });
+
+  it('calls onRegenerate when the Regenerate button is clicked', () => {
+    const onRegenerate = vi.fn();
+    render(
+      <ConceptComparisonPanel
+        concepts={[MOCK_CONCEPT]}
+        conceptReviews={{}}
+        chosenConceptId={null}
+        lockedAspects={[]}
+        resolvers={MOCK_RESOLVERS}
+        onChoose={vi.fn()}
+        onReview={vi.fn()}
+        onToggleLock={vi.fn()}
+        onRegenerate={onRegenerate}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /regenerate/i }));
+    expect(onRegenerate).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls onChoose with the concept when the Choose button is clicked', () => {
+    const onChoose = vi.fn();
+    render(
+      <ConceptComparisonPanel
+        concepts={[MOCK_CONCEPT]}
+        conceptReviews={{}}
+        chosenConceptId={null}
+        lockedAspects={[]}
+        resolvers={MOCK_RESOLVERS}
+        onChoose={onChoose}
+        onReview={vi.fn()}
+        onToggleLock={vi.fn()}
+        onRegenerate={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: `Choose ${MOCK_CONCEPT.name}` }));
+    expect(onChoose).toHaveBeenCalledWith(MOCK_CONCEPT);
+  });
+
+  it('marks the chosen concept with "Chosen" label', () => {
+    render(
+      <ConceptComparisonPanel
+        concepts={[MOCK_CONCEPT]}
+        conceptReviews={{}}
+        chosenConceptId={MOCK_CONCEPT.id}
+        lockedAspects={[]}
+        resolvers={MOCK_RESOLVERS}
+        onChoose={vi.fn()}
+        onReview={vi.fn()}
+        onToggleLock={vi.fn()}
+        onRegenerate={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('Chosen')).toBeTruthy();
+  });
+
+  it('calls onReview with "favorited" when the star button is clicked', () => {
+    const onReview = vi.fn();
+    render(
+      <ConceptComparisonPanel
+        concepts={[MOCK_CONCEPT]}
+        conceptReviews={{}}
+        chosenConceptId={null}
+        lockedAspects={[]}
+        resolvers={MOCK_RESOLVERS}
+        onChoose={vi.fn()}
+        onReview={onReview}
+        onToggleLock={vi.fn()}
+        onRegenerate={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /add to favourites/i }));
+    expect(onReview).toHaveBeenCalledWith(MOCK_CONCEPT.id, 'favorited');
+  });
+
+  it('calls onReview with "shortlisted" when the bookmark button is clicked', () => {
+    const onReview = vi.fn();
+    render(
+      <ConceptComparisonPanel
+        concepts={[MOCK_CONCEPT]}
+        conceptReviews={{}}
+        chosenConceptId={null}
+        lockedAspects={[]}
+        resolvers={MOCK_RESOLVERS}
+        onChoose={vi.fn()}
+        onReview={onReview}
+        onToggleLock={vi.fn()}
+        onRegenerate={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /add to shortlist/i }));
+    expect(onReview).toHaveBeenCalledWith(MOCK_CONCEPT.id, 'shortlisted');
+  });
+
+  it('shows shortlist summary when concepts are shortlisted', () => {
+    render(
+      <ConceptComparisonPanel
+        concepts={[MOCK_CONCEPT, MOCK_CONCEPT_2]}
+        conceptReviews={{ [MOCK_CONCEPT.id]: 'shortlisted' }}
+        chosenConceptId={null}
+        lockedAspects={[]}
+        resolvers={MOCK_RESOLVERS}
+        onChoose={vi.fn()}
+        onReview={vi.fn()}
+        onToggleLock={vi.fn()}
+        onRegenerate={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(/1 concept shortlisted/i)).toBeTruthy();
+  });
+
+  it('renders lock toggle buttons for all four aspects', () => {
+    render(
+      <ConceptComparisonPanel
+        concepts={[MOCK_CONCEPT]}
+        conceptReviews={{}}
+        chosenConceptId={null}
+        lockedAspects={[]}
+        resolvers={MOCK_RESOLVERS}
+        onChoose={vi.fn()}
+        onReview={vi.fn()}
+        onToggleLock={vi.fn()}
+        onRegenerate={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('button', { name: /lock colours/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /lock type/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /lock buttons/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /lock nav/i })).toBeTruthy();
+  });
+
+  it('calls onToggleLock with the correct aspect', () => {
+    const onToggleLock = vi.fn();
+    render(
+      <ConceptComparisonPanel
+        concepts={[MOCK_CONCEPT]}
+        conceptReviews={{}}
+        chosenConceptId={null}
+        lockedAspects={[]}
+        resolvers={MOCK_RESOLVERS}
+        onChoose={vi.fn()}
+        onReview={vi.fn()}
+        onToggleLock={onToggleLock}
+        onRegenerate={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /lock type/i }));
+    expect(onToggleLock).toHaveBeenCalledWith('typography');
+  });
+
+  it('shows empty state when no concepts are provided', () => {
+    render(
+      <ConceptComparisonPanel
+        concepts={[]}
+        conceptReviews={{}}
+        chosenConceptId={null}
+        lockedAspects={[]}
+        resolvers={MOCK_RESOLVERS}
+        onChoose={vi.fn()}
+        onReview={vi.fn()}
+        onToggleLock={vi.fn()}
+        onRegenerate={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(/no concepts generated/i)).toBeTruthy();
+  });
+});
+
+// ── StyleFlowStateMachine Phase 4 mutations ───────────────────────────────────
+
+describe('StyleFlowStateMachine (Phase 4)', () => {
+  it('setConcepts() stores concepts in state', () => {
+    const machine = new StyleFlowStateMachine('test-phase4');
+    machine.setConcepts([MOCK_CONCEPT, MOCK_CONCEPT_2]);
+    expect(machine.getState().concepts).toHaveLength(2);
+  });
+
+  it('reviewConcept() stores concept review status', () => {
+    const machine = new StyleFlowStateMachine('test-phase4-review');
+    machine.reviewConcept('concept-1', 'favorited');
+    expect(machine.getState().conceptReviews['concept-1']).toBe('favorited');
+  });
+
+  it('chooseConcept() sets finalConceptId and pre-populates selections', () => {
+    const machine = new StyleFlowStateMachine('test-phase4-choose');
+    machine.chooseConcept(MOCK_CONCEPT);
+    const state = machine.getState();
+    expect(state.selection.finalConceptId).toBe(MOCK_CONCEPT.id);
+    expect(state.selection.recommendationId).toBe(MOCK_CONCEPT.recommendation.id);
+    expect(state.selection.typographyPairingId).toBe(MOCK_CONCEPT.typographyPairingId);
+    expect(state.selection.buttonStyleId).toBe(MOCK_CONCEPT.buttonStyleId);
+    expect(state.selection.navigationStyleId).toBe(MOCK_CONCEPT.navigationStyleId);
+  });
+
+  it('chooseConcept() marks the concept as shortlisted', () => {
+    const machine = new StyleFlowStateMachine('test-phase4-shortlist');
+    machine.chooseConcept(MOCK_CONCEPT);
+    expect(machine.getState().conceptReviews[MOCK_CONCEPT.id]).toBe('shortlisted');
+  });
+
+  it('toggleLockedAspect() adds a new locked aspect', () => {
+    const machine = new StyleFlowStateMachine('test-phase4-lock');
+    machine.toggleLockedAspect('typography');
+    expect(machine.getState().selection.lockedAspects).toContain('typography');
+  });
+
+  it('toggleLockedAspect() removes an already-locked aspect', () => {
+    const machine = new StyleFlowStateMachine('test-phase4-unlock');
+    machine.toggleLockedAspect('buttons');
+    machine.toggleLockedAspect('buttons');
+    expect(machine.getState().selection.lockedAspects).not.toContain('buttons');
+  });
+
+  it('canAdvance() is true from recommendations step after chooseConcept()', () => {
+    const machine = new StyleFlowStateMachine('test-phase4-advance');
+    machine.start();
+    machine.updateSeeds({ moods: ['minimal'], industry: 'technology' });
+    machine.advance(); // → recommendations
+    machine.chooseConcept(MOCK_CONCEPT);
+    expect(machine.canAdvance()).toBe(true);
   });
 });
