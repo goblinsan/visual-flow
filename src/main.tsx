@@ -8,7 +8,6 @@ import StyleFlowTestPage from './StyleFlowTestPage'
 import { MobileFlowShell } from './mobile/MobileFlowShell'
 import { MobileGate } from './mobile/MobileGate'
 import { useMobile } from './hooks/useMobile'
-import type { MobileDesignSnapshot } from './mobile/types'
 import { saveMobileSnapshot } from './utils/persistence'
 
 // Route based on URL
@@ -37,13 +36,8 @@ function Root() {
   if (isTestPage)  return <ProposalsTestPage />;
   if (isStyleFlowTest) return <StyleFlowTestPage />;
 
-  // Issue #211: persist the snapshot so the desktop editor can pick it up
-  const handleMobileComplete = (snapshot: MobileDesignSnapshot) => {
-    saveMobileSnapshot(snapshot);
-  };
-
   if (forceMobile || isMobile) {
-    return <MobileFlowShell onComplete={handleMobileComplete} />;
+    return <MobileFlowShell onComplete={(snapshot) => saveMobileSnapshot(snapshot)} />;
   }
 
   // Issue #209: MobileGate ensures canvas never renders on mobile even if

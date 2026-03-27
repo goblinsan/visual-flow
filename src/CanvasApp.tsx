@@ -276,18 +276,18 @@ export default function CanvasApp() {
 
   const handleApplyMobileHandoff = useCallback(() => {
     if (!mobileSnapshot) return;
+    // Pass typography into applyPalette so the theme state is updated atomically
     const newTheme = applyPalette(
       [mobileSnapshot.primaryColor, mobileSnapshot.accentColor],
       'light',
-      { name: `Mobile – ${mobileSnapshot.mood}` },
+      {
+        name: `Mobile – ${mobileSnapshot.mood}`,
+        typography: { headingFont: mobileSnapshot.headingFont, bodyFont: mobileSnapshot.bodyFont },
+      },
     );
-    updateTypography({ headingFont: mobileSnapshot.headingFont, bodyFont: mobileSnapshot.bodyFont });
-    setSpec(prev => bindAndApplyTheme(prev, {
-      ...newTheme,
-      typography: { ...newTheme.typography, headingFont: mobileSnapshot.headingFont, bodyFont: mobileSnapshot.bodyFont },
-    }));
+    setSpec(prev => bindAndApplyTheme(prev, newTheme));
     dismissMobileHandoff();
-  }, [mobileSnapshot, applyPalette, updateTypography, setSpec, dismissMobileHandoff]);
+  }, [mobileSnapshot, applyPalette, setSpec, dismissMobileHandoff]);
 
   const handleViewportChange = useCallback((newViewport: { scale: number; x: number; y: number }) => {
     setViewport(newViewport);
