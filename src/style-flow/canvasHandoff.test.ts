@@ -95,7 +95,7 @@ describe('buildCanvasScene', () => {
     expect(spec.root.children.length).toBeGreaterThan(0);
   });
 
-  it('includes a colour swatch rect for each swatch in the recommendation', () => {
+  it('includes a color swatch rect for each swatch in the recommendation', () => {
     const spec = buildCanvasScene(MOCK_CONCEPT);
     const swatchRects = spec.root.children.filter(
       (n) => n.type === 'rect' && (n.id as string).includes('swatch') && !(n.id as string).includes('nav'),

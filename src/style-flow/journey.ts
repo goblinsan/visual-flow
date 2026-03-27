@@ -23,7 +23,7 @@ export const JOURNEY_STEPS: readonly JourneyStep[] = [
     id: 'seeds',
     order: 1,
     title: 'Your Style Seeds',
-    description: 'Tell us about the mood, industry, and colours that inspire you.',
+    description: 'Tell us about the mood, industry, and colors that inspire you.',
     optional: false,
   },
   {
@@ -57,8 +57,8 @@ export const JOURNEY_STEPS: readonly JourneyStep[] = [
   {
     id: 'customisation',
     order: 6,
-    title: 'Customise',
-    description: 'Fine-tune colours, typography, and other tokens.',
+    title: 'Customize',
+    description: 'Fine-tune colors, typography, and other tokens.',
     optional: true,
   },
   {

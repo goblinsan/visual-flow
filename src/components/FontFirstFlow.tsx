@@ -7,7 +7,7 @@
  *  1. The user browses curated font groups, each associated with a personality
  *     (serif, sans-serif, monospace, display) and suggested moods.
  *  2. Selecting a font group shows a live typographic preview and infers
- *     compatible moods and a suggested colour palette direction.
+ *     compatible moods and a suggested color palette direction.
  *  3. The caller receives the font choice and inferred moods via
  *     `onApplyFont` and can use them to pre-fill StyleSeed fields.
  *
@@ -38,7 +38,7 @@ export interface FontEntry {
   suggestedMoods: StyleMood[];
   /** Sample text shown in the preview */
   sampleText: string;
-  /** Suggested base colours that complement the font's personality */
+  /** Suggested base colors that complement the font's personality */
   suggestedColors: string[];
 }
 
@@ -292,7 +292,7 @@ export function FontFirstFlow({
                   </div>
                   {/* Description */}
                   <p className="text-[9px] text-gray-500 mt-0.5 leading-tight">{entry.description}</p>
-                  {/* Colour suggestions */}
+                  {/* Color suggestions */}
                   <SwatchStrip colors={entry.suggestedColors} />
                 </div>
 

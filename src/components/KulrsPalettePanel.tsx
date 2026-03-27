@@ -58,7 +58,7 @@ function resolveTheme(mode: ThemeMode, customBg: string): ThemeColors {
   return { pageBg: '#f9fafb', cardBg: '#ffffff', textPrimary: '#0f172a', textSecondary: '#64748b', border: '#e2e8f0', isDark: false };
 }
 
-/** Hex colours that are "neutral" across both theme variants. */
+/** Hex colors that are "neutral" across both theme variants. */
 const LIGHT_NEUTRALS = new Set([
   '#f9fafb', '#f8fafc', '#f1f5f9', '#ffffff', '#fff', '#e5e7eb',
   '#e2e8f0', '#d1d5db', '#0f172a', '#1f2937', '#1a1a2e', '#64748b',
@@ -75,8 +75,8 @@ function normalise(hex: string): string {
   return h;
 }
 
-/** True if a colour is "neutral" (a known light or dark theme scaffold colour
- *  as opposed to a vibrant palette colour the user chose). */
+/** True if a color is "neutral" (a known light or dark theme scaffold color
+ *  as opposed to a vibrant palette color the user chose). */
 function isNeutral(hex: string): boolean {
   const n = normalise(hex);
   return LIGHT_NEUTRALS.has(n) || DARK_NEUTRALS.has(n);
@@ -166,7 +166,7 @@ function applyThemeToSpec(spec: LayoutSpec, theme: ThemeColors): LayoutSpec {
 // ---------------------------------------------------------------------------
 
 export interface KulrsPalettePanelProps {
-  /** Called when the user clicks a swatch — colour is a hex string. */
+  /** Called when the user clicks a swatch — color is a hex string. */
   onPickColor: (hex: string) => void;
   /** Optional: apply to the selected node's fill immediately. */
   onApplyFill?: (hex: string) => void;

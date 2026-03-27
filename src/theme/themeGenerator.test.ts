@@ -46,7 +46,7 @@ describe('generateThemeFromPalette', () => {
     expect(theme.typography).toBeDefined();
   });
 
-  it('assigns all 23 colour tokens', () => {
+  it('assigns all 23 color tokens', () => {
     const theme = generateThemeFromPalette(SAMPLE_PALETTE, 'dark');
     const tokens = Object.keys(theme.colors) as ColorTokenName[];
     expect(tokens).toHaveLength(23);
@@ -58,7 +58,7 @@ describe('generateThemeFromPalette', () => {
     expect(tokens).toContain('color.surface.card');
   });
 
-  it('produces valid hex colours for every token', () => {
+  it('produces valid hex colors for every token', () => {
     const theme = generateThemeFromPalette(SAMPLE_PALETTE, 'light');
     const hexPattern = /^#[0-9a-f]{6}$/i;
     for (const [token, value] of Object.entries(theme.colors)) {
@@ -83,9 +83,9 @@ describe('generateThemeFromPalette', () => {
     expect(lum).toBeGreaterThan(128);
   });
 
-  it('sets accent from the most saturated palette colour', () => {
+  it('sets accent from the most saturated palette color', () => {
     const theme = generateThemeFromPalette(SAMPLE_PALETTE, 'light');
-    // Accent should be one of the palette colours (the most saturated one)
+    // Accent should be one of the palette colors (the most saturated one)
     expect(SAMPLE_PALETTE).toContain(theme.colors['color.accent.primary']);
     // Verify it's not a grey — it should have notable saturation
     const [r, g, b] = hexToRgbTest(theme.colors['color.accent.primary']);
@@ -116,7 +116,7 @@ describe('generateThemeFromPalette', () => {
     expect(theme.kulrsPaletteId).toBe('sunset-012');
   });
 
-  it('handles single-colour palette gracefully', () => {
+  it('handles single-color palette gracefully', () => {
     const theme = generateThemeFromPalette(['#3b82f6'], 'dark');
     expect(Object.keys(theme.colors)).toHaveLength(23);
     for (const v of Object.values(theme.colors)) {
@@ -124,7 +124,7 @@ describe('generateThemeFromPalette', () => {
     }
   });
 
-  it('handles greyscale palette (no saturated colours)', () => {
+  it('handles grayscale palette (no saturated colors)', () => {
     const greys = ['#111111', '#555555', '#999999', '#cccccc', '#eeeeee'];
     const theme = generateThemeFromPalette(greys, 'light');
     expect(Object.keys(theme.colors)).toHaveLength(23);
@@ -155,18 +155,18 @@ describe('createDefaultTheme', () => {
 // ---------------------------------------------------------------------------
 
 describe('createNeutralTheme', () => {
-  it('returns a greyscale light theme', () => {
+  it('returns a grayscale light theme', () => {
     const theme = createNeutralTheme('light');
     expect(theme.mode).toBe('light');
     expect(theme.name).toContain('Neutral');
-    // All colours should be grey (r≈g≈b)
+    // All colors should be grey (r≈g≈b)
     for (const [, hex] of Object.entries(theme.colors)) {
       const [r, g, b] = hexToRgbTest(hex);
       expect(Math.abs(r - g) + Math.abs(g - b), `${hex} should be grey`).toBeLessThan(10);
     }
   });
 
-  it('returns a greyscale dark theme', () => {
+  it('returns a grayscale dark theme', () => {
     const theme = createNeutralTheme('dark');
     expect(theme.mode).toBe('dark');
     const bg = theme.colors['color.background.primary'];
@@ -189,7 +189,7 @@ describe('KNOWN_COLOR_BINDINGS', () => {
     const validTokens = new Set<string>(COLOR_TOKEN_NAMES);
     for (const [hex, token] of Object.entries(KNOWN_COLOR_BINDINGS)) {
       expect(hex).toMatch(/^#[0-9a-f]{6}$/i);
-      expect(validTokens.has(token), `${token} should be a valid colour token`).toBe(true);
+      expect(validTokens.has(token), `${token} should be a valid color token`).toBe(true);
     }
   });
 });
@@ -201,7 +201,7 @@ describe('KNOWN_COLOR_BINDINGS', () => {
 describe('resolveThemeBindings', () => {
   const theme = createDefaultTheme('light');
 
-  it('applies bound fill colour from theme', () => {
+  it('applies bound fill color from theme', () => {
     const node: LayoutNode = {
       type: 'rect',
       id: 'r1',
@@ -217,7 +217,7 @@ describe('resolveThemeBindings', () => {
     expect(resolved.fill).toBe(theme.colors['color.action.primary']);
   });
 
-  it('applies bound stroke colour from theme', () => {
+  it('applies bound stroke color from theme', () => {
     const node: LayoutNode = {
       type: 'rect',
       id: 'r2',
@@ -233,7 +233,7 @@ describe('resolveThemeBindings', () => {
     expect(resolved.stroke).toBe(theme.colors['color.border.primary']);
   });
 
-  it('applies bound text colour from theme', () => {
+  it('applies bound text color from theme', () => {
     const node: LayoutNode = {
       type: 'text',
       id: 't1',
@@ -329,7 +329,7 @@ describe('bindAndApplyTheme', () => {
     expect(resolved.stroke).toBe(theme.colors['color.border.primary']);
   });
 
-  it('infers text colour binding', () => {
+  it('infers text color binding', () => {
     const node: LayoutNode = {
       type: 'text',
       id: 't1',
@@ -380,7 +380,7 @@ describe('bindAndApplyTheme', () => {
     expect(resolved.fill).toBe(theme.colors['color.surface.card']);
   });
 
-  it('leaves unrecognised colours unbound', () => {
+  it('leaves unrecognized colors unbound', () => {
     const node: LayoutNode = {
       type: 'rect',
       id: 'r4',

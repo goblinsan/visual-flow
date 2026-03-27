@@ -5,7 +5,7 @@
  * Replaces the unusable canvas-based editor on mobile with a streamlined
  * guided experience:
  *
- *   1. Entry      – user picks how to start (theme / colour / font / image / template / blank)
+ *   1. Entry      – user picks how to start (theme / color / font / image / template / blank)
  *   2. Pick       – entry-specific selection screen
  *   3. Refine     – mood chips + industry picker (pre-filled from pick step)
  *   4. Components – button / card / navigation style selectors  #214
@@ -52,7 +52,7 @@ import {
 export interface MobileFlowShellProps {
   /**
    * Called when the user confirms their design at the end of the flow.
-   * Receives the assembled MobileDesignSnapshot (tokens, colours, fonts).
+   * Receives the assembled MobileDesignSnapshot (tokens, colors, fonts).
    */
   onComplete: (snapshot: MobileDesignSnapshot) => void;
 }

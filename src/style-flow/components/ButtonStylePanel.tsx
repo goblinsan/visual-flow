@@ -61,7 +61,7 @@ export const BUTTON_STYLES: ButtonStyle[] = [
 interface ButtonStylePanelProps {
   /** Currently selected button style ID, or null if none */
   selectedId: string | null;
-  /** Accent colour used in the button previews */
+  /** Accent color used in the button previews */
   accentColor?: string;
   /** Called when the user selects a button style */
   onSelect: (id: string) => void;

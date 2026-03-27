@@ -26,7 +26,7 @@ export function StyleCard({ recommendation, isSelected, onSelect }: StyleCardPro
             : 'bg-white/[0.06] border-white/10 hover:bg-white/[0.1] hover:border-white/25'
         }`}
     >
-      {/* Colour swatches preview */}
+      {/* Color swatches preview */}
       <div className="flex gap-1 mb-3 h-6 rounded-md overflow-hidden">
         {swatches.map((swatch) => (
           <div

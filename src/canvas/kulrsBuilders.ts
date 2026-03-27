@@ -125,7 +125,7 @@ export function buildTopNav(c: string[], hf: string, bf: string, t: ThemeColors)
         { id: 'bg', type: 'rect', position: { x: 0, y: 0 }, size: { width: 1200, height: canvasH }, fill: t.pageBg, stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1 },
         // Nav bar — 56px tall, full width
         { id: 'nav', type: 'rect', position: { x: 0, y: 0 }, size: { width: 1200, height: 56 }, fill: nav, stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1 },
-        // Brand text — vertically centred in 56px bar: (56-20)/2 = 18
+        // Brand text — vertically centered in 56px bar: (56-20)/2 = 18
         { id: 'nav-logo', type: 'text', text: 'Brand', variant: 'h2', fontSize: 20, fontWeight: 700, position: { x: 32, y: 18 }, size: { width: 80, height: 22 }, color: textOn(nav), fontFamily: hf },
         // Nav links
         { id: 'nav-link1', type: 'text', text: 'Home',     variant: 'body', fontSize: 14, position: { x: 160, y: 21 }, size: { width: 50, height: 16 }, color: textOn(nav), opacity: 0.8, fontFamily: bf },
@@ -172,7 +172,7 @@ export function buildLeftNav(c: string[], hf: string, bf: string, t: ThemeColors
         { id: 'sidebar-logo', type: 'text', text: 'Dashboard', variant: 'h2', fontSize: 18, fontWeight: 700, position: { x: 16, y: 24 }, size: { width: 180, height: 24 }, color: textOn(sidebar), fontFamily: hf },
         // Active nav item highlight — marginBottom 32 after logo (24+24+32=80), height 40
         { id: 'nav-active', type: 'rect', position: { x: 8, y: 80 }, size: { width: 204, height: 40 }, fill: lighten(sidebar, 0.15), stroke: undefined, strokeWidth: 0, radius: 8, opacity: 1 },
-        // Nav text centred in 40px items: (40-14)/2=13 from top of item
+        // Nav text centered in 40px items: (40-14)/2=13 from top of item
         { id: 'nav-text1', type: 'text', text: 'Overview',  variant: 'body', fontSize: 14, position: { x: 24, y: 93 },  size: { width: 150, height: 16 }, color: textOn(sidebar), fontFamily: bf },
         { id: 'nav-text2', type: 'text', text: 'Analytics', variant: 'body', fontSize: 14, position: { x: 24, y: 137 }, size: { width: 150, height: 16 }, color: lighten(textOn(sidebar), 0.3), fontFamily: bf },
         { id: 'nav-text3', type: 'text', text: 'Settings',  variant: 'body', fontSize: 14, position: { x: 24, y: 181 }, size: { width: 150, height: 16 }, color: lighten(textOn(sidebar), 0.3), fontFamily: bf },
@@ -352,7 +352,7 @@ export function buildLanding(c: string[], hf: string, bf: string, t: ThemeColors
         { id: 'hero-btn1-t', type: 'text', text: 'Get Started', variant: 'body', fontSize: 15, fontWeight: 600, position: { x: 148, y: heroY + 235 }, size: { width: 108, height: 20 }, color: textOn(primary), fontFamily: bf },
         { id: 'hero-btn2', type: 'rect', position: { x: 296, y: heroY + 222 }, size: { width: 160, height: 48 }, fill: 'transparent', stroke: primary, strokeWidth: 2, radius: 10, opacity: 1 },
         { id: 'hero-btn2-t', type: 'text', text: 'Learn More', variant: 'body', fontSize: 15, fontWeight: 600, position: { x: 324, y: heroY + 235 }, size: { width: 108, height: 20 }, color: t.isDark ? lighten(primary, 0.4) : primary, fontFamily: bf },
-        // Features section — title centred; y = featInnerY
+        // Features section — title centered; y = featInnerY
         { id: 'features-title', type: 'text', text: 'Features', variant: 'h1', fontSize: 28, fontWeight: 700, position: { x: 480, y: featInnerY }, size: { width: 240, height: 36 }, color: t.textPrimary, fontFamily: hf },
         // 3 feature cards
         ...[0, 1, 2].flatMap((i) => {

@@ -122,7 +122,7 @@ export interface ImageNode extends BaseNode, Partial<AbsoluteChild> {
   preserveAspect?: boolean;
   /** For icon images — the library icon ID so the SVG can be regenerated */
   iconId?: string;
-  /** For icon images — the fill colour baked into the SVG */
+  /** For icon images — the fill color baked into the SVG */
   fill?: string;
 }
 

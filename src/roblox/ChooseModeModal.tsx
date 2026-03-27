@@ -126,7 +126,7 @@ export function ChooseModeModal({
             </h1>
           </div>
           <p className="text-white/60 text-sm">
-            {selectedCategory ? 'Choose a template and customise your starting point.' : 'Design, prototype, and collaborate — all in one canvas.'}
+            {selectedCategory ? 'Choose a template and customize your starting point.' : 'Design, prototype, and collaborate — all in one canvas.'}
           </p>
         </div>
 

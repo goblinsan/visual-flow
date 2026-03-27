@@ -238,7 +238,7 @@ export const ${componentName}: React.FC = () => {
         </button>
       </section>
 
-      {/* Colour palette preview */}
+      {/* Color palette preview */}
       <section style={{ padding: '2rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
 ${rec.swatches
   .map(

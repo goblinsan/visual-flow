@@ -33,7 +33,7 @@ function brightness(hex: string): number {
   return (r * 299 + g * 587 + b * 114) / 1000;
 }
 
-/** Lighten a hex colour by an amount (0–1) */
+/** Lighten a hex color by an amount (0–1) */
 function lighten(hex: string, amount: number): string {
   const [r, g, b] = hexToRgb(hex);
   return rgbToHex(
@@ -43,13 +43,13 @@ function lighten(hex: string, amount: number): string {
   );
 }
 
-/** Darken a hex colour by an amount (0–1) */
+/** Darken a hex color by an amount (0–1) */
 function darken(hex: string, amount: number): string {
   const [r, g, b] = hexToRgb(hex);
   return rgbToHex(r * (1 - amount), g * (1 - amount), b * (1 - amount));
 }
 
-/** Mix two colours by ratio (0 = a, 1 = b) */
+/** Mix two colors by ratio (0 = a, 1 = b) */
 function mix(a: string, b: string, ratio: number): string {
   const [r1, g1, b1] = hexToRgb(a);
   const [r2, g2, b2] = hexToRgb(b);
@@ -333,7 +333,7 @@ export const KNOWN_COLOR_BINDINGS: Record<string, ColorTokenName> = {
   '#24292e': 'color.background.inverse',
   '#2d3748': 'color.background.inverse',
   '#2a2640': 'color.surface.overlay',
-  // Dark text colours
+  // Dark text colors
   '#0f172a': 'color.text.primary',
   '#0c4a6e': 'color.text.primary',
   '#1f2937': 'color.text.primary',
@@ -398,7 +398,7 @@ export function resolveThemeBindings(spec: LayoutSpec, theme: DesignTheme): Layo
       }
     }
 
-    // Icon images: regenerate SVG src when fill colour changes
+    // Icon images: regenerate SVG src when fill color changes
     if (node.type === 'image' && 'iconId' in node && (node as { iconId?: string }).iconId && patched.fill) {
       const imgNode = node as { src: string };
       try {
@@ -439,10 +439,10 @@ export function applyThemeToSpec(spec: LayoutSpec, theme: DesignTheme): LayoutSp
 
 /**
  * Infer theme-bindings for nodes whose fill/stroke/color match well-known
- * default colours, then resolve every binding in the tree.
+ * default colors, then resolve every binding in the tree.
  *
  * Safe to call repeatedly — nodes that already own bindings keep them,
- * and nodes whose colours no longer match any known default are left alone.
+ * and nodes whose colors no longer match any known default are left alone.
  */
 export function bindAndApplyTheme(spec: LayoutSpec, theme: DesignTheme): LayoutSpec {
   function processNode(node: LayoutNode): LayoutNode {
@@ -455,7 +455,7 @@ export function bindAndApplyTheme(spec: LayoutSpec, theme: DesignTheme): LayoutS
     const norm = (h: string) => h.toLowerCase();
 
     // Dark fills used as backgrounds should map to background.inverse, not text.primary
-    // Exception: icon images use dark fill as the icon colour → text.primary
+    // Exception: icon images use dark fill as the icon color → text.primary
     const isIconImage = node.type === 'image' && 'iconId' in node && !!(node as { iconId?: string }).iconId;
     const FILL_OVERRIDES: Record<string, ColorTokenName> = isIconImage ? {} : {
       '#111827': 'color.background.inverse',
@@ -515,11 +515,11 @@ export function bindAndApplyTheme(spec: LayoutSpec, theme: DesignTheme): LayoutS
       }
     }
 
-    // Icon images: regenerate SVG src when fill colour changes
+    // Icon images: regenerate SVG src when fill color changes
     if (node.type === 'image' && 'iconId' in node && (node as { iconId?: string }).iconId) {
       const newFill = patched.fill as string | undefined;
       if (newFill) {
-        // Decode the existing SVG data-URL, replace the fill colour, encode back
+        // Decode the existing SVG data-URL, replace the fill color, encode back
         const imgNode = node as { src: string; fill?: string };
         try {
           const decoded = decodeURIComponent(imgNode.src.replace('data:image/svg+xml;utf8,', ''));
@@ -566,9 +566,9 @@ export function createDefaultTheme(mode: 'light' | 'dark'): DesignTheme {
 }
 
 /**
- * Create a monotone greyscale theme with all tokens defined.
+ * Create a monotone grayscale theme with all tokens defined.
  * Used when the user removes/clears their palette — elements stay themed
- * but with neutral grey tones instead of colourful palette values.
+ * but with neutral grey tones instead of colorful palette values.
  */
 export function createNeutralTheme(mode: 'light' | 'dark' = 'light'): DesignTheme {
   const isDark = mode === 'dark';
@@ -596,7 +596,7 @@ export function createNeutralTheme(mode: 'light' | 'dark' = 'light'): DesignThem
     'color.action.primaryHover':   isDark ? '#8a8a8a' : '#333333',
     'color.action.secondary':      isDark ? '#525252' : '#737373',
     'color.action.secondaryHover': isDark ? '#666666' : '#666666',
-    // Status — subtle greyscale versions
+    // Status — subtle grayscale versions
     'color.status.success': isDark ? '#aaaaaa' : '#555555',
     'color.status.warning': isDark ? '#999999' : '#666666',
     'color.status.error':   isDark ? '#888888' : '#444444',

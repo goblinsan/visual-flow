@@ -50,7 +50,7 @@ describe('accessibility utilities', () => {
       expect(ratio).toBeCloseTo(21, 0);
     });
 
-    it('returns 1 for identical colours', () => {
+    it('returns 1 for identical colors', () => {
       expect(wcagContrastRatio('#ff0000', '#ff0000')).toBeCloseTo(1, 5);
     });
 

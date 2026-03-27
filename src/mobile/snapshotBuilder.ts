@@ -31,7 +31,7 @@ const MOOD_HEADING_FONTS: Partial<Record<StyleMood, string>> = {
  *
  * @param moods            One or more moods selected by the user.
  * @param industry         The industry context.
- * @param overrideColors   Colours extracted/chosen during the pick step.
+ * @param overrideColors   Colors extracted/chosen during the pick step.
  * @param overrideFont     Font family selected during the pick step.
  * @param components       Component style selections (Issue #214).
  */

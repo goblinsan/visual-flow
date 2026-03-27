@@ -313,13 +313,13 @@ export function ThemePanel({
               title={`${hex} \u2014 click to apply, drag to reorder`}
             />
           ))}
-        </div>        {/* Revert to neutral greyscale theme */}
+        </div>        {/* Revert to neutral grayscale theme */}
         {onClearTheme && (
           <button
             type="button"
             onClick={onClearTheme}
             className="mt-1.5 w-full flex items-center justify-center gap-1.5 text-[10px] text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded py-1 transition-colors"
-            title="Revert to neutral greyscale colors"
+            title="Revert to neutral grayscale colors"
           >
             <i className="fa-solid fa-circle-half-stroke text-[9px]" />
             Reset to Neutral

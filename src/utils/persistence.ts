@@ -163,7 +163,7 @@ export function setCurrentDesignName(name: string | null): void {
 
 // --- Mobile Design Snapshot Handoff (Issue #211) ---
 // Persists the snapshot produced at the end of the mobile flow so the desktop
-// editor can pick it up and apply the chosen colours + typography.
+// editor can pick it up and apply the chosen colors + typography.
 
 import type { MobileDesignSnapshot, MobileFlowSessionState } from '../mobile/types';
 

@@ -33,7 +33,7 @@ const MOCK_RECOMMENDATION: StyleRecommendation = {
     { role: 'accent', hex: '#34A853' },
   ],
   typography: { headingFont: 'Inter', bodyFont: 'Inter', baseSizePx: 16, lineHeight: 1.6 },
-  tokens: [{ name: 'color-primary', value: '#1A73E8', description: 'Primary colour' }],
+  tokens: [{ name: 'color-primary', value: '#1A73E8', description: 'Primary color' }],
 };
 
 // ── StepProgress ──────────────────────────────────────────────────────────────
@@ -52,7 +52,7 @@ describe('StepProgress', () => {
     expect(screen.getByText('Typography')).toBeTruthy();
     expect(screen.getByText('Button Style')).toBeTruthy();
     expect(screen.getByText('Navigation')).toBeTruthy();
-    expect(screen.getByText('Customise')).toBeTruthy();
+    expect(screen.getByText('Customize')).toBeTruthy();
     expect(screen.getByText('Export')).toBeTruthy();
   });
 
@@ -144,7 +144,7 @@ describe('StyleCard', () => {
     expect(screen.getByRole('button').getAttribute('aria-pressed')).toBe('false');
   });
 
-  it('renders colour swatches', () => {
+  it('renders color swatches', () => {
     const { container } = render(
       <StyleCard
         recommendation={MOCK_RECOMMENDATION}
@@ -152,7 +152,7 @@ describe('StyleCard', () => {
         onSelect={vi.fn()}
       />,
     );
-    // Should have 5 colour divs inside the swatches container
+    // Should have 5 color divs inside the swatches container
     const swatchContainer = container.querySelector('.flex.gap-1.mb-3');
     expect(swatchContainer?.children).toHaveLength(MOCK_RECOMMENDATION.swatches.length);
   });
@@ -526,7 +526,7 @@ describe('ConceptComparisonPanel', () => {
         onRegenerate={vi.fn()}
       />,
     );
-    fireEvent.click(screen.getByRole('button', { name: /add to favourites/i }));
+    fireEvent.click(screen.getByRole('button', { name: /add to favorites/i }));
     expect(onReview).toHaveBeenCalledWith(MOCK_CONCEPT.id, 'favorited');
   });
 
@@ -580,7 +580,7 @@ describe('ConceptComparisonPanel', () => {
         onRegenerate={vi.fn()}
       />,
     );
-    expect(screen.getByRole('button', { name: /lock colours/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /lock colors/i })).toBeTruthy();
     expect(screen.getByRole('button', { name: /lock type/i })).toBeTruthy();
     expect(screen.getByRole('button', { name: /lock buttons/i })).toBeTruthy();
     expect(screen.getByRole('button', { name: /lock nav/i })).toBeTruthy();

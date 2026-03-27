@@ -721,7 +721,7 @@ export function AttributesSidebar({
                       patch[prop] = activeTheme.colors[token as keyof typeof activeTheme.colors];
                     }
                   }
-                  // Icon images: regenerate SVG src when fill colour changes
+                  // Icon images: regenerate SVG src when fill color changes
                   if (node.type === 'image' && 'iconId' in node) {
                     const iconId = (node as unknown as { iconId?: string }).iconId;
                     const newFill = patch.fill as string | undefined;

@@ -1,5 +1,5 @@
 /**
- * PreviewScaffold – renders a live colour/typography preview for the
+ * PreviewScaffold – renders a live color/typography preview for the
  * currently selected style recommendation.
  * Phase 3 (#184, #185, #186): accepts optional typography pairing,
  * button style, and navigation style overrides.
@@ -166,7 +166,7 @@ export function PreviewScaffold({
             This text demonstrates how content reads with your chosen style.
           </p>
 
-          {/* Colour chips */}
+          {/* Color chips */}
           <div className="flex gap-1.5 flex-wrap">
             {swatches.map((swatch) => (
               <div key={swatch.role} className="flex items-center gap-1">

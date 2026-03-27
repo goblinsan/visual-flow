@@ -7,7 +7,7 @@
  * Determinism: concepts are derived solely from the seeds and the locked
  * aspect values, so the same inputs always produce the same output.
  *
- * Distinctness: each concept is assigned a unique combination of colour
+ * Distinctness: each concept is assigned a unique combination of color
  * palette, typography pairing, button style, and navigation style by cycling
  * through the available options in a structured way.
  */
@@ -35,7 +35,7 @@ const BUTTON_IDS = ['rounded', 'pill', 'sharp', 'ghost-border', 'minimal-link'];
 
 const NAVIGATION_IDS = ['top-bar', 'sidebar', 'tab-bar', 'floating', 'bottom-bar'];
 
-// ── Colour palettes (one per mood) ────────────────────────────────────────────
+// ── Color palettes (one per mood) ────────────────────────────────────────────
 
 type HexQuad = [string, string, string, string];
 
@@ -128,7 +128,7 @@ function buildRecommendation(
       lineHeight: 1.6,
     },
     tokens: [
-      { name: 'color-primary', value: c1, description: 'Primary brand colour' },
+      { name: 'color-primary', value: c1, description: 'Primary brand color' },
       { name: 'color-secondary', value: c2 },
       { name: 'color-accent', value: c3 },
       { name: 'color-highlight', value: c4 },
@@ -187,7 +187,7 @@ export function generateConcepts(
   const concepts: StyleConcept[] = [];
 
   for (let i = 0; i < count; i++) {
-    // ── Colour recommendation ────────────────────────────────────────────────
+    // ── Color recommendation ────────────────────────────────────────────────
     const recommendation: StyleRecommendation = locked.includes('recommendation') && lockedValues.recommendation
       ? lockedValues.recommendation
       : buildRecommendation(primaryMood, industry, i, i);

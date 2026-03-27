@@ -2,7 +2,7 @@
  * MobileTemplatePickStep
  *
  * Presents a curated set of named design presets (templates) the user can
- * select from to instantly pre-configure their colour palette, typography,
+ * select from to instantly pre-configure their color palette, typography,
  * mood and industry.  Selecting a template advances the user into the
  * component-selection step with all values pre-seeded.
  *
@@ -21,7 +21,7 @@ export interface TemplatePreset {
   icon: string;
   /** Tailwind gradient for the icon strip. */
   gradient: string;
-  /** Representative colours (primary, accent, surface). */
+  /** Representative colors (primary, accent, surface). */
   colors: [string, string, string, string];
   mood: StyleMood;
   industry: StyleIndustry;
@@ -175,7 +175,7 @@ export function MobileTemplatePickStep({ onPick, onBack }: MobileTemplatePickSte
                   <p className="text-xs text-white/45 leading-snug truncate">{preset.description}</p>
                 </div>
 
-                {/* Colour swatches */}
+                {/* Color swatches */}
                 <div className="flex gap-0.5 shrink-0">
                   {preset.colors.slice(0, 3).map((hex) => (
                     <div

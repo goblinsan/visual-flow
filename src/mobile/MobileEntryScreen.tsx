@@ -44,7 +44,7 @@ const ENTRY_CARDS: EntryCard[] = [
     id: 'color',
     icon: 'fa-solid fa-droplet',
     label: 'By Color',
-    description: 'Start with a colour you love',
+    description: 'Start with a color you love',
     gradient: 'from-pink-500 to-rose-600',
   },
   {

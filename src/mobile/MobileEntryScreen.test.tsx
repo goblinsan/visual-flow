@@ -23,7 +23,7 @@ describe('MobileEntryScreen', () => {
     render(<MobileEntryScreen onSelect={vi.fn()} />);
     expect(screen.getByText(/Pick a ready-made preset/i)).toBeInTheDocument();
     expect(screen.getByText(/Pick a mood/i)).toBeInTheDocument();
-    expect(screen.getByText(/Start with a colour/i)).toBeInTheDocument();
+    expect(screen.getByText(/Start with a color/i)).toBeInTheDocument();
     expect(screen.getByText(/Let typography set the tone/i)).toBeInTheDocument();
     expect(screen.getByText(/Extract a palette from a photo/i)).toBeInTheDocument();
     expect(screen.getByText(/Choose moods and industry yourself/i)).toBeInTheDocument();

@@ -15,7 +15,7 @@ export interface CanvasTemplate {
 
 // ---------------------------------------------------------------------------
 // themeBindings helper — each property maps a visual prop to a token name so
-// that applying a palette instantly recolours the whole design.
+// that applying a palette instantly recolors the whole design.
 // ---------------------------------------------------------------------------
 // The default hex values below are the Kulrs-neutral fallbacks (same palette
 // the fromKulrsPage uses for its light-mode previews).  Once a palette is

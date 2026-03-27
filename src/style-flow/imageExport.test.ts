@@ -46,17 +46,17 @@ describe('computeConceptLayout', () => {
     expect(layout.height).toBe(480);
   });
 
-  it('extracts surface colour from swatches', () => {
+  it('extracts surface color from swatches', () => {
     const layout = computeConceptLayout(MOCK_CONCEPT, 800, 480);
     expect(layout.surface).toBe('#FFFFFF');
   });
 
-  it('extracts primary colour from swatches', () => {
+  it('extracts primary color from swatches', () => {
     const layout = computeConceptLayout(MOCK_CONCEPT, 800, 480);
     expect(layout.primary).toBe('#1A1A2E');
   });
 
-  it('extracts text colour from swatches', () => {
+  it('extracts text color from swatches', () => {
     const layout = computeConceptLayout(MOCK_CONCEPT, 800, 480);
     expect(layout.textColor).toBe('#111111');
   });

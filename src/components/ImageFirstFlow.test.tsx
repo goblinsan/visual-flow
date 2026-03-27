@@ -138,7 +138,7 @@ describe('ImageFirstFlow', () => {
     expect(screen.getByText(/Please upload an image file/i)).toBeInTheDocument();
   });
 
-  it('displays extracted colours after a valid image is uploaded', () => {
+  it('displays extracted colors after a valid image is uploaded', () => {
     render(<ImageFirstFlow onExtractedColors={vi.fn()} />);
     const input = screen.getByLabelText('Image file input') as HTMLInputElement;
 
