@@ -134,6 +134,7 @@ export function MobileComponentStep({
                 key={opt.value}
                 type="button"
                 aria-pressed={active}
+                aria-label={opt.label}
                 onClick={() => setButtonStyle(opt.value)}
                 className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all duration-150
                   focus:outline-none focus:ring-2 focus:ring-cyan-400/50
@@ -161,6 +162,7 @@ export function MobileComponentStep({
                 key={opt.value}
                 type="button"
                 aria-pressed={active}
+                aria-label={opt.label}
                 onClick={() => setCardStyle(opt.value)}
                 className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-150
                   focus:outline-none focus:ring-2 focus:ring-cyan-400/50
@@ -191,6 +193,7 @@ export function MobileComponentStep({
                 key={opt.value}
                 type="button"
                 aria-pressed={active}
+                aria-label={opt.label}
                 onClick={() => setNavStyle(opt.value)}
                 className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-150
                   focus:outline-none focus:ring-2 focus:ring-cyan-400/50
