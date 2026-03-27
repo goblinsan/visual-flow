@@ -13,8 +13,12 @@ import {
   getSavedPalettes,
   userOwnsSavedPalette,
   saveUserPalette,
+  saveMobileSnapshot,
+  loadMobileSnapshot,
+  clearMobileSnapshot,
 } from './persistence';
 import type { DesignTheme } from '../theme/types';
+import type { MobileDesignSnapshot } from '../mobile/types';
 
 beforeEach(() => {
   localStorage.clear();
@@ -229,6 +233,55 @@ describe('saveUserPalette', () => {
     // The stored id should be prefixed (not the raw theme id)
     expect(result.id).toContain('theme-orig');
     expect(result.id).not.toBe('theme-orig');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Mobile Snapshot Handoff (Issue #211)
+// ---------------------------------------------------------------------------
+
+const SAMPLE_SNAPSHOT: MobileDesignSnapshot = {
+  primaryColor: '#1A1A2E',
+  accentColor: '#E94560',
+  headingFont: 'Inter',
+  bodyFont: 'Inter',
+  mood: 'minimal',
+  industry: 'technology',
+  tokens: {
+    'color-primary': '#1A1A2E',
+    'color-accent': '#E94560',
+    'font-heading': 'Inter',
+    'font-body': 'Inter',
+    'font-size-base': '16px',
+    'line-height-base': '1.6',
+  },
+};
+
+describe('mobile snapshot persistence', () => {
+  it('loadMobileSnapshot returns null when nothing stored', () => {
+    expect(loadMobileSnapshot()).toBeNull();
+  });
+
+  it('round-trips a snapshot via save/load', () => {
+    saveMobileSnapshot(SAMPLE_SNAPSHOT);
+    const loaded = loadMobileSnapshot();
+    expect(loaded).toEqual(SAMPLE_SNAPSHOT);
+  });
+
+  it('clearMobileSnapshot removes the stored snapshot', () => {
+    saveMobileSnapshot(SAMPLE_SNAPSHOT);
+    clearMobileSnapshot();
+    expect(loadMobileSnapshot()).toBeNull();
+  });
+
+  it('LS_KEYS.mobileSnapshot is the storage key', () => {
+    saveMobileSnapshot(SAMPLE_SNAPSHOT);
+    expect(localStorage.getItem(LS_KEYS.mobileSnapshot)).not.toBeNull();
+  });
+
+  it('loadMobileSnapshot returns null for corrupt data', () => {
+    localStorage.setItem(LS_KEYS.mobileSnapshot, '{invalid json');
+    expect(loadMobileSnapshot()).toBeNull();
   });
 });
 

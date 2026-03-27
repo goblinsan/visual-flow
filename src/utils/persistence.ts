@@ -11,6 +11,7 @@ export const LS_KEYS = {
   savedDesigns: 'vf_saved_designs',
   currentDesignName: 'vf_current_design_name',
   logLevel: 'vf:logLevel',
+  mobileSnapshot: 'vf_mobile_snapshot',
 } as const;
 
 export interface SavedDesign {
@@ -158,6 +159,39 @@ export function setCurrentDesignName(name: string | null): void {
 
 // Note: Disabled fill/stroke (represented as undefined) are NOT explicitly persisted yet.
 // A future phase may introduce explicit boolean flags or sentinel values for disabled states.
+
+// --- Mobile Design Snapshot Handoff (Issue #211) ---
+// Persists the snapshot produced at the end of the mobile flow so the desktop
+// editor can pick it up and apply the chosen colours + typography.
+
+import type { MobileDesignSnapshot } from '../mobile/types';
+
+/** Persist a mobile design snapshot so the desktop editor can import it. */
+export function saveMobileSnapshot(snapshot: MobileDesignSnapshot): void {
+  try {
+    localStorage.setItem(LS_KEYS.mobileSnapshot, JSON.stringify(snapshot));
+  } catch (err) {
+    console.warn('Failed to save mobile snapshot to localStorage:', err);
+  }
+}
+
+/** Load the pending mobile snapshot (if any). Returns null when none exists. */
+export function loadMobileSnapshot(): MobileDesignSnapshot | null {
+  try {
+    const raw = localStorage.getItem(LS_KEYS.mobileSnapshot);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object') return parsed as MobileDesignSnapshot;
+  } catch {
+    // Ignore corrupt data
+  }
+  return null;
+}
+
+/** Remove the pending mobile snapshot after it has been applied or dismissed. */
+export function clearMobileSnapshot(): void {
+  try { localStorage.removeItem(LS_KEYS.mobileSnapshot); } catch {/* ignore */}
+}
 
 // --- User Saved Palettes (per-user, keyed by userId) ---
 

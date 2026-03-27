@@ -14,6 +14,7 @@ import { useSnapSettings } from './hooks/canvas/useSnapSettings';
 import { useFlowState } from './hooks/canvas/useFlowState';
 import { useKeyboardShortcuts } from './hooks/canvas/useKeyboardShortcuts';
 import { useThemeActions } from './hooks/canvas/useThemeActions';
+import { useMobileHandoff } from './hooks/useMobileHandoff';
 import { logger } from "./utils/logger";
 import { DialogManager } from "./components/dialogs/DialogManager";
 import { findNode, updateNode } from './utils/specUtils';
@@ -46,6 +47,7 @@ import { useDesignTheme } from './theme';
 import { bindAndApplyTheme } from './theme';
 import { TEMPLATES } from './templates';
 import { getRoomIdFromURL, generateRoomId, getUserId, getDisplayName, getWebSocketUrl, buildInitialSpec } from './utils/canvasHelpers';
+import { MobileHandoffBanner } from './components/canvas/MobileHandoffBanner';
 
 export default function CanvasApp() {
   // Design mode (#142): null = not chosen yet, shown as modal on first load
@@ -268,6 +270,24 @@ export default function CanvasApp() {
   const { handleApplyPaletteAsTheme, handleClearTheme, handlePickThemeColor } = useThemeActions(
     activeTheme, setSpec, updateRectDefaults, setTextDefaults, applyPalette, setTheme, pushRecent,
   );
+
+  // Issue #211: mobile design handoff — check for a pending snapshot from the mobile flow
+  const { snapshot: mobileSnapshot, dismiss: dismissMobileHandoff } = useMobileHandoff();
+
+  const handleApplyMobileHandoff = useCallback(() => {
+    if (!mobileSnapshot) return;
+    // Pass typography into applyPalette so the theme state is updated atomically
+    const newTheme = applyPalette(
+      [mobileSnapshot.primaryColor, mobileSnapshot.accentColor],
+      'light',
+      {
+        name: `Mobile – ${mobileSnapshot.mood}`,
+        typography: { headingFont: mobileSnapshot.headingFont, bodyFont: mobileSnapshot.bodyFont },
+      },
+    );
+    setSpec(prev => bindAndApplyTheme(prev, newTheme));
+    dismissMobileHandoff();
+  }, [mobileSnapshot, applyPalette, setSpec, dismissMobileHandoff]);
 
   const handleViewportChange = useCallback((newViewport: { scale: number; x: number; y: number }) => {
     setViewport(newViewport);
@@ -593,6 +613,14 @@ export default function CanvasApp() {
         setExportDialogOpen={setExportDialogOpen}
         tool={tool}
       />
+      {/* Issue #211: mobile handoff banner — shown when a mobile snapshot is pending */}
+      {mobileSnapshot && (
+        <MobileHandoffBanner
+          snapshot={mobileSnapshot}
+          onApply={handleApplyMobileHandoff}
+          onDismiss={dismissMobileHandoff}
+        />
+      )}
       {/* Dialogs */}
       <DialogManager
         shareDialogOpen={shareDialogOpen}
