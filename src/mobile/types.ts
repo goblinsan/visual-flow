@@ -6,6 +6,7 @@
  * Issue #213 – Template and preset selection screens
  * Issue #214 – Component selection and configuration steps
  * Issue #215 – Lightweight live preview and summary review
+ * Issue #217 – Define mobile flow state model and persistence rules
  */
 
 /** The entry points exposed on the mobile landing screen. */
@@ -54,4 +55,27 @@ export interface MobileDesignSnapshot {
   components?: MobileComponentSelections;
   /** Full token map (CSS-variable-name → resolved value). */
   tokens: Record<string, string>;
+}
+
+/**
+ * Persisted in-progress state for the mobile guided flow.
+ * Stored to localStorage so the user can resume a partially completed session.
+ * Issue #217 – Define mobile flow state model and persistence rules
+ */
+export interface MobileFlowSessionState {
+  /** Current step in the guided flow. */
+  step: MobileFlowStep;
+  /** Selected entry point; null while the user is still on the 'entry' screen. */
+  entry: MobileEntryPoint | null;
+  /** Colours, moods, font, and industry accumulated during the pick step. */
+  pickState: {
+    colors: string[];
+    moods: string[];
+    font: { family: string; body: string } | null;
+    industry: string | null;
+  };
+  /** Assembled snapshot; available once the components step completes. */
+  snapshot: MobileDesignSnapshot | null;
+  /** Unix epoch (ms) when this record was last written. */
+  savedAt: number;
 }

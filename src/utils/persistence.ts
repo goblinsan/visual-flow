@@ -12,6 +12,7 @@ export const LS_KEYS = {
   currentDesignName: 'vf_current_design_name',
   logLevel: 'vf:logLevel',
   mobileSnapshot: 'vf_mobile_snapshot',
+  mobileFlowSession: 'vf_mobile_flow_session',
 } as const;
 
 export interface SavedDesign {
@@ -164,7 +165,7 @@ export function setCurrentDesignName(name: string | null): void {
 // Persists the snapshot produced at the end of the mobile flow so the desktop
 // editor can pick it up and apply the chosen colours + typography.
 
-import type { MobileDesignSnapshot } from '../mobile/types';
+import type { MobileDesignSnapshot, MobileFlowSessionState } from '../mobile/types';
 
 /** Persist a mobile design snapshot so the desktop editor can import it. */
 export function saveMobileSnapshot(snapshot: MobileDesignSnapshot): void {
@@ -191,6 +192,37 @@ export function loadMobileSnapshot(): MobileDesignSnapshot | null {
 /** Remove the pending mobile snapshot after it has been applied or dismissed. */
 export function clearMobileSnapshot(): void {
   try { localStorage.removeItem(LS_KEYS.mobileSnapshot); } catch {/* ignore */}
+}
+
+// --- Mobile Flow Session (Issue #217) ---
+// Persists the in-progress guided flow state so the user can resume after
+// leaving the page or refreshing the browser.
+
+/** Persist the current in-progress mobile flow state. */
+export function saveMobileFlowSession(state: MobileFlowSessionState): void {
+  try {
+    localStorage.setItem(LS_KEYS.mobileFlowSession, JSON.stringify(state));
+  } catch (err) {
+    console.warn('Failed to save mobile flow session to localStorage:', err);
+  }
+}
+
+/** Load a previously saved mobile flow session, or null if none exists. */
+export function loadMobileFlowSession(): MobileFlowSessionState | null {
+  try {
+    const raw = localStorage.getItem(LS_KEYS.mobileFlowSession);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object') return parsed as MobileFlowSessionState;
+  } catch {
+    // Ignore corrupt data
+  }
+  return null;
+}
+
+/** Remove the saved mobile flow session (call on completion or explicit reset). */
+export function clearMobileFlowSession(): void {
+  try { localStorage.removeItem(LS_KEYS.mobileFlowSession); } catch {/* ignore */}
 }
 
 // --- User Saved Palettes (per-user, keyed by userId) ---
