@@ -56,7 +56,7 @@ export function MobileColorPickStep({ onPick, onBack }: MobileColorPickStepProps
         </button>
         <div>
           <p className="text-[11px] font-semibold text-white/40 uppercase tracking-wider">
-            Step 1 of 3
+            Step 1 of 4
           </p>
           <h2 className="text-lg font-bold leading-tight">Pick a palette</h2>
         </div>

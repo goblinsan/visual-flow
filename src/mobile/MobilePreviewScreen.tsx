@@ -3,9 +3,11 @@
  *
  * Shows a phone-frame mock-up of the assembled design system together with
  * the chosen colour palette and typography so the user can see their choices
- * before exporting.
+ * before exporting.  A compact summary review panel at the bottom lists
+ * every selection the user made throughout the guided flow.
  *
  * Issue #206 – Design the simplified selection-based workflow
+ * Issue #215 – Lightweight live preview and summary review
  */
 
 import type { MobileDesignSnapshot } from './types';
@@ -39,7 +41,7 @@ export function MobilePreviewScreen({
         </button>
         <div>
           <p className="text-[11px] font-semibold text-white/40 uppercase tracking-wider">
-            Step 3 of 3
+            Step 4 of 4
           </p>
           <h2 className="text-lg font-bold leading-tight">Preview</h2>
         </div>
@@ -138,6 +140,67 @@ export function MobilePreviewScreen({
           </span>{' '}
           / {bodyFont}
         </p>
+      </div>
+
+      {/* ── Summary review (Issue #215) ─────────────────────────────────────── */}
+      <div
+        aria-label="Design summary"
+        className="mb-6 rounded-2xl border border-white/10 bg-white/[0.04] divide-y divide-white/10"
+      >
+        <p className="px-4 pt-3 pb-2 text-[11px] font-semibold text-white/40 uppercase tracking-wider">
+          Your choices
+        </p>
+
+        {/* Mood */}
+        <div className="flex items-center justify-between px-4 py-2.5">
+          <span className="text-xs text-white/50 flex items-center gap-2">
+            <i className="fa-solid fa-face-smile w-3" />
+            Mood
+          </span>
+          <span className="text-xs font-medium text-white/80 capitalize">{mood}</span>
+        </div>
+
+        {/* Industry */}
+        <div className="flex items-center justify-between px-4 py-2.5">
+          <span className="text-xs text-white/50 flex items-center gap-2">
+            <i className="fa-solid fa-building w-3" />
+            Industry
+          </span>
+          <span className="text-xs font-medium text-white/80 capitalize">{industry}</span>
+        </div>
+
+        {/* Component styles (if present) */}
+        {snapshot.components && (
+          <>
+            <div className="flex items-center justify-between px-4 py-2.5">
+              <span className="text-xs text-white/50 flex items-center gap-2">
+                <i className="fa-solid fa-rectangle-list w-3" />
+                Button
+              </span>
+              <span className="text-xs font-medium text-white/80 capitalize">
+                {snapshot.components.buttonStyle}
+              </span>
+            </div>
+            <div className="flex items-center justify-between px-4 py-2.5">
+              <span className="text-xs text-white/50 flex items-center gap-2">
+                <i className="fa-solid fa-layer-group w-3" />
+                Card
+              </span>
+              <span className="text-xs font-medium text-white/80 capitalize">
+                {snapshot.components.cardStyle}
+              </span>
+            </div>
+            <div className="flex items-center justify-between px-4 py-2.5">
+              <span className="text-xs text-white/50 flex items-center gap-2">
+                <i className="fa-solid fa-bars w-3" />
+                Navigation
+              </span>
+              <span className="text-xs font-medium text-white/80 capitalize">
+                {snapshot.components.navStyle.replace('-', ' ')}
+              </span>
+            </div>
+          </>
+        )}
       </div>
 
       {/* CTA */}
