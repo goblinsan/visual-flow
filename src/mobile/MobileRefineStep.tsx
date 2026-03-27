@@ -78,7 +78,7 @@ export function MobileRefineStep({
         </button>
         <div>
           <p className="text-[11px] font-semibold text-white/40 uppercase tracking-wider">
-            Step 2 of 3
+            Step 2 of 4
           </p>
           <h2 className="text-lg font-bold leading-tight">Refine your style</h2>
         </div>

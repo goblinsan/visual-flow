@@ -9,8 +9,9 @@ import userEvent from '@testing-library/user-event';
 import { MobileEntryScreen } from './MobileEntryScreen';
 
 describe('MobileEntryScreen', () => {
-  it('renders all five entry point cards', () => {
+  it('renders all six entry point cards', () => {
     render(<MobileEntryScreen onSelect={vi.fn()} />);
+    expect(screen.getByText('By Template')).toBeInTheDocument();
     expect(screen.getByText('By Theme')).toBeInTheDocument();
     expect(screen.getByText('By Color')).toBeInTheDocument();
     expect(screen.getByText('By Font')).toBeInTheDocument();
@@ -20,6 +21,7 @@ describe('MobileEntryScreen', () => {
 
   it('renders a description for each card', () => {
     render(<MobileEntryScreen onSelect={vi.fn()} />);
+    expect(screen.getByText(/Pick a ready-made preset/i)).toBeInTheDocument();
     expect(screen.getByText(/Pick a mood/i)).toBeInTheDocument();
     expect(screen.getByText(/Start with a colour/i)).toBeInTheDocument();
     expect(screen.getByText(/Let typography set the tone/i)).toBeInTheDocument();
@@ -61,6 +63,13 @@ describe('MobileEntryScreen', () => {
     render(<MobileEntryScreen onSelect={onSelect} />);
     await userEvent.click(screen.getByLabelText('Start by Start Blank'));
     expect(onSelect).toHaveBeenCalledWith('blank');
+  });
+
+  it('calls onSelect with "template" when the template card is tapped (#213)', async () => {
+    const onSelect = vi.fn();
+    render(<MobileEntryScreen onSelect={onSelect} />);
+    await userEvent.click(screen.getByLabelText('Start by By Template'));
+    expect(onSelect).toHaveBeenCalledWith('template');
   });
 
   it('renders the hero headline', () => {

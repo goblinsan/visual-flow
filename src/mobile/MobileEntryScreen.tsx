@@ -2,10 +2,11 @@
  * MobileEntryScreen
  *
  * Landing screen for the mobile-first flow.
- * Presents five entry point cards; selecting one advances the user into the
+ * Presents six entry point cards; selecting one advances the user into the
  * appropriate guided step.
  *
- * Entry points (Issue #207 – mobile information architecture):
+ * Entry points:
+ *  - By Template → preset template gallery (MobileTemplatePickStep)  #213
  *  - By Theme  → theme taxonomy cards (ThemeFirstFlow)
  *  - By Color  → color picker → palette (ColorFirstFlow)
  *  - By Font   → font catalogue (FontFirstFlow)
@@ -25,6 +26,13 @@ interface EntryCard {
 }
 
 const ENTRY_CARDS: EntryCard[] = [
+  {
+    id: 'template',
+    icon: 'fa-solid fa-table-cells-large',
+    label: 'By Template',
+    description: 'Pick a ready-made preset to get started fast',
+    gradient: 'from-cyan-500 to-teal-600',
+  },
   {
     id: 'theme',
     icon: 'fa-solid fa-palette',

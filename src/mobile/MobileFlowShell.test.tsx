@@ -1,6 +1,6 @@
 /**
  * Tests for MobileFlowShell
- * Issues #205, #206, #207
+ * Issues #205, #206, #207, #213, #214, #215
  */
 
 import { describe, it, expect, vi } from 'vitest';
@@ -20,7 +20,18 @@ describe('MobileFlowShell', () => {
     expect(screen.getByText('By Theme')).toBeInTheDocument();
   });
 
+  it('shows the "By Template" entry card on the landing screen (#213)', () => {
+    render(<MobileFlowShell onComplete={vi.fn()} />);
+    expect(screen.getByLabelText('Start by By Template')).toBeInTheDocument();
+  });
+
   // ── Entry → Pick navigation ─────────────────────────────────────────────────
+
+  it('navigates to the template pick step when "By Template" is tapped (#213)', async () => {
+    render(<MobileFlowShell onComplete={vi.fn()} />);
+    await userEvent.click(screen.getByLabelText('Start by By Template'));
+    expect(screen.getByText('Choose a template')).toBeInTheDocument();
+  });
 
   it('navigates to the theme pick step when "By Theme" is tapped', async () => {
     render(<MobileFlowShell onComplete={vi.fn()} />);
@@ -74,6 +85,15 @@ describe('MobileFlowShell', () => {
     expect(screen.getByText('Visual Flow')).toBeInTheDocument();
   });
 
+  it('goes back to the template pick step from the entry screen (#213)', async () => {
+    render(<MobileFlowShell onComplete={vi.fn()} />);
+    await userEvent.click(screen.getByLabelText('Start by By Template'));
+    expect(screen.getByText('Choose a template')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByLabelText('Go back'));
+    expect(screen.getByText('Visual Flow')).toBeInTheDocument();
+  });
+
   // ── Color entry flow ───────────────────────────────────────────────────────
 
   it('advances from color pick to refine when a palette is selected and confirmed', async () => {
@@ -89,9 +109,59 @@ describe('MobileFlowShell', () => {
     expect(screen.getByText('Refine your style')).toBeInTheDocument();
   });
 
-  // ── Blank → Refine → Preview full flow ─────────────────────────────────────
+  // ── Template entry flow (#213) ─────────────────────────────────────────────
 
-  it('navigates blank → refine → preview and calls onComplete', async () => {
+  it('advances from template pick to refine when a template is selected and confirmed (#213)', async () => {
+    render(<MobileFlowShell onComplete={vi.fn()} />);
+    await userEvent.click(screen.getByLabelText('Start by By Template'));
+
+    // Select the first template
+    const templateBtn = screen.getAllByRole('button', { pressed: false })[0]!;
+    await userEvent.click(templateBtn);
+
+    await userEvent.click(screen.getByText('Use this template'));
+    expect(screen.getByText('Refine your style')).toBeInTheDocument();
+  });
+
+  // ── Component step (#214) ─────────────────────────────────────────────────
+
+  it('shows the component selection step after refine (#214)', async () => {
+    render(<MobileFlowShell onComplete={vi.fn()} />);
+
+    await userEvent.click(screen.getByLabelText('Start by Start Blank'));
+    await userEvent.click(screen.getByRole('checkbox', { name: /minimal/i }));
+    await userEvent.click(screen.getByText('Preview my design'));
+
+    expect(screen.getByText('Choose components')).toBeInTheDocument();
+  });
+
+  it('shows button, card and navigation selectors in the component step (#214)', async () => {
+    render(<MobileFlowShell onComplete={vi.fn()} />);
+
+    await userEvent.click(screen.getByLabelText('Start by Start Blank'));
+    await userEvent.click(screen.getByRole('checkbox', { name: /minimal/i }));
+    await userEvent.click(screen.getByText('Preview my design'));
+
+    expect(screen.getByText('Button style')).toBeInTheDocument();
+    expect(screen.getByText('Card style')).toBeInTheDocument();
+    expect(screen.getByText('Navigation pattern')).toBeInTheDocument();
+  });
+
+  it('goes back to refine from the component step (#214)', async () => {
+    render(<MobileFlowShell onComplete={vi.fn()} />);
+
+    await userEvent.click(screen.getByLabelText('Start by Start Blank'));
+    await userEvent.click(screen.getByRole('checkbox', { name: /minimal/i }));
+    await userEvent.click(screen.getByText('Preview my design'));
+    expect(screen.getByText('Choose components')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByLabelText('Go back'));
+    expect(screen.getByText('Refine your style')).toBeInTheDocument();
+  });
+
+  // ── Blank → Refine → Components → Preview full flow ────────────────────────
+
+  it('navigates blank → refine → components → preview and calls onComplete', async () => {
     const onComplete = vi.fn();
     render(<MobileFlowShell onComplete={onComplete} />);
 
@@ -102,7 +172,11 @@ describe('MobileFlowShell', () => {
     await userEvent.click(screen.getByRole('checkbox', { name: /minimal/i }));
     await userEvent.click(screen.getByText('Preview my design'));
 
-    // Step 3: confirm preview
+    // Step 3: confirm component selections
+    expect(screen.getByText('Choose components')).toBeInTheDocument();
+    await userEvent.click(screen.getByText('Preview my design'));
+
+    // Step 4: confirm preview
     expect(screen.getByText('Preview')).toBeInTheDocument();
     await userEvent.click(screen.getByText('Use this design'));
 
@@ -113,6 +187,62 @@ describe('MobileFlowShell', () => {
       mood: 'minimal',
       primaryColor: expect.any(String),
       tokens: expect.objectContaining({ 'color-primary': expect.any(String) }),
+      components: expect.objectContaining({
+        buttonStyle: expect.any(String),
+        cardStyle: expect.any(String),
+        navStyle: expect.any(String),
+      }),
+    });
+  });
+
+  // ── Summary review in preview (#215) ───────────────────────────────────────
+
+  it('shows the design summary panel on the preview screen (#215)', async () => {
+    render(<MobileFlowShell onComplete={vi.fn()} />);
+
+    await userEvent.click(screen.getByLabelText('Start by Start Blank'));
+    await userEvent.click(screen.getByRole('checkbox', { name: /bold/i }));
+    await userEvent.click(screen.getByText('Preview my design'));
+    await userEvent.click(screen.getByText('Preview my design'));
+
+    // Summary panel should be visible
+    expect(screen.getByLabelText('Design summary')).toBeInTheDocument();
+    expect(screen.getByText('Your choices')).toBeInTheDocument();
+    expect(screen.getByText('Mood')).toBeInTheDocument();
+    expect(screen.getByText('Industry')).toBeInTheDocument();
+  });
+
+  it('shows component selections in the summary panel (#215)', async () => {
+    render(<MobileFlowShell onComplete={vi.fn()} />);
+
+    await userEvent.click(screen.getByLabelText('Start by Start Blank'));
+    await userEvent.click(screen.getByRole('checkbox', { name: /minimal/i }));
+    await userEvent.click(screen.getByText('Preview my design'));
+
+    // Select a specific button style
+    await userEvent.click(screen.getByRole('button', { pressed: false, name: /pill/i }));
+    await userEvent.click(screen.getByText('Preview my design'));
+
+    // Summary should list the chosen styles
+    expect(screen.getByText('Button')).toBeInTheDocument();
+    expect(screen.getByText('Card')).toBeInTheDocument();
+    expect(screen.getByText('Navigation')).toBeInTheDocument();
+  });
+
+  it('shows component token in snapshot when component step is completed (#214)', async () => {
+    const onComplete = vi.fn();
+    render(<MobileFlowShell onComplete={onComplete} />);
+
+    await userEvent.click(screen.getByLabelText('Start by Start Blank'));
+    await userEvent.click(screen.getByRole('checkbox', { name: /minimal/i }));
+    await userEvent.click(screen.getByText('Preview my design'));
+    await userEvent.click(screen.getByText('Preview my design'));
+    await userEvent.click(screen.getByText('Use this design'));
+
+    expect(onComplete.mock.calls[0][0].tokens).toMatchObject({
+      'component-button-style': expect.any(String),
+      'component-card-style':   expect.any(String),
+      'component-nav-style':    expect.any(String),
     });
   });
 
@@ -121,9 +251,10 @@ describe('MobileFlowShell', () => {
   it('shows a "Start over" button on the done screen that resets to entry', async () => {
     render(<MobileFlowShell onComplete={vi.fn()} />);
 
-    // Run through the minimal blank flow
+    // Run through the full blank flow
     await userEvent.click(screen.getByLabelText('Start by Start Blank'));
     await userEvent.click(screen.getByRole('checkbox', { name: /bold/i }));
+    await userEvent.click(screen.getByText('Preview my design'));
     await userEvent.click(screen.getByText('Preview my design'));
     await userEvent.click(screen.getByText('Use this design'));
 

@@ -3,27 +3,33 @@
  *
  * Top-level orchestrator for the mobile-first, selection-based design flow.
  * Replaces the unusable canvas-based editor on mobile with a streamlined
- * 5-step guided experience:
+ * guided experience:
  *
- *   1. Entry  – user picks how to start (theme / colour / font / image / blank)
- *   2. Pick   – entry-specific selection screen
- *   3. Refine – mood chips + industry picker (pre-filled from pick step)
- *   4. Preview – phone-frame mock-up of the assembled design
- *   5. Done   – success + token export
+ *   1. Entry      – user picks how to start (theme / colour / font / image / template / blank)
+ *   2. Pick       – entry-specific selection screen
+ *   3. Refine     – mood chips + industry picker (pre-filled from pick step)
+ *   4. Components – button / card / navigation style selectors  #214
+ *   5. Preview    – phone-frame mock-up + summary review  #215
+ *   6. Done       – success + token export
  *
  * Issues:
  *  #205 – Audit current desktop canvas actions
  *  #206 – Design the simplified selection-based workflow
  *  #207 – Specify mobile information architecture and navigation
+ *  #213 – Template and preset selection screens
+ *  #214 – Component selection and configuration steps
+ *  #215 – Lightweight live preview and summary review
  */
 
 import { useState, useCallback } from 'react';
 import type { StyleMood, StyleIndustry } from '../style-flow/types';
-import type { MobileEntryPoint, MobileFlowStep, MobileDesignSnapshot } from './types';
+import type { MobileEntryPoint, MobileFlowStep, MobileDesignSnapshot, MobileComponentSelections } from './types';
 import { MobileEntryScreen } from './MobileEntryScreen';
 import { MobileColorPickStep } from './MobileColorPickStep';
 import { MobileRefineStep } from './MobileRefineStep';
+import { MobileComponentStep } from './MobileComponentStep';
 import { MobilePreviewScreen } from './MobilePreviewScreen';
+import { MobileTemplatePickStep } from './MobileTemplatePickStep';
 import { buildSnapshot } from './snapshotBuilder';
 import { ThemeFirstFlow } from '../components/ThemeFirstFlow';
 import { FontFirstFlow } from '../components/FontFirstFlow';
@@ -45,15 +51,18 @@ interface PickState {
   colors: string[];
   moods: StyleMood[];
   font: { family: string; body: string } | null;
+  /** Pre-seeded industry from a template preset (#213). */
+  industry: StyleIndustry | null;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function MobileFlowShell({ onComplete }: MobileFlowShellProps) {
-  const [step, setStep]           = useState<MobileFlowStep>('entry');
-  const [entry, setEntry]         = useState<MobileEntryPoint | null>(null);
-  const [pickState, setPickState] = useState<PickState>({ colors: [], moods: [], font: null });
-  const [snapshot, setSnapshot]   = useState<MobileDesignSnapshot | null>(null);
+  const [step, setStep]                 = useState<MobileFlowStep>('entry');
+  const [entry, setEntry]               = useState<MobileEntryPoint | null>(null);
+  const [pickState, setPickState]       = useState<PickState>({ colors: [], moods: [], font: null, industry: null });
+  const [components, setComponents]     = useState<MobileComponentSelections | null>(null);
+  const [snapshot, setSnapshot]         = useState<MobileDesignSnapshot | null>(null);
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
 
@@ -65,18 +74,26 @@ export function MobileFlowShell({ onComplete }: MobileFlowShellProps) {
   }, []);
 
   /** User confirmed their choice on the pick step. */
-  const handlePickDone = useCallback((colors: string[], moods: StyleMood[], font: { family: string; body: string } | null) => {
-    setPickState({ colors, moods, font });
+  const handlePickDone = useCallback((colors: string[], moods: StyleMood[], font: { family: string; body: string } | null, industry?: StyleIndustry) => {
+    setPickState({ colors, moods, font, industry: industry ?? null });
     setStep('refine');
   }, []);
 
   /** User confirmed mood + industry on the refine step. */
   const handleRefineDone = useCallback((moods: StyleMood[], industry: StyleIndustry) => {
+    setPickState((prev) => ({ ...prev, moods, industry }));
+    setStep('components');
+  }, []);
+
+  /** User confirmed component style selections (#214). */
+  const handleComponentsDone = useCallback((selections: MobileComponentSelections) => {
+    setComponents(selections);
     const snap = buildSnapshot(
-      moods,
-      industry,
+      pickState.moods.length ? pickState.moods : ['minimal'],
+      (pickState.industry ?? 'technology') as StyleIndustry,
       pickState.colors.length ? pickState.colors : undefined,
       pickState.font ?? undefined,
+      selections,
     );
     setSnapshot(snap);
     setStep('preview');
@@ -94,7 +111,8 @@ export function MobileFlowShell({ onComplete }: MobileFlowShellProps) {
   const handleRestart = useCallback(() => {
     setStep('entry');
     setEntry(null);
-    setPickState({ colors: [], moods: [], font: null });
+    setPickState({ colors: [], moods: [], font: null, industry: null });
+    setComponents(null);
     setSnapshot(null);
   }, []);
 
@@ -119,7 +137,7 @@ export function MobileFlowShell({ onComplete }: MobileFlowShellProps) {
           </button>
           <div>
             <p className="text-[11px] font-semibold text-white/40 uppercase tracking-wider">
-              Step 1 of 3
+              Step 1 of 4
             </p>
             <h2 className="text-lg font-bold leading-tight">{stepLabel}</h2>
           </div>
@@ -136,6 +154,21 @@ export function MobileFlowShell({ onComplete }: MobileFlowShellProps) {
 
   function renderPickStep() {
     switch (entry) {
+      case 'template':
+        return (
+          <MobileTemplatePickStep
+            onPick={(preset) =>
+              handlePickDone(
+                [...preset.colors],
+                [preset.mood],
+                { family: preset.headingFont, body: preset.bodyFont },
+                preset.industry,
+              )
+            }
+            onBack={() => setStep('entry')}
+          />
+        );
+
       case 'theme':
         return (
           <PickWrapper stepLabel="Choose a theme">
@@ -260,9 +293,18 @@ export function MobileFlowShell({ onComplete }: MobileFlowShellProps) {
     return (
       <MobileRefineStep
         initialMoods={pickState.moods}
-        initialIndustry="technology"
+        initialIndustry={pickState.industry ?? 'technology'}
         onConfirm={handleRefineDone}
         onBack={() => setStep(entry === 'blank' ? 'entry' : 'pick')}
+      />
+    );
+  }
+
+  if (step === 'components') {
+    return (
+      <MobileComponentStep
+        onConfirm={handleComponentsDone}
+        onBack={() => setStep('refine')}
       />
     );
   }
@@ -271,7 +313,7 @@ export function MobileFlowShell({ onComplete }: MobileFlowShellProps) {
     return (
       <MobilePreviewScreen
         snapshot={snapshot}
-        onBack={() => setStep('refine')}
+        onBack={() => setStep('components')}
         onConfirm={handlePreviewConfirm}
       />
     );
