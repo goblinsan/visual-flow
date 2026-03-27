@@ -27,7 +27,7 @@ export interface ImageExportOptions {
 }
 
 /**
- * Render the given concept's colour swatches, typography, and metadata onto
+ * Render the given concept's color swatches, typography, and metadata onto
  * an off-screen canvas and return the result as a PNG data URL.
  *
  * Throws when the canvas 2D context cannot be obtained (e.g. in certain
@@ -79,7 +79,7 @@ export function exportConceptAsPng(
 // ── Rendering helpers ─────────────────────────────────────────────────────────
 
 /**
- * Compute the layout data (positions, sizes, colours) for a concept render.
+ * Compute the layout data (positions, sizes, colors) for a concept render.
  * Pure function – useful for testing without a real canvas context.
  */
 export function computeConceptLayout(
@@ -167,10 +167,10 @@ function drawConcept(
   // ── Section label ─────────────────────────────────────────────────────────
   ctx.globalAlpha = 0.4;
   ctx.font = '11px Inter, sans-serif';
-  ctx.fillText('COLOUR PALETTE', 40, 128);
+  ctx.fillText('COLOR PALETTE', 40, 128);
   ctx.globalAlpha = 1;
 
-  // ── Colour swatches ───────────────────────────────────────────────────────
+  // ── Color swatches ───────────────────────────────────────────────────────
   for (const swatch of layout.swatches) {
     ctx.fillStyle = swatch.hex;
     roundRect(ctx, swatch.x, swatch.y, swatch.size, swatch.size, 8);

@@ -110,7 +110,7 @@ export function brightness(hex: string): number {
   return (p.r * 299 + p.g * 587 + p.b * 114) / 1000;
 }
 
-/** Lighten a hex colour toward white by `amount` (0 = no change, 1 = white) */
+/** Lighten a hex color toward white by `amount` (0 = no change, 1 = white) */
 export function lighten(hex: string, amount: number): string {
   const p = parseColor(hex);
   if (!p) return hex;
@@ -122,7 +122,7 @@ export function lighten(hex: string, amount: number): string {
   });
 }
 
-/** Darken a hex colour toward black by `amount` (0 = no change, 1 = black) */
+/** Darken a hex color toward black by `amount` (0 = no change, 1 = black) */
 export function darken(hex: string, amount: number): string {
   const p = parseColor(hex);
   if (!p) return hex;

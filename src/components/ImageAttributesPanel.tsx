@@ -37,7 +37,7 @@ export const ImageAttributesPanel: React.FC<ImageAttributesPanelProps> = ({
     if (fill) setColorInput(fill);
   }, [fill]);
 
-  // Update icon colour: regenerates SVG src AND sets fill
+  // Update icon color: regenerates SVG src AND sets fill
   const handleIconColorChange = (newColor: string) => {
     setColorInput(newColor);
     if (!iconId) return;

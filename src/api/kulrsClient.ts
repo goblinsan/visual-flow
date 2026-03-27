@@ -219,7 +219,7 @@ export async function fetchKulrsPaletteById(id: string): Promise<KulrsPalette | 
  * Find palettes whose colors are visually close to `targetHex`.
  *
  * This is a client-side filter on top of the browse endpoint because the
- * Kulrs API does not currently expose a colour-search endpoint.
+ * Kulrs API does not currently expose a color-search endpoint.
  *
  * @param targetHex  6-digit hex string to match (with or without '#')
  * @param tolerance  Maximum Euclidean RGB distance (0–441); default 60

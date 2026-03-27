@@ -54,10 +54,10 @@ interface CardOption {
 }
 
 const CARD_OPTIONS: CardOption[] = [
-  { value: 'flat',      label: 'Flat',      description: 'No shadow, pure colour',      icon: 'fa-solid fa-square' },
+  { value: 'flat',      label: 'Flat',      description: 'No shadow, pure color',      icon: 'fa-solid fa-square' },
   { value: 'elevated',  label: 'Elevated',  description: 'Subtle shadow for depth',    icon: 'fa-solid fa-layer-group' },
   { value: 'bordered',  label: 'Bordered',  description: 'Defined border edge',         icon: 'fa-regular fa-square' },
-  { value: 'gradient',  label: 'Gradient',  description: 'Gentle colour gradient fill', icon: 'fa-solid fa-fill-drip' },
+  { value: 'gradient',  label: 'Gradient',  description: 'Gentle color gradient fill', icon: 'fa-solid fa-fill-drip' },
 ];
 
 interface NavOption {

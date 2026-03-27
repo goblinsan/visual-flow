@@ -29,7 +29,7 @@ export interface StyleSeed {
   /** Industry or domain context */
   industry: StyleIndustry;
   /**
-   * Optional base colours provided by the user (hex strings).
+   * Optional base colors provided by the user (hex strings).
    * When omitted, the engine derives a palette from the moods.
    */
   baseColors?: string[];
@@ -54,11 +54,11 @@ export interface DesignToken {
   description?: string;
 }
 
-/** A colour swatch within a recommendation */
+/** A color swatch within a recommendation */
 export interface ColorSwatch {
   /** Semantic role, e.g. "primary", "accent", "surface" */
   role: string;
-  /** Hex colour value */
+  /** Hex color value */
   hex: string;
 }
 
@@ -85,7 +85,7 @@ export interface StyleRecommendation {
   name: string;
   /** Short description of the style */
   description: string;
-  /** Colour swatches for visual preview */
+  /** Color swatches for visual preview */
   swatches: ColorSwatch[];
   /** Typography specification */
   typography: TypographySpec;
@@ -137,7 +137,7 @@ export type ExportFormat = 'css-variables' | 'json' | 'tailwind-config' | 'react
 export interface StyleExportPackage {
   /** The resolved set of design tokens (merged overrides applied) */
   tokens: DesignToken[];
-  /** Colour swatches from the selected recommendation */
+  /** Color swatches from the selected recommendation */
   swatches: ColorSwatch[];
   /** Typography spec */
   typography: TypographySpec;
@@ -210,7 +210,7 @@ export interface NavigationStyle {
 // ── Concept (Phase 4 – #188) ──────────────────────────────────────────────────
 
 /**
- * A fully resolved style concept that bundles a colour recommendation with
+ * A fully resolved style concept that bundles a color recommendation with
  * pre-selected typography, button, and navigation choices.
  * Multiple distinct concepts are generated from the user's seeds and
  * presented in the comparison panel.
@@ -222,7 +222,7 @@ export interface StyleConcept {
   name: string;
   /** Short tagline describing the concept's character */
   tagline: string;
-  /** The colour recommendation that forms the visual base */
+  /** The color recommendation that forms the visual base */
   recommendation: StyleRecommendation;
   /** Pre-selected typography pairing ID */
   typographyPairingId: string;
@@ -288,7 +288,7 @@ export interface JourneyState {
   recommendations: StyleRecommendation[];
   /**
    * Full style concepts generated for the comparison step (Phase 4 – #188).
-   * Each concept bundles a colour recommendation with pre-chosen typography,
+   * Each concept bundles a color recommendation with pre-chosen typography,
    * button style, and navigation style.
    */
   concepts: StyleConcept[];

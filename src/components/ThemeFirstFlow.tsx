@@ -5,9 +5,9 @@
  *
  * Flow:
  *  1. The user browses a curated taxonomy of moods and themes, each with
- *     a short description and illustrative swatch colours.
+ *     a short description and illustrative swatch colors.
  *  2. Clicking a theme card immediately produces a StyleSeed with matching
- *     moods, suggested base colours, and font preferences.
+ *     moods, suggested base colors, and font preferences.
  *  3. The caller receives the seed via `onApplyTheme` and can feed it
  *     straight into the StyleFlow journey.
  *
@@ -34,7 +34,7 @@ export interface ThemeEntry {
   mood: StyleMood;
   /** Additional moods that complement the primary one */
   secondaryMoods: StyleMood[];
-  /** Suggested base colours (hex) */
+  /** Suggested base colors (hex) */
   suggestedColors: string[];
   /** Suggested font preferences */
   suggestedFonts: string[];
@@ -57,7 +57,7 @@ export const THEME_TAXONOMY: ThemeEntry[] = [
   {
     id: 'bold-energetic',
     name: 'Bold & Energetic',
-    description: 'Saturated colours, strong contrasts, and confident shapes.',
+    description: 'Saturated colors, strong contrasts, and confident shapes.',
     icon: 'fa-solid fa-bolt',
     mood: 'bold',
     secondaryMoods: ['playful'],

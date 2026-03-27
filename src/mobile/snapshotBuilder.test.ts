@@ -29,21 +29,21 @@ describe('buildSnapshot', () => {
     expect(snap.mood).toBe('minimal');
   });
 
-  // ── Colour overrides ──────────────────────────────────────────────────────
+  // ── Color overrides ──────────────────────────────────────────────────────
 
-  it('applies override primary colour when provided', () => {
+  it('applies override primary color when provided', () => {
     const snap = buildSnapshot(['minimal'], 'technology', ['#AABBCC', '#DDEEFF', '#112233', '#445566']);
     expect(snap.primaryColor).toBe('#AABBCC');
   });
 
-  it('applies override accent colour (index 2) when provided', () => {
+  it('applies override accent color (index 2) when provided', () => {
     const snap = buildSnapshot(['minimal'], 'technology', ['#111111', '#222222', '#3E9BFF', '#444444']);
     expect(snap.accentColor).toBe('#3E9BFF');
   });
 
-  it('falls back to palette colour when override array has fewer than 3 colours', () => {
+  it('falls back to palette color when override array has fewer than 3 colors', () => {
     const snap = buildSnapshot(['minimal'], 'technology', ['#AABBCC', '#DDEEFF']);
-    // No index-2 colour supplied → should fall back to mood palette[2]
+    // No index-2 color supplied → should fall back to mood palette[2]
     expect(snap.accentColor).toMatch(/^#/);
   });
 

@@ -2,7 +2,7 @@
  * ConceptComparisonPanel – Phase 4 (#189)
  *
  * Displays multiple StyleConcepts in a comparison grid. Each card surfaces
- * colour swatches, typography, and key style choices so the user can make
+ * color swatches, typography, and key style choices so the user can make
  * an informed comparison.
  *
  * Supports: view, favorite, shortlist, and final-choice (chooseConcept).
@@ -90,7 +90,7 @@ function ConceptCard({
         </div>
       </div>
 
-      {/* ── Colour swatches ────────────────────────────────────────────────── */}
+      {/* ── Color swatches ────────────────────────────────────────────────── */}
       <div className="flex gap-0.5 px-3 pt-2">
         {concept.recommendation.swatches.slice(0, 5).map((s) => (
           <div
@@ -137,10 +137,10 @@ function ConceptCard({
 
       {/* ── Actions ────────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-1 px-3 pb-3">
-        {/* Favourite */}
+        {/* Favorite */}
         <button
           type="button"
-          aria-label={isFavorited ? 'Remove from favourites' : 'Add to favourites'}
+          aria-label={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
           aria-pressed={isFavorited}
           onClick={() => onReview(concept.id, isFavorited ? 'viewed' : 'favorited')}
           className={`p-1.5 rounded-lg transition-colors ${
@@ -266,7 +266,7 @@ export function ConceptComparisonPanel({
         {(['recommendation', 'typography', 'buttons', 'navigation'] as LockableAspect[]).map(
           (aspect) => {
             const labels: Record<LockableAspect, string> = {
-              recommendation: 'Colours',
+              recommendation: 'Colors',
               typography: 'Type',
               buttons: 'Buttons',
               navigation: 'Nav',

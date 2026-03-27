@@ -72,7 +72,7 @@ describe('MobileColorPickStep', () => {
 
   // ── Confirmation ──────────────────────────────────────────────────────────
 
-  it('calls onPick with 4 hex colours and the mood when CTA is clicked', async () => {
+  it('calls onPick with 4 hex colors and the mood when CTA is clicked', async () => {
     const onPick = vi.fn();
     render(<MobileColorPickStep onPick={onPick} onBack={vi.fn()} />);
 

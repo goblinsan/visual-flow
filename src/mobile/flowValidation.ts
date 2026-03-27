@@ -89,7 +89,7 @@ export function validateSnapshotForDesktop(snapshot: MobileDesignSnapshot): Vali
   if (!snapshot.primaryColor || !snapshot.accentColor) {
     issues.push({
       code:     'MISSING_COLORS',
-      message:  'Snapshot is missing required colour values and cannot be applied to the canvas.',
+      message:  'Snapshot is missing required color values and cannot be applied to the canvas.',
       severity: 'error',
     });
   }

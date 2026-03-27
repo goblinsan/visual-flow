@@ -135,8 +135,8 @@ export function appendNodesToRoot(spec: LayoutSpec, nodes: LayoutNode[]): Layout
 }
 
 /**
- * Build an SVG data-URL for an icon with a given fill colour.
- * Exported so bindAndApplyTheme can regenerate icon srcs when colours change.
+ * Build an SVG data-URL for an icon with a given fill color.
+ * Exported so bindAndApplyTheme can regenerate icon srcs when colors change.
  */
 export function buildIconSvgSrc(iconId: string, fill: string): string | null {
   const icon = ICON_LIBRARY.find(i => i.id === iconId);
@@ -149,7 +149,7 @@ export function buildIconSvgSrc(iconId: string, fill: string): string | null {
 
 /**
  * Create an icon node at the specified world position.
- * When an activeTheme is provided the icon colour and font are derived from
+ * When an activeTheme is provided the icon color and font are derived from
  * the theme and themeBindings are persisted so future theme switches update it.
  */
 export function createIcon(

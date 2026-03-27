@@ -8,10 +8,10 @@
  * The generated spec includes a phone-sized (390 × 844) root frame that
  * scaffolds a minimal but representative screen layout:
  *
- *   – A navigation bar rect (primary colour)
+ *   – A navigation bar rect (primary color)
  *   – A heading text node   (heading font)
  *   – A body text node      (body font)
- *   – A primary-action rect (accent colour, respects button-style radius)
+ *   – A primary-action rect (accent color, respects button-style radius)
  *
  * Issue #218 – Add transformation layer between guided selections and canvas schema
  */

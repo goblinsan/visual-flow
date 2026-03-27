@@ -20,7 +20,7 @@ describe('ThemeFirstFlow', () => {
     render(<ThemeFirstFlow onApplyTheme={vi.fn()} />);
     // Spot-check a couple of descriptions
     expect(screen.getByText(/White space, neutral tones/i)).toBeInTheDocument();
-    expect(screen.getByText(/Saturated colours, strong contrasts/i)).toBeInTheDocument();
+    expect(screen.getByText(/Saturated colors, strong contrasts/i)).toBeInTheDocument();
   });
 
   it('shows an Apply button when a card is selected', async () => {

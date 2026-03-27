@@ -104,7 +104,7 @@ function generateRecommendations(
       lineHeight: 1.6,
     },
     tokens: [
-      { name: 'color-primary', value: c1, description: 'Primary brand colour' },
+      { name: 'color-primary', value: c1, description: 'Primary brand color' },
       { name: 'color-secondary', value: c2 },
       { name: 'color-accent', value: c3 },
       { name: 'color-highlight', value: c4 },
@@ -481,7 +481,7 @@ export function StyleFlowShell({ machine, onClose, onHandoffToCanvas }: StyleFlo
   const selectedNavigationStyle =
     NAVIGATION_STYLES.find((n) => n.id === state.selection.navigationStyleId) ?? null;
 
-  // Primary colour used to tint Phase 3 previews
+  // Primary color used to tint Phase 3 previews
   const previewPrimary =
     selectedRec?.swatches.find((s) => s.role === 'primary')?.hex ?? '#06b6d4';
   const previewAccent =
@@ -626,7 +626,7 @@ export function StyleFlowShell({ machine, onClose, onHandoffToCanvas }: StyleFlo
                 Choose a concept
               </p>
               <p className="text-[11px] text-white/30 mb-4">
-                Compare fully styled concepts. Favourite or shortlist options, then choose one to continue.
+                Compare fully styled concepts. Favorite or shortlist options, then choose one to continue.
               </p>
               <ConceptComparisonPanel
                 concepts={state.concepts}
@@ -735,7 +735,7 @@ export function StyleFlowShell({ machine, onClose, onHandoffToCanvas }: StyleFlo
                   const isOverridden = Boolean(overrideValue);
                   return (
                     <div key={token.name} className="flex items-center gap-3">
-                      {/* Colour swatch if it looks like a colour */}
+                      {/* Color swatch if it looks like a color */}
                       {displayValue.startsWith('#') && (
                         <div
                           className="w-6 h-6 rounded flex-shrink-0 border border-white/10"

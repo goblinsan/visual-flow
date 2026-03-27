@@ -32,12 +32,12 @@ describe('StyleSeed', () => {
       industry: 'gaming',
       baseColors: ['#FF0000', '#00FF00'],
       fontPreferences: ['Inter', 'Playfair Display'],
-      notes: 'High-energy colour scheme',
+      notes: 'High-energy color scheme',
     };
     expect(seed.moods).toHaveLength(2);
     expect(seed.baseColors).toHaveLength(2);
     expect(seed.fontPreferences).toHaveLength(2);
-    expect(seed.notes).toBe('High-energy colour scheme');
+    expect(seed.notes).toBe('High-energy color scheme');
   });
 });
 
@@ -58,7 +58,7 @@ describe('StyleRecommendation', () => {
       lineHeight: 1.6,
     },
     tokens: [
-      { name: 'color-primary', value: '#1A73E8', description: 'Primary colour' },
+      { name: 'color-primary', value: '#1A73E8', description: 'Primary color' },
     ],
   };
 

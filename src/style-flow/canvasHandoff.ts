@@ -6,8 +6,8 @@
  * be loaded directly into the Vizail canvas editor.
  *
  * The generated scene contains:
- *  - A root frame with the concept's surface colour as background
- *  - Colour swatch rectangles with role labels
+ *  - A root frame with the concept's surface color as background
+ *  - Color swatch rectangles with role labels
  *  - Typography showcase text nodes
  *  - A button preview element
  *  - A navigation preview element
@@ -220,7 +220,7 @@ function buildSwatchRow(
     id: `${conceptId}-palette-header`,
     name: 'Swatches Section Label',
     type: 'text',
-    text: 'COLOUR PALETTE',
+    text: 'COLOR PALETTE',
     fontFamily: 'Inter',
     fontSize: 11,
     fontWeight: '600',

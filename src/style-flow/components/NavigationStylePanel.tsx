@@ -185,7 +185,7 @@ function NavScene({ style, primaryColor }: NavSceneProps) {
 interface NavigationStylePanelProps {
   /** Currently selected navigation style ID, or null if none */
   selectedId: string | null;
-  /** Primary colour used to tint nav preview scenes */
+  /** Primary color used to tint nav preview scenes */
   primaryColor?: string;
   /** Called when the user selects a navigation style */
   onSelect: (id: string) => void;

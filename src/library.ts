@@ -734,7 +734,7 @@ export const COMPONENT_LIBRARY: ComponentTemplate[] = [
         { id: makeId("text"), type: "text", position: { x: 24, y: 166 }, text: "📤", fontSize: 16, fontFamily: "Arial", fontWeight: "400", color: "#64748b" },
         { id: makeId("text"), type: "text", position: { x: 52, y: 164 }, text: "Outbox", fontSize: 14, fontFamily: "Arial", fontWeight: "400", color: "#334155" },
         { id: makeId("text"), type: "text", position: { x: 24, y: 210 }, text: "⭐", fontSize: 16, fontFamily: "Arial", fontWeight: "400", color: "#64748b" },
-        { id: makeId("text"), type: "text", position: { x: 52, y: 208 }, text: "Favourites", fontSize: 14, fontFamily: "Arial", fontWeight: "400", color: "#334155" },
+        { id: makeId("text"), type: "text", position: { x: 52, y: 208 }, text: "Favorites", fontSize: 14, fontFamily: "Arial", fontWeight: "400", color: "#334155" },
         // Divider
         { id: makeId("rect"), type: "rect", position: { x: 16, y: 244 }, size: { width: 248, height: 1 }, fill: "#e2e8f0", stroke: undefined, strokeWidth: 0, radius: 0, opacity: 1 },
         { id: makeId("text"), type: "text", position: { x: 24, y: 262 }, text: "⚙", fontSize: 16, fontFamily: "Arial", fontWeight: "400", color: "#64748b" },

@@ -39,9 +39,9 @@ export interface MobileComponentSelections {
 
 /** Lightweight design snapshot produced at the end of the mobile flow. */
 export interface MobileDesignSnapshot {
-  /** Resolved primary colour (hex). */
+  /** Resolved primary color (hex). */
   primaryColor: string;
-  /** Resolved accent colour (hex). */
+  /** Resolved accent color (hex). */
   accentColor: string;
   /** Heading font family. */
   headingFont: string;
@@ -67,7 +67,7 @@ export interface MobileFlowSessionState {
   step: MobileFlowStep;
   /** Selected entry point; null while the user is still on the 'entry' screen. */
   entry: MobileEntryPoint | null;
-  /** Colours, moods, font, and industry accumulated during the pick step. */
+  /** Colors, moods, font, and industry accumulated during the pick step. */
   pickState: {
     colors: string[];
     moods: string[];

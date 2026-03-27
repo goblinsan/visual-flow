@@ -35,12 +35,12 @@ describe('snapshotToLayoutSpec (#218)', () => {
     expect(spec.root.size.height).toBe(844);
   });
 
-  it('uses the primary colour as the root background', () => {
+  it('uses the primary color as the root background', () => {
     const spec = snapshotToLayoutSpec(BASE_SNAPSHOT);
     expect(spec.root.background).toBe('#1A1A2E');
   });
 
-  it('includes a navigation bar rect child with the primary colour', () => {
+  it('includes a navigation bar rect child with the primary color', () => {
     const spec = snapshotToLayoutSpec(BASE_SNAPSHOT);
     const navBar = spec.root.children.find((n) => n.id === 'mobile-nav');
     expect(navBar).toBeDefined();
@@ -71,7 +71,7 @@ describe('snapshotToLayoutSpec (#218)', () => {
     }
   });
 
-  it('includes a primary button rect with the accent colour', () => {
+  it('includes a primary button rect with the accent color', () => {
     const spec = snapshotToLayoutSpec(BASE_SNAPSHOT);
     const cta = spec.root.children.find((n) => n.id === 'mobile-button');
     expect(cta).toBeDefined();

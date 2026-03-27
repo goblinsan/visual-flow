@@ -8,7 +8,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MobileFlowShell } from './MobileFlowShell';
 
-// Mock canvas API used by ImageFirstFlow's colour extraction
+// Mock canvas API used by ImageFirstFlow's color extraction
 HTMLCanvasElement.prototype.getContext = vi.fn().mockReturnValue(null);
 
 describe('MobileFlowShell', () => {

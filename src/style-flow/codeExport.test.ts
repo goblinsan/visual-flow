@@ -16,7 +16,7 @@ import type { StyleConcept, StyleExportPackage } from './types';
 // ── Mock data ─────────────────────────────────────────────────────────────────
 
 const MOCK_TOKENS: StyleExportPackage['tokens'] = [
-  { name: 'color-primary', value: '#1A1A2E', description: 'Primary brand colour' },
+  { name: 'color-primary', value: '#1A1A2E', description: 'Primary brand color' },
   { name: 'color-secondary', value: '#16213E' },
   { name: 'color-accent', value: '#0F3460' },
   { name: 'color-surface', value: '#FFFFFF' },
@@ -98,7 +98,7 @@ describe('buildTokensFile', () => {
 
   it('includes a description comment when present', () => {
     const output = buildTokensFile(MOCK_TOKENS);
-    expect(output).toContain('Primary brand colour');
+    expect(output).toContain('Primary brand color');
   });
 
   it('does not throw for tokens without a description', () => {
@@ -124,7 +124,7 @@ describe('buildCSSFile', () => {
 
   it('includes description comments', () => {
     const output = buildCSSFile(MOCK_TOKENS);
-    expect(output).toContain('/* Primary brand colour */');
+    expect(output).toContain('/* Primary brand color */');
   });
 
   it('includes a Google Fonts import', () => {
@@ -136,7 +136,7 @@ describe('buildCSSFile', () => {
 // ── buildTailwindConfig ───────────────────────────────────────────────────────
 
 describe('buildTailwindConfig', () => {
-  it('references var(--…) for colour tokens', () => {
+  it('references var(--…) for color tokens', () => {
     const output = buildTailwindConfig(MOCK_CONCEPT, MOCK_TOKENS);
     expect(output).toContain("'var(--color-primary)'");
     expect(output).toContain("'var(--color-secondary)'");
@@ -184,7 +184,7 @@ describe('buildAppComponent', () => {
     expect(output).toContain('Clean Vision');
   });
 
-  it('references CSS custom properties for colours', () => {
+  it('references CSS custom properties for colors', () => {
     const output = buildAppComponent(MOCK_CONCEPT, MOCK_TOKENS, 'App');
     expect(output).toContain('var(--color-primary)');
   });

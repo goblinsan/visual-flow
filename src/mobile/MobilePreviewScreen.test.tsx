@@ -60,9 +60,9 @@ describe('MobilePreviewScreen', () => {
     expect(screen.getByLabelText('Design preview')).toBeInTheDocument();
   });
 
-  it('renders the colour palette section', () => {
+  it('renders the color palette section', () => {
     render(<MobilePreviewScreen snapshot={MINIMAL_SNAPSHOT} onBack={vi.fn()} onConfirm={vi.fn()} />);
-    expect(screen.getByText('Colour palette')).toBeInTheDocument();
+    expect(screen.getByText('Color palette')).toBeInTheDocument();
   });
 
   it('renders the typography section', () => {

@@ -189,7 +189,7 @@ export class CanvasRoom {
 
       const message = JSON.parse(data);
 
-      // Structure validation: must have a recognised type
+      // Structure validation: must have a recognized type
       if (!message || typeof message.type !== 'string') return;
 
       switch (message.type) {

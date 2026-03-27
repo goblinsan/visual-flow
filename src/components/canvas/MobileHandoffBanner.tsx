@@ -3,7 +3,7 @@
  *
  * Non-intrusive top banner shown in the desktop editor when a design
  * snapshot from the mobile flow is waiting to be applied.  The user can
- * accept (apply the mobile colours + typography) or dismiss the banner.
+ * accept (apply the mobile colors + typography) or dismiss the banner.
  *
  * Issue #211 – Preserve seamless transitions between mobile and desktop editing
  */
@@ -29,7 +29,7 @@ export function MobileHandoffBanner({
       aria-live="polite"
       className="flex items-center gap-3 px-4 py-2 bg-cyan-950 border-b border-cyan-800/60 text-sm text-cyan-100"
     >
-      {/* Colour swatches */}
+      {/* Color swatches */}
       <div className="flex gap-1 shrink-0">
         <span
           className="w-4 h-4 rounded-full border border-white/20"

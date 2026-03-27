@@ -1,19 +1,19 @@
 /**
  * ImageFirstFlow
  *
- * Guides the user from an uploaded image to extracted colour hints and
+ * Guides the user from an uploaded image to extracted color hints and
  * inferred mood suggestions, ready to seed the style journey.
  *
  * Flow:
  *  1. The user uploads or drops an image file.
  *  2. The component renders the image onto an off-screen <canvas> and
- *     samples pixels to extract the most prominent colours.
- *  3. Dominant colours are mapped to the nearest StyleMood via a simple
+ *     samples pixels to extract the most prominent colors.
+ *  3. Dominant colors are mapped to the nearest StyleMood via a simple
  *     hue-based heuristic.
- *  4. The caller receives the extracted colours and suggested moods via
+ *  4. The caller receives the extracted colors and suggested moods via
  *     `onExtractedColors` and can use them to pre-fill StyleSeed fields.
  *
- * Colour extraction runs entirely in the browser – no network requests.
+ * Color extraction runs entirely in the browser – no network requests.
  *
  * Phase 6 (#197)
  */
@@ -22,7 +22,7 @@ import { useState, useRef, useCallback } from 'react';
 import type { StyleMood } from '../style-flow/types';
 
 // ---------------------------------------------------------------------------
-// Colour extraction helpers
+// Color extraction helpers
 // ---------------------------------------------------------------------------
 
 /**
@@ -82,7 +82,7 @@ function rgbToHex(r: number, g: number, b: number): string {
 }
 
 /**
- * Cluster sampled RGB colours into `k` dominant colours using a simplified
+ * Cluster sampled RGB colors into `k` dominant colors using a simplified
  * median-cut approach (iterative k-means, 5 iterations).
  */
 function dominantColors(
@@ -128,9 +128,9 @@ function dominantColors(
 }
 
 /**
- * Map a dominant colour palette to the nearest StyleMood using HSL heuristics.
+ * Map a dominant color palette to the nearest StyleMood using HSL heuristics.
  *
- * Rules (applied to the most saturated / visually dominant colour):
+ * Rules (applied to the most saturated / visually dominant color):
  *  - Low saturation + light → minimal
  *  - Low saturation + dark  → elegant
  *  - High saturation, warm hues (red / orange / yellow) → bold
@@ -140,7 +140,7 @@ function dominantColors(
 function inferMoods(
   palette: [number, number, number][],
 ): StyleMood[] {
-  // Find the colour with the highest saturation as the "key" colour
+  // Find the color with the highest saturation as the "key" color
   const withHsl = palette.map((rgb) => ({
     rgb,
     hsl: rgbToHsl(rgb[0], rgb[1], rgb[2]),
@@ -174,7 +174,7 @@ function inferMoods(
 }
 
 /**
- * Extract dominant colours from an image element using an off-screen canvas.
+ * Extract dominant colors from an image element using an off-screen canvas.
  * Returns up to `maxColors` hex strings.
  */
 function extractColorsFromImage(
@@ -182,7 +182,7 @@ function extractColorsFromImage(
   maxColors = 5,
 ): string[] {
   const canvas = document.createElement('canvas');
-  // Scale down for performance – 80px is plenty for colour analysis
+  // Scale down for performance – 80px is plenty for color analysis
   const scale = Math.min(1, 80 / Math.max(img.naturalWidth, img.naturalHeight, 1));
   canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
   canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
@@ -210,11 +210,11 @@ function extractColorsFromImage(
 
 export interface ImageFirstFlowProps {
   /**
-   * Called once colours have been extracted from the uploaded image.
-   * Receives the dominant hex colours and inferred mood suggestions.
+   * Called once colors have been extracted from the uploaded image.
+   * Receives the dominant hex colors and inferred mood suggestions.
    */
   onExtractedColors: (colors: string[], suggestedMoods: StyleMood[]) => void;
-  /** Maximum number of dominant colours to extract (default: 5). */
+  /** Maximum number of dominant colors to extract (default: 5). */
   maxColors?: number;
 }
 
@@ -284,7 +284,7 @@ export function ImageFirstFlow({ onExtractedColors, maxColors = 5 }: ImageFirstF
   return (
     <div className="space-y-3">
       <p className="text-[11px] text-gray-500 italic">
-        Upload an image to extract its colour palette and kick off your style journey.
+        Upload an image to extract its color palette and kick off your style journey.
       </p>
 
       {/* Drop zone */}

@@ -1,8 +1,8 @@
 /**
  * MobileColorPickStep
  *
- * Offline-capable colour selection step for the 'color' mobile entry point.
- * Shows a curated grid of colour palettes (one per mood) so the user can
+ * Offline-capable color selection step for the 'color' mobile entry point.
+ * Shows a curated grid of color palettes (one per mood) so the user can
  * pick their starting palette without requiring an API call.
  *
  * Issue #206 – Design the simplified selection-based workflow

@@ -2,7 +2,7 @@
  * MobilePreviewScreen
  *
  * Shows a phone-frame mock-up of the assembled design system together with
- * the chosen colour palette and typography so the user can see their choices
+ * the chosen color palette and typography so the user can see their choices
  * before exporting.  A compact summary review panel at the bottom lists
  * every selection the user made throughout the guided flow.
  *
@@ -115,7 +115,7 @@ export function MobilePreviewScreen({
       {/* Palette row */}
       <div className="mt-6 mb-2">
         <p className="text-[11px] font-semibold text-white/40 uppercase tracking-wider mb-2">
-          Colour palette
+          Color palette
         </p>
         <div className="flex gap-2">
           {[primaryColor, accentColor, '#ffffff', '#111111'].map((hex) => (
