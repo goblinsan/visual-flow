@@ -3,7 +3,7 @@
  * Issues #205, #206, #207, #213, #214, #215
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MobileFlowShell } from './MobileFlowShell';
@@ -12,6 +12,10 @@ import { MobileFlowShell } from './MobileFlowShell';
 HTMLCanvasElement.prototype.getContext = vi.fn().mockReturnValue(null);
 
 describe('MobileFlowShell', () => {
+  // Clear persisted session so each test starts from a clean state (#217)
+  beforeEach(() => {
+    localStorage.clear();
+  });
   // ── Initial state ──────────────────────────────────────────────────────────
 
   it('starts at the entry screen', () => {

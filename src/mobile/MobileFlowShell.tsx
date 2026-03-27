@@ -21,7 +21,7 @@
  *  #215 – Lightweight live preview and summary review
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { StyleMood, StyleIndustry } from '../style-flow/types';
 import type { MobileEntryPoint, MobileFlowStep, MobileDesignSnapshot, MobileComponentSelections } from './types';
 import { MobileEntryScreen } from './MobileEntryScreen';
@@ -34,6 +34,7 @@ import { buildSnapshot } from './snapshotBuilder';
 import { ThemeFirstFlow } from '../components/ThemeFirstFlow';
 import { FontFirstFlow } from '../components/FontFirstFlow';
 import { ImageFirstFlow } from '../components/ImageFirstFlow';
+import { saveMobileFlowSession, loadMobileFlowSession, clearMobileFlowSession } from '../utils/persistence';
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
@@ -58,10 +59,48 @@ interface PickState {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function MobileFlowShell({ onComplete }: MobileFlowShellProps) {
-  const [step, setStep]                 = useState<MobileFlowStep>('entry');
-  const [entry, setEntry]               = useState<MobileEntryPoint | null>(null);
-  const [pickState, setPickState]       = useState<PickState>({ colors: [], moods: [], font: null, industry: null });
-  const [snapshot, setSnapshot]         = useState<MobileDesignSnapshot | null>(null);
+  // Restore any previously saved session on mount — lazy initialisers so
+  // localStorage is only read once (Issue #217)
+  const [step, setStep]           = useState<MobileFlowStep>(() => {
+    const s = loadMobileFlowSession();
+    return s?.step ?? 'entry';
+  });
+  const [entry, setEntry]         = useState<MobileEntryPoint | null>(() => {
+    return loadMobileFlowSession()?.entry ?? null;
+  });
+  const [pickState, setPickState] = useState<PickState>(() => {
+    const s = loadMobileFlowSession();
+    return {
+      colors:   s?.pickState.colors   ?? [],
+      moods:    (s?.pickState.moods   ?? []) as StyleMood[],
+      font:     s?.pickState.font     ?? null,
+      industry: (s?.pickState.industry ?? null) as StyleIndustry | null,
+    };
+  });
+  const [snapshot, setSnapshot]   = useState<MobileDesignSnapshot | null>(() => {
+    return loadMobileFlowSession()?.snapshot ?? null;
+  });
+
+  // Persist session on every state change (Issue #217)
+  useEffect(() => {
+    if (step === 'entry') {
+      // Nothing yet to save; clear any stale session
+      clearMobileFlowSession();
+      return;
+    }
+    saveMobileFlowSession({
+      step,
+      entry,
+      pickState: {
+        colors:   pickState.colors,
+        moods:    pickState.moods,
+        font:     pickState.font,
+        industry: pickState.industry,
+      },
+      snapshot,
+      savedAt: Date.now(),
+    });
+  }, [step, entry, pickState, snapshot]);
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
 
@@ -102,11 +141,13 @@ export function MobileFlowShell({ onComplete }: MobileFlowShellProps) {
     if (snapshot) {
       onComplete(snapshot);
     }
+    clearMobileFlowSession();
     setStep('done');
   }, [snapshot, onComplete]);
 
   /** Reset the entire flow. */
   const handleRestart = useCallback(() => {
+    clearMobileFlowSession();
     setStep('entry');
     setEntry(null);
     setPickState({ colors: [], moods: [], font: null, industry: null });
