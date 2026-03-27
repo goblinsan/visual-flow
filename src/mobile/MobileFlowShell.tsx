@@ -21,7 +21,7 @@
  *  #215 – Lightweight live preview and summary review
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import type { StyleMood, StyleIndustry } from '../style-flow/types';
 import type { MobileEntryPoint, MobileFlowStep, MobileDesignSnapshot, MobileComponentSelections } from './types';
 import { MobileEntryScreen } from './MobileEntryScreen';
@@ -35,6 +35,17 @@ import { ThemeFirstFlow } from '../components/ThemeFirstFlow';
 import { FontFirstFlow } from '../components/FontFirstFlow';
 import { ImageFirstFlow } from '../components/ImageFirstFlow';
 import { saveMobileFlowSession, loadMobileFlowSession, clearMobileFlowSession } from '../utils/persistence';
+import {
+  trackFlowStarted,
+  trackStepViewed,
+  trackStepCompleted,
+  trackFlowCompleted,
+  trackSessionResumed,
+  trackEntrySelected,
+  trackTemplateSelected,
+  trackComponentsSelected,
+  trackTokensDownloaded,
+} from './telemetry';
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
@@ -59,6 +70,17 @@ interface PickState {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function MobileFlowShell({ onComplete }: MobileFlowShellProps) {
+  // Stable session identifier for analytics — generated once per mount (#223)
+  const sessionId = useRef<string>(
+    `mf-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+  );
+
+  // Track step-entry timestamps so we can report duration per step (#223)
+  const stepEnteredAt = useRef<number>(Date.now());
+
+  // Track total flow start time for overall journey duration (#223)
+  const flowStartedAt = useRef<number>(Date.now());
+
   // Restore any previously saved session on mount — lazy initialisers so
   // localStorage is only read once (Issue #217)
   const [step, setStep]           = useState<MobileFlowStep>(() => {
@@ -80,6 +102,20 @@ export function MobileFlowShell({ onComplete }: MobileFlowShellProps) {
   const [snapshot, setSnapshot]   = useState<MobileDesignSnapshot | null>(() => {
     return loadMobileFlowSession()?.snapshot ?? null;
   });
+
+  // Fire session-resumed event if we loaded a non-entry step (#223)
+  useEffect(() => {
+    if (step !== 'entry') {
+      trackSessionResumed(sessionId.current, step);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Track step views (#223) — fires whenever the active step changes
+  useEffect(() => {
+    trackStepViewed(sessionId.current, step);
+    stepEnteredAt.current = Date.now();
+  }, [step]);
 
   // Persist session on every state change (Issue #217)
   useEffect(() => {
@@ -106,6 +142,10 @@ export function MobileFlowShell({ onComplete }: MobileFlowShellProps) {
 
   /** User selected an entry point on the landing screen. */
   const handleEntrySelect = useCallback((ep: MobileEntryPoint) => {
+    // Fire flow-started on the first user action, then track the specific entry (#223)
+    trackFlowStarted(sessionId.current);
+    trackEntrySelected(sessionId.current, ep);
+    trackStepCompleted(sessionId.current, 'entry', Date.now() - stepEnteredAt.current);
     setEntry(ep);
     // 'blank' skips the pick step and goes straight to refinement
     setStep(ep === 'blank' ? 'refine' : 'pick');
@@ -113,18 +153,27 @@ export function MobileFlowShell({ onComplete }: MobileFlowShellProps) {
 
   /** User confirmed their choice on the pick step. */
   const handlePickDone = useCallback((colors: string[], moods: StyleMood[], font: { family: string; body: string } | null, industry?: StyleIndustry) => {
+    trackStepCompleted(sessionId.current, 'pick', Date.now() - stepEnteredAt.current);
     setPickState({ colors, moods, font, industry: industry ?? null });
     setStep('refine');
   }, []);
 
   /** User confirmed mood + industry on the refine step. */
   const handleRefineDone = useCallback((moods: StyleMood[], industry: StyleIndustry) => {
+    trackStepCompleted(sessionId.current, 'refine', Date.now() - stepEnteredAt.current);
     setPickState((prev) => ({ ...prev, moods, industry }));
     setStep('components');
   }, []);
 
   /** User confirmed component style selections (#214). */
   const handleComponentsDone = useCallback((selections: MobileComponentSelections) => {
+    trackComponentsSelected(
+      sessionId.current,
+      selections.buttonStyle,
+      selections.cardStyle,
+      selections.navStyle,
+    );
+    trackStepCompleted(sessionId.current, 'components', Date.now() - stepEnteredAt.current);
     const snap = buildSnapshot(
       pickState.moods.length ? pickState.moods : ['minimal'],
       (pickState.industry ?? 'technology') as StyleIndustry,
@@ -139,6 +188,7 @@ export function MobileFlowShell({ onComplete }: MobileFlowShellProps) {
   /** User confirmed the preview — call the parent with the snapshot. */
   const handlePreviewConfirm = useCallback(() => {
     if (snapshot) {
+      trackFlowCompleted(sessionId.current, snapshot, Date.now() - flowStartedAt.current);
       onComplete(snapshot);
     }
     clearMobileFlowSession();
@@ -195,14 +245,15 @@ export function MobileFlowShell({ onComplete }: MobileFlowShellProps) {
       case 'template':
         return (
           <MobileTemplatePickStep
-            onPick={(preset) =>
+            onPick={(preset) => {
+              trackTemplateSelected(sessionId.current, preset.id);
               handlePickDone(
                 [...preset.colors],
                 [preset.mood],
                 { family: preset.headingFont, body: preset.bodyFont },
                 preset.industry,
-              )
-            }
+              );
+            }}
             onBack={() => setStep('entry')}
           />
         );
@@ -285,6 +336,7 @@ export function MobileFlowShell({ onComplete }: MobileFlowShellProps) {
         <button
           type="button"
           onClick={() => {
+            trackTokensDownloaded(sessionId.current);
             const css = `:root {\n${Object.entries(snapshot.tokens)
               .map(([k, v]) => `  --${k}: ${v};`)
               .join('\n')}\n}`;

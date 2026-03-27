@@ -207,6 +207,7 @@ export function MobilePreviewScreen({
       <button
         type="button"
         onClick={onConfirm}
+        aria-label="Use this design"
         className="mt-auto w-full py-4 rounded-2xl font-semibold text-base
                    bg-gradient-to-r from-cyan-500 to-blue-500 text-white
                    active:scale-[0.98] transition-transform duration-100"

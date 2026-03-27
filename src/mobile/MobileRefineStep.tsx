@@ -138,11 +138,19 @@ export function MobileRefineStep({
         </select>
       </section>
 
+      {/* Validation hint (#222) */}
+      {!canContinue && (
+        <p role="alert" className="text-xs text-amber-400/80 text-center mb-3">
+          Select at least one mood to continue.
+        </p>
+      )}
+
       {/* Continue CTA */}
       <button
         type="button"
         disabled={!canContinue}
         onClick={() => onConfirm(moods, industry)}
+        aria-disabled={!canContinue}
         className="mt-auto w-full py-4 rounded-2xl font-semibold text-base transition-all duration-200
                    disabled:opacity-40 disabled:cursor-not-allowed
                    bg-gradient-to-r from-cyan-500 to-blue-500 text-white
