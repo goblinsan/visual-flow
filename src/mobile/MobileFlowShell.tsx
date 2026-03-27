@@ -61,7 +61,6 @@ export function MobileFlowShell({ onComplete }: MobileFlowShellProps) {
   const [step, setStep]                 = useState<MobileFlowStep>('entry');
   const [entry, setEntry]               = useState<MobileEntryPoint | null>(null);
   const [pickState, setPickState]       = useState<PickState>({ colors: [], moods: [], font: null, industry: null });
-  const [components, setComponents]     = useState<MobileComponentSelections | null>(null);
   const [snapshot, setSnapshot]         = useState<MobileDesignSnapshot | null>(null);
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
@@ -87,7 +86,6 @@ export function MobileFlowShell({ onComplete }: MobileFlowShellProps) {
 
   /** User confirmed component style selections (#214). */
   const handleComponentsDone = useCallback((selections: MobileComponentSelections) => {
-    setComponents(selections);
     const snap = buildSnapshot(
       pickState.moods.length ? pickState.moods : ['minimal'],
       (pickState.industry ?? 'technology') as StyleIndustry,
@@ -112,7 +110,6 @@ export function MobileFlowShell({ onComplete }: MobileFlowShellProps) {
     setStep('entry');
     setEntry(null);
     setPickState({ colors: [], moods: [], font: null, industry: null });
-    setComponents(null);
     setSnapshot(null);
   }, []);
 
