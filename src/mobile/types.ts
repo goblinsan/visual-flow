@@ -10,7 +10,7 @@
  */
 
 /** The entry points exposed on the mobile landing screen. */
-export type MobileEntryPoint = 'theme' | 'color' | 'font' | 'image' | 'blank' | 'template';
+export type MobileEntryPoint = 'theme' | 'color' | 'font' | 'image' | 'blank' | 'template' | 'kulrs';
 
 /**
  * Step IDs for the mobile guided flow.
@@ -33,8 +33,14 @@ export interface MobileComponentSelections {
   buttonStyle: 'filled' | 'outlined' | 'ghost' | 'pill';
   /** Visual style for content cards. */
   cardStyle: 'flat' | 'elevated' | 'bordered' | 'gradient';
+  /** Visual style for containers/sections. */
+  containerStyle: 'flat' | 'soft' | 'glass' | 'outlined';
   /** Navigation pattern. */
   navStyle: 'bottom-bar' | 'top-bar' | 'side-nav';
+  /** Typography personality preset. */
+  typographyStyle: 'balanced' | 'editorial' | 'compact' | 'expressive';
+  /** Target design artifact to generate. */
+  outputType: 'mobile-app' | 'responsive-web' | 'dashboard' | 'landing-page';
 }
 
 /** Lightweight design snapshot produced at the end of the mobile flow. */
@@ -55,6 +61,8 @@ export interface MobileDesignSnapshot {
   components?: MobileComponentSelections;
   /** Full token map (CSS-variable-name → resolved value). */
   tokens: Record<string, string>;
+  /** Intended output form factor / artifact type. */
+  outputType?: MobileComponentSelections['outputType'];
 }
 
 /**

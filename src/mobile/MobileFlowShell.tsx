@@ -30,11 +30,13 @@ import { MobileRefineStep } from './MobileRefineStep';
 import { MobileComponentStep } from './MobileComponentStep';
 import { MobilePreviewScreen } from './MobilePreviewScreen';
 import { MobileTemplatePickStep } from './MobileTemplatePickStep';
+import { MobileKulrsImportStep } from './MobileKulrsImportStep';
 import { buildSnapshot } from './snapshotBuilder';
-import { ThemeFirstFlow } from '../components/ThemeFirstFlow';
+import { ThemeFirstFlow, type ThemeEntry } from '../components/ThemeFirstFlow';
 import { FontFirstFlow } from '../components/FontFirstFlow';
 import { ImageFirstFlow } from '../components/ImageFirstFlow';
 import { saveMobileFlowSession, loadMobileFlowSession, clearMobileFlowSession } from '../utils/persistence';
+import { darken, lighten } from '../utils/color';
 import {
   trackFlowStarted,
   trackStepViewed,
@@ -65,6 +67,16 @@ interface PickState {
   font: { family: string; body: string } | null;
   /** Pre-seeded industry from a template preset (#213). */
   industry: StyleIndustry | null;
+}
+
+function alignPaletteToMainColor(baseColors: string[], mainColor: string): string[] {
+  const base = baseColors.length ? [...baseColors] : [mainColor, lighten(mainColor, 0.2), lighten(mainColor, 0.86), darken(mainColor, 0.2)];
+  return [
+    mainColor,
+    base[1] ?? lighten(mainColor, 0.18),
+    base[2] ?? lighten(mainColor, 0.86),
+    base[3] ?? darken(mainColor, 0.2),
+  ];
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -102,6 +114,8 @@ export function MobileFlowShell({ onComplete }: MobileFlowShellProps) {
   const [snapshot, setSnapshot]   = useState<MobileDesignSnapshot | null>(() => {
     return loadMobileFlowSession()?.snapshot ?? null;
   });
+  const [themeMainColor, setThemeMainColor] = useState<string>('#ec4899');
+  const [selectedThemeEntry, setSelectedThemeEntry] = useState<ThemeEntry | null>(null);
 
   // Fire session-resumed event if we loaded a non-entry step (#223)
   useEffect(() => {
@@ -261,10 +275,42 @@ export function MobileFlowShell({ onComplete }: MobileFlowShellProps) {
       case 'theme':
         return (
           <PickWrapper stepLabel="Choose a theme">
+            <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-2">
+                Recolor selected theme
+              </p>
+              <div className="flex items-center gap-2 mb-2">
+                {['#ec4899', '#6366f1', '#0ea5e9', '#14b8a6', '#f59e0b', '#ef4444'].map((hex) => (
+                  <button
+                    key={hex}
+                    type="button"
+                    onClick={() => setThemeMainColor(hex)}
+                    aria-label={`Use ${hex} as main color`}
+                    className={`w-7 h-7 rounded-md border ${themeMainColor === hex ? 'border-slate-900' : 'border-slate-300'}`}
+                    style={{ backgroundColor: hex }}
+                  />
+                ))}
+              </div>
+              <label className="text-xs text-slate-600 flex items-center gap-2">
+                Main color
+                <input
+                  type="color"
+                  value={themeMainColor}
+                  onChange={(e) => setThemeMainColor(e.target.value)}
+                  className="w-9 h-7 rounded border border-slate-300"
+                />
+              </label>
+              {selectedThemeEntry && (
+                <p className="mt-2 text-[11px] text-slate-500">
+                  Applying <span className="font-semibold text-slate-700">{selectedThemeEntry.name}</span> with main color <span className="font-mono">{themeMainColor}</span>
+                </p>
+              )}
+            </div>
             <ThemeFirstFlow
+              onSelectTheme={setSelectedThemeEntry}
               onApplyTheme={(seed) =>
                 handlePickDone(
-                  seed.baseColors ?? [],
+                  alignPaletteToMainColor(seed.baseColors ?? [], themeMainColor),
                   seed.moods as StyleMood[],
                   seed.fontPreferences?.length
                     ? { family: seed.fontPreferences[0]!, body: seed.fontPreferences[1] ?? seed.fontPreferences[0]! }
@@ -302,6 +348,20 @@ export function MobileFlowShell({ onComplete }: MobileFlowShellProps) {
           <MobileColorPickStep
             onPick={(colors, mood) => handlePickDone(colors, [mood], null)}
             onBack={() => setStep('entry')}
+          />
+        );
+
+      case 'kulrs':
+        return (
+          <MobileKulrsImportStep
+            onBack={() => setStep('entry')}
+            onImport={(payload) =>
+              handlePickDone(
+                payload.colors,
+                [payload.mood],
+                { family: payload.headingFont, body: payload.bodyFont },
+              )
+            }
           />
         );
 

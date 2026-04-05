@@ -68,6 +68,13 @@ const ENTRY_CARDS: EntryCard[] = [
     description: 'Choose moods and industry yourself',
     gradient: 'from-emerald-500 to-teal-600',
   },
+  {
+    id: 'kulrs',
+    icon: 'fa-solid fa-swatchbook',
+    label: 'From Kulrs',
+    description: 'Paste a Kulrs link or import a palette directly',
+    gradient: 'from-teal-500 to-cyan-600',
+  },
 ];
 
 export interface MobileEntryScreenProps {
@@ -80,7 +87,14 @@ export function MobileEntryScreen({ onSelect }: MobileEntryScreenProps) {
     <div className="flex flex-col min-h-screen bg-slate-950 text-white px-5 pt-14 pb-8">
       {/* Hero */}
       <div className="mb-10">
-        <h1 className="text-3xl font-bold tracking-tight mb-2">Visual Flow</h1>
+        <div className="flex items-center gap-2.5 mb-2">
+          <div className="w-8 h-8 rounded-lg bg-white/15 backdrop-blur flex items-center justify-center shadow-sm overflow-hidden">
+            <img src="/vizail-mark.svg" alt="Vizail" className="w-5 h-5" />
+          </div>
+          <h1 className="tracking-wide text-white" style={{ fontFamily: '"Cal Sans", "Cal Sans Semibold", sans-serif', fontWeight: 600, fontSize: '1.6rem' }}>
+            Viz<span className="text-cyan-300">ai</span>l
+          </h1>
+        </div>
         <p className="text-white/50 text-base leading-relaxed">
           Build a beautiful design system in a few taps. How do you want to start?
         </p>

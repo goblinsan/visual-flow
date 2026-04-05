@@ -25,7 +25,9 @@ export function MobilePreviewScreen({
   onBack,
   onConfirm,
 }: MobilePreviewScreenProps) {
-  const { primaryColor, accentColor, headingFont, bodyFont, mood, industry } = snapshot;
+  const { primaryColor, accentColor, headingFont, bodyFont, mood, industry, outputType = 'mobile-app' } = snapshot;
+
+  const outputLabel = outputType.replace('-', ' ');
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-950 text-white px-5 pt-6 pb-8">
@@ -47,70 +49,65 @@ export function MobilePreviewScreen({
         </div>
       </div>
 
-      {/* Phone frame mock-up */}
-      <div
-        aria-label="Design preview"
-        className="relative mx-auto w-[220px] rounded-[32px] border-4 border-white/20 bg-white overflow-hidden shadow-xl shrink-0"
-        style={{ height: 390 }}
-      >
-        {/* Status bar */}
+      {/* Device/Output mock-up */}
+      {outputType === 'mobile-app' ? (
         <div
-          className="w-full h-7 flex items-center px-4 justify-between"
-          style={{ backgroundColor: primaryColor }}
+          aria-label="Design preview"
+          className="relative mx-auto w-[220px] rounded-[32px] border-4 border-white/20 bg-white overflow-hidden shadow-xl shrink-0"
+          style={{ height: 390 }}
         >
-          <span className="text-[8px] font-bold text-white/80">9:41</span>
-          <i className="fa-solid fa-wifi text-[8px] text-white/80" />
+          <div className="w-full h-7 flex items-center px-4 justify-between" style={{ backgroundColor: primaryColor }}>
+            <span className="text-[8px] font-bold text-white/80">9:41</span>
+            <i className="fa-solid fa-wifi text-[8px] text-white/80" />
+          </div>
+          <div className="w-full px-4 py-3" style={{ backgroundColor: primaryColor }}>
+            <p className="font-bold text-white text-[13px] truncate" style={{ fontFamily: headingFont }}>
+              {mood.charAt(0).toUpperCase() + mood.slice(1)} {industry}
+            </p>
+          </div>
+          <div className="p-3 space-y-2" style={{ backgroundColor: '#f8f8f8' }}>
+            {[accentColor, primaryColor, accentColor].map((color, i) => (
+              <div key={i} className="rounded-lg p-3 flex items-center gap-2" style={{ backgroundColor: '#fff', borderLeft: `4px solid ${color}` }}>
+                <div className="w-4 h-4 rounded" style={{ backgroundColor: color }} />
+                <div className="flex-1 min-w-0">
+                  <div className="h-2 rounded mb-1" style={{ backgroundColor: '#e0e0e0', width: `${60 + i * 10}%` }} />
+                  <div className="h-1.5 rounded" style={{ backgroundColor: '#e0e0e0', width: `${40 + i * 8}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="absolute bottom-0 w-full h-10 flex items-center justify-around px-4 border-t border-white/10" style={{ backgroundColor: primaryColor }}>
+            {['fa-house', 'fa-magnifying-glass', 'fa-bell', 'fa-user'].map((icon) => (
+              <i key={icon} className={`fa-solid ${icon} text-white/70 text-[11px]`} />
+            ))}
+          </div>
         </div>
-
-        {/* Header bar */}
-        <div
-          className="w-full px-4 py-3"
-          style={{ backgroundColor: primaryColor }}
-        >
-          <p
-            className="font-bold text-white text-[13px] truncate"
-            style={{ fontFamily: headingFont }}
-          >
-            {mood.charAt(0).toUpperCase() + mood.slice(1)} {industry}
-          </p>
-        </div>
-
-        {/* Content cards */}
-        <div className="p-3 space-y-2" style={{ backgroundColor: '#f8f8f8' }}>
-          {[accentColor, primaryColor, accentColor].map((color, i) => (
-            <div
-              key={i}
-              className="rounded-lg p-3 flex items-center gap-2"
-              style={{ backgroundColor: '#fff', borderLeft: `4px solid ${color}` }}
-            >
-              <div
-                className="w-4 h-4 rounded"
-                style={{ backgroundColor: color }}
-              />
-              <div className="flex-1 min-w-0">
-                <div
-                  className="h-2 rounded mb-1"
-                  style={{ backgroundColor: '#e0e0e0', width: `${60 + i * 10}%` }}
-                />
-                <div
-                  className="h-1.5 rounded"
-                  style={{ backgroundColor: '#e0e0e0', width: `${40 + i * 8}%` }}
-                />
+      ) : (
+        <div aria-label="Design preview" className="mx-auto w-full max-w-[320px] rounded-2xl border border-white/15 overflow-hidden shadow-xl shrink-0 bg-white">
+          <div className="h-9 px-3 flex items-center justify-between" style={{ backgroundColor: primaryColor }}>
+            <span className="text-[11px] text-white/85 font-semibold" style={{ fontFamily: headingFont }}>
+              {outputType === 'dashboard' ? 'Analytics Workspace' : outputType === 'landing-page' ? 'Launch Campaign' : 'Responsive Site'}
+            </span>
+            <span className="text-[10px] text-white/70 uppercase">{outputLabel}</span>
+          </div>
+          <div className="p-3 grid gap-2" style={{ backgroundColor: '#f8fafc' }}>
+            <div className="rounded-lg p-3" style={{ backgroundColor: '#ffffff', borderTop: `3px solid ${accentColor}` }}>
+              <div className="h-2 rounded mb-2" style={{ width: '72%', backgroundColor: '#dbe2ea' }} />
+              <div className="h-1.5 rounded" style={{ width: '48%', backgroundColor: '#e2e8f0' }} />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-lg p-2.5" style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
+                <div className="h-1.5 rounded mb-1.5" style={{ width: '65%', backgroundColor: '#dbe2ea' }} />
+                <div className="h-5 rounded" style={{ backgroundColor: `${primaryColor}22` }} />
+              </div>
+              <div className="rounded-lg p-2.5" style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
+                <div className="h-1.5 rounded mb-1.5" style={{ width: '58%', backgroundColor: '#dbe2ea' }} />
+                <div className="h-5 rounded" style={{ backgroundColor: `${accentColor}22` }} />
               </div>
             </div>
-          ))}
+          </div>
         </div>
-
-        {/* Bottom nav */}
-        <div
-          className="absolute bottom-0 w-full h-10 flex items-center justify-around px-4 border-t border-white/10"
-          style={{ backgroundColor: primaryColor }}
-        >
-          {['fa-house', 'fa-magnifying-glass', 'fa-bell', 'fa-user'].map((icon) => (
-            <i key={icon} className={`fa-solid ${icon} text-white/70 text-[11px]`} />
-          ))}
-        </div>
-      </div>
+      )}
 
       {/* Palette row */}
       <div className="mt-6 mb-2">
@@ -197,6 +194,33 @@ export function MobilePreviewScreen({
               </span>
               <span className="text-xs font-medium text-white/80 capitalize">
                 {snapshot.components.navStyle.replace('-', ' ')}
+              </span>
+            </div>
+            <div className="flex items-center justify-between px-4 py-2.5">
+              <span className="text-xs text-white/50 flex items-center gap-2">
+                <i className="fa-solid fa-box w-3" />
+                Container
+              </span>
+              <span className="text-xs font-medium text-white/80 capitalize">
+                {snapshot.components.containerStyle}
+              </span>
+            </div>
+            <div className="flex items-center justify-between px-4 py-2.5">
+              <span className="text-xs text-white/50 flex items-center gap-2">
+                <i className="fa-solid fa-font w-3" />
+                Typography
+              </span>
+              <span className="text-xs font-medium text-white/80 capitalize">
+                {snapshot.components.typographyStyle}
+              </span>
+            </div>
+            <div className="flex items-center justify-between px-4 py-2.5">
+              <span className="text-xs text-white/50 flex items-center gap-2">
+                <i className="fa-solid fa-layer-group w-3" />
+                Output
+              </span>
+              <span className="text-xs font-medium text-white/80 capitalize">
+                {outputLabel}
               </span>
             </div>
           </>

@@ -51,12 +51,17 @@ export function buildSnapshot(
   const headingFont = overrideFont?.family ?? MOOD_HEADING_FONTS[mood] ?? 'Inter';
   const bodyFont    = overrideFont?.body   ?? 'Inter';
 
+  const typographyStyle = components?.typographyStyle ?? 'balanced';
+  const baseFontSize = typographyStyle === 'compact' ? '14px' : typographyStyle === 'editorial' ? '17px' : '16px';
+  const headingScale = typographyStyle === 'expressive' ? '1.5' : typographyStyle === 'editorial' ? '1.4' : typographyStyle === 'compact' ? '1.2' : '1.3';
+
   const tokens: Record<string, string> = {
     'color-primary':      primaryColor,
     'color-accent':       accentColor,
     'font-heading':       headingFont,
     'font-body':          bodyFont,
-    'font-size-base':     '16px',
+    'font-size-base':     baseFontSize,
+    'font-scale-heading': headingScale,
     'line-height-base':   '1.6',
   };
 
@@ -64,7 +69,10 @@ export function buildSnapshot(
   if (components) {
     tokens['component-button-style'] = components.buttonStyle;
     tokens['component-card-style']   = components.cardStyle;
+    tokens['component-container-style'] = components.containerStyle;
     tokens['component-nav-style']    = components.navStyle;
+    tokens['component-typography-style'] = components.typographyStyle;
+    tokens['output-type'] = components.outputType;
   }
 
   return {
@@ -75,6 +83,7 @@ export function buildSnapshot(
     mood,
     industry,
     components,
+    outputType: components?.outputType,
     tokens,
   };
 }
