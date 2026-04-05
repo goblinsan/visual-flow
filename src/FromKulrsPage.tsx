@@ -59,6 +59,7 @@ function buildThemeFromResolvedColors(
   themeMode: ThemeMode,
   resolvedColors: ThemeColors,
 ): DesignTheme {
+  const primary = safe(paletteColors, 0);
   const isPaletteDark = resolvedColors.isDark;
   
   // Map the resolved theme colors to semantic tokens
@@ -78,7 +79,9 @@ function buildThemeFromResolvedColors(
       // Text — use resolved colors
       'color.text.primary': resolvedColors.textPrimary,
       'color.text.secondary': resolvedColors.textSecondary,
-      'color.text.inverse': isPaletteDark ? resolvedColors.textSecondary : resolvedColors.textPrimary,
+      // Inverse text is used on primary action/nav surfaces in Kulrs templates.
+      // It must follow contrast against the primary color (not page text semantics).
+      'color.text.inverse': textOn(primary),
       'color.text.link': safe(paletteColors, 2), // Use 3rd palette color as link
       
       // Borders — use resolved colors

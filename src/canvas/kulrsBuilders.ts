@@ -392,7 +392,7 @@ export const TOP_NAV_BINDINGS: Record<string, ThemeBindings> = {
   'hero-title':    { color: 'color.action.secondary' },
   'hero-subtitle': { color: 'color.action.secondary' },
   'hero-cta':      { fill: 'color.accent.primary' },
-  'hero-cta-text': { color: 'color.text.inverse' },
+  'hero-cta-text': { color: 'color.text.primary' },
   'content':       { fill: 'color.surface.card', stroke: 'color.border.primary' },
   'content-title': { color: 'color.text.primary' },
 };
