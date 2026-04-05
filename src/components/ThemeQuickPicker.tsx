@@ -14,13 +14,21 @@ import { useEffect } from 'react';
 import { loadGoogleFont } from '../utils/googleFonts';
 
 // ── Preset palettes ────────────────────────────────────────────────────────
-export const PRESET_PALETTES: { id: string; name: string; colors: string[] }[] = [
+export const PRESET_PALETTES: { id: string; name: string; colors: string[]; mood?: string }[] = [
   { id: 'none', name: 'None', colors: [] },
-  { id: 'ocean', name: 'Ocean', colors: ['#0f172a', '#1e3a5f', '#3b82f6', '#93c5fd', '#f0f9ff'] },
-  { id: 'sunset', name: 'Sunset', colors: ['#7c2d12', '#ea580c', '#fb923c', '#fde68a', '#fffbeb'] },
-  { id: 'forest', name: 'Forest', colors: ['#14532d', '#16a34a', '#4ade80', '#bbf7d0', '#f0fdf4'] },
-  { id: 'slate', name: 'Slate', colors: ['#0f172a', '#334155', '#64748b', '#cbd5e1', '#f8fafc'] },
-  { id: 'berry', name: 'Berry', colors: ['#4a044e', '#a21caf', '#e879f9', '#f5d0fe', '#fdf4ff'] },
+  { id: 'ocean', name: 'Ocean', colors: ['#0f172a', '#1e3a5f', '#3b82f6', '#93c5fd', '#f0f9ff'], mood: 'Calm marine depth' },
+  { id: 'sunset', name: 'Sunset', colors: ['#7c2d12', '#ea580c', '#fb923c', '#fde68a', '#fffbeb'], mood: 'Warm cinematic dusk' },
+  { id: 'forest', name: 'Forest', colors: ['#14532d', '#16a34a', '#4ade80', '#bbf7d0', '#f0fdf4'], mood: 'Organic and grounded' },
+  { id: 'slate', name: 'Slate', colors: ['#0f172a', '#334155', '#64748b', '#cbd5e1', '#f8fafc'], mood: 'Neutral product UI' },
+  { id: 'berry', name: 'Berry', colors: ['#4a044e', '#a21caf', '#e879f9', '#f5d0fe', '#fdf4ff'], mood: 'Playful bold contrast' },
+  { id: 'premium-fintech', name: 'Premium Fintech', colors: ['#533afd', '#061b31', '#ea2261', '#f96bee', '#e5edf5'], mood: 'Premium fintech confidence' },
+  { id: 'editorial-soft', name: 'Editorial Soft', colors: ['#ffffff', '#f6f5f4', '#615d59', '#0075de', '#31302e'], mood: 'Warm editorial minimalism' },
+  { id: 'media-night', name: 'Media Night', colors: ['#121212', '#181818', '#1f1f1f', '#1ed760', '#b3b3b3'], mood: 'Immersive dark media' },
+  { id: 'ops-control', name: 'Ops Control', colors: ['#08090a', '#191a1b', '#5e6ad2', '#7170ff', '#d0d6e0'], mood: 'Precision dark tooling' },
+  { id: 'warm-hospitality', name: 'Warm Hospitality', colors: ['#ff385c', '#ffb400', '#00a699', '#f7f7f7', '#484848'], mood: 'Hospitality with warmth' },
+  { id: 'neon-developer', name: 'Neon Developer', colors: ['#0f172a', '#111827', '#3ecf8e', '#80ed99', '#f8fafc'], mood: 'Developer green glow' },
+  { id: 'mono-ink', name: 'Monochrome Ink', colors: ['#000000', '#171717', '#404040', '#fafafa', '#2563eb'], mood: 'Monochrome with sharp accent' },
+  { id: 'electric-builder', name: 'Electric Builder', colors: ['#146ef5', '#2f66f3', '#9ec5fe', '#f8fbff', '#0b1220'], mood: 'Energetic builder UI' },
 ];
 
 // ── Font pair presets ──────────────────────────────────────────────────────
@@ -29,6 +37,14 @@ export const FONT_PAIRS: { id: string; heading: string; body: string; label: str
   { id: 'elegant', heading: 'Playfair Display', body: 'Inter', label: 'Elegant', style: 'Serif + sans' },
   { id: 'modern', heading: 'Space Grotesk', body: 'DM Sans', label: 'Techy', style: 'Geometric sans' },
   { id: 'friendly', heading: 'Poppins', body: 'Open Sans', label: 'Friendly', style: 'Rounded sans' },
+  { id: 'fintech', heading: 'Space Grotesk', body: 'Source Sans 3', label: 'Fintech', style: 'Engineered and premium' },
+  { id: 'editorial', heading: 'DM Sans', body: 'Inter', label: 'Editorial', style: 'Calm product documentation' },
+  { id: 'ops', heading: 'Inter', body: 'Inter', label: 'Ops', style: 'Dense and precise' },
+  { id: 'music', heading: 'Montserrat', body: 'Nunito Sans', label: 'Music', style: 'Bold and compact' },
+  { id: 'hospitality', heading: 'Nunito Sans', body: 'Source Sans 3', label: 'Hospitality', style: 'Friendly and human' },
+  { id: 'luxury', heading: 'Cormorant Garamond', body: 'Work Sans', label: 'Luxury', style: 'High-contrast serif voice' },
+  { id: 'neo-grotesk', heading: 'Plus Jakarta Sans', body: 'Manrope', label: 'SaaS', style: 'Neutral modern app' },
+  { id: 'retro-tech', heading: 'Bebas Neue', body: 'Space Mono', label: 'Retro Tech', style: 'Display plus mono' },
 ];
 
 export interface ThemeQuickPickerProps {
@@ -128,6 +144,11 @@ export function ThemeQuickPicker({
                   ? (isDark ? 'text-white/80' : 'text-gray-800')
                   : (isDark ? 'text-white/40' : 'text-gray-500')
               }`}>{pal.name}</div>
+              {pal.mood && (
+                <div className={`text-[9px] mt-0.5 text-center ${isDark ? 'text-white/30' : 'text-gray-400'}`}>
+                  {pal.mood}
+                </div>
+              )}
             </button>
           ))}
         </div>
@@ -136,7 +157,7 @@ export function ThemeQuickPicker({
       {/* Font pair picker */}
       <div>
         <p className={sectionLabel}>Font Pairing</p>
-        <div className={`grid gap-2 ${fontPairs.length > 4 ? 'grid-cols-5' : 'grid-cols-4'}`}>
+        <div className={`grid gap-2 ${fontPairs.length > 8 ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4' : fontPairs.length > 4 ? 'grid-cols-5' : 'grid-cols-4'}`}>
           {fontPairs.map((fp) => (
             <button
               key={fp.id}
