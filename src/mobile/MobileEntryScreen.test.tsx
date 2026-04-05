@@ -9,7 +9,7 @@ import userEvent from '@testing-library/user-event';
 import { MobileEntryScreen } from './MobileEntryScreen';
 
 describe('MobileEntryScreen', () => {
-  it('renders all six entry point cards', () => {
+  it('renders all entry point cards', () => {
     render(<MobileEntryScreen onSelect={vi.fn()} />);
     expect(screen.getByText('By Template')).toBeInTheDocument();
     expect(screen.getByText('By Theme')).toBeInTheDocument();
@@ -17,6 +17,7 @@ describe('MobileEntryScreen', () => {
     expect(screen.getByText('By Font')).toBeInTheDocument();
     expect(screen.getByText('By Image')).toBeInTheDocument();
     expect(screen.getByText('Start Blank')).toBeInTheDocument();
+    expect(screen.getByText('From Kulrs')).toBeInTheDocument();
   });
 
   it('renders a description for each card', () => {
@@ -27,6 +28,7 @@ describe('MobileEntryScreen', () => {
     expect(screen.getByText(/Let typography set the tone/i)).toBeInTheDocument();
     expect(screen.getByText(/Extract a palette from a photo/i)).toBeInTheDocument();
     expect(screen.getByText(/Choose moods and industry yourself/i)).toBeInTheDocument();
+    expect(screen.getByText(/Paste a Kulrs link/i)).toBeInTheDocument();
   });
 
   it('calls onSelect with "theme" when the theme card is tapped', async () => {
@@ -72,9 +74,16 @@ describe('MobileEntryScreen', () => {
     expect(onSelect).toHaveBeenCalledWith('template');
   });
 
+  it('calls onSelect with "kulrs" when the kulrs card is tapped', async () => {
+    const onSelect = vi.fn();
+    render(<MobileEntryScreen onSelect={onSelect} />);
+    await userEvent.click(screen.getByLabelText('Start by From Kulrs'));
+    expect(onSelect).toHaveBeenCalledWith('kulrs');
+  });
+
   it('renders the hero headline', () => {
     render(<MobileEntryScreen onSelect={vi.fn()} />);
-    expect(screen.getByText('Visual Flow')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /vizail/i })).toBeInTheDocument();
   });
 
   it('renders the hero subtitle', () => {

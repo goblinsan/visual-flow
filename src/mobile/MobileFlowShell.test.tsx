@@ -20,7 +20,7 @@ describe('MobileFlowShell', () => {
 
   it('starts at the entry screen', () => {
     render(<MobileFlowShell onComplete={vi.fn()} />);
-    expect(screen.getByText('Visual Flow')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /vizail/i })).toBeInTheDocument();
     expect(screen.getByText('By Theme')).toBeInTheDocument();
   });
 
@@ -77,7 +77,7 @@ describe('MobileFlowShell', () => {
     expect(screen.getByText('Pick a palette')).toBeInTheDocument();
 
     await userEvent.click(screen.getByLabelText('Go back'));
-    expect(screen.getByText('Visual Flow')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /vizail/i })).toBeInTheDocument();
   });
 
   it('goes back to the entry screen from the refine step (blank entry)', async () => {
@@ -86,7 +86,7 @@ describe('MobileFlowShell', () => {
     expect(screen.getByText('Refine your style')).toBeInTheDocument();
 
     await userEvent.click(screen.getByLabelText('Go back'));
-    expect(screen.getByText('Visual Flow')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /vizail/i })).toBeInTheDocument();
   });
 
   it('goes back to the template pick step from the entry screen (#213)', async () => {
@@ -95,7 +95,7 @@ describe('MobileFlowShell', () => {
     expect(screen.getByText('Choose a template')).toBeInTheDocument();
 
     await userEvent.click(screen.getByLabelText('Go back'));
-    expect(screen.getByText('Visual Flow')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /vizail/i })).toBeInTheDocument();
   });
 
   // ── Color entry flow ───────────────────────────────────────────────────────
@@ -266,6 +266,6 @@ describe('MobileFlowShell', () => {
     await userEvent.click(screen.getByText('Start over'));
 
     // Should be back at the entry screen
-    expect(screen.getByText('Visual Flow')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /vizail/i })).toBeInTheDocument();
   });
 });
