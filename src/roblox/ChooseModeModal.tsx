@@ -114,7 +114,7 @@ export function ChooseModeModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-blue-950/95 via-slate-900/95 to-cyan-900/95 backdrop-blur-md">
-      <div className="w-full max-w-2xl mx-4 animate-slide-up">
+      <div className="w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto animate-slide-up rounded-xl">
         {/* Header */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-3 mb-4">

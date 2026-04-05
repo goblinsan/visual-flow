@@ -14,37 +14,37 @@ import { useEffect } from 'react';
 import { loadGoogleFont } from '../utils/googleFonts';
 
 // ── Preset palettes ────────────────────────────────────────────────────────
-export const PRESET_PALETTES: { id: string; name: string; colors: string[]; mood?: string }[] = [
+export const PRESET_PALETTES: { id: string; name: string; colors: string[]; mood?: string; designGuidance?: { spacingUnit?: number; borderRadiusScale?: Record<string, number>; shadowProfile?: 'subtle' | 'moderate' | 'dramatic' } }[] = [
   { id: 'none', name: 'None', colors: [] },
-  { id: 'ocean', name: 'Ocean', colors: ['#0f172a', '#1e3a5f', '#3b82f6', '#93c5fd', '#f0f9ff'], mood: 'Calm marine depth' },
-  { id: 'sunset', name: 'Sunset', colors: ['#7c2d12', '#ea580c', '#fb923c', '#fde68a', '#fffbeb'], mood: 'Warm cinematic dusk' },
-  { id: 'forest', name: 'Forest', colors: ['#14532d', '#16a34a', '#4ade80', '#bbf7d0', '#f0fdf4'], mood: 'Organic and grounded' },
-  { id: 'slate', name: 'Slate', colors: ['#0f172a', '#334155', '#64748b', '#cbd5e1', '#f8fafc'], mood: 'Neutral product UI' },
-  { id: 'berry', name: 'Berry', colors: ['#4a044e', '#a21caf', '#e879f9', '#f5d0fe', '#fdf4ff'], mood: 'Playful bold contrast' },
-  { id: 'premium-fintech', name: 'Premium Fintech', colors: ['#533afd', '#061b31', '#ea2261', '#f96bee', '#e5edf5'], mood: 'Premium fintech confidence' },
-  { id: 'editorial-soft', name: 'Editorial Soft', colors: ['#ffffff', '#f6f5f4', '#615d59', '#0075de', '#31302e'], mood: 'Warm editorial minimalism' },
-  { id: 'media-night', name: 'Media Night', colors: ['#121212', '#181818', '#1f1f1f', '#1ed760', '#b3b3b3'], mood: 'Immersive dark media' },
-  { id: 'ops-control', name: 'Ops Control', colors: ['#08090a', '#191a1b', '#5e6ad2', '#7170ff', '#d0d6e0'], mood: 'Precision dark tooling' },
-  { id: 'warm-hospitality', name: 'Warm Hospitality', colors: ['#ff385c', '#ffb400', '#00a699', '#f7f7f7', '#484848'], mood: 'Hospitality with warmth' },
-  { id: 'neon-developer', name: 'Neon Developer', colors: ['#0f172a', '#111827', '#3ecf8e', '#80ed99', '#f8fafc'], mood: 'Developer green glow' },
-  { id: 'mono-ink', name: 'Monochrome Ink', colors: ['#000000', '#171717', '#404040', '#fafafa', '#2563eb'], mood: 'Monochrome with sharp accent' },
-  { id: 'electric-builder', name: 'Electric Builder', colors: ['#146ef5', '#2f66f3', '#9ec5fe', '#f8fbff', '#0b1220'], mood: 'Energetic builder UI' },
+  { id: 'ocean', name: 'Ocean', colors: ['#0f172a', '#1e3a5f', '#3b82f6', '#93c5fd', '#f0f9ff'], mood: 'Calm marine depth', designGuidance: { spacingUnit: 8, borderRadiusScale: { sm: 4, md: 8, lg: 12 }, shadowProfile: 'subtle' } },
+  { id: 'sunset', name: 'Sunset', colors: ['#7c2d12', '#ea580c', '#fb923c', '#fde68a', '#fffbeb'], mood: 'Warm cinematic dusk', designGuidance: { spacingUnit: 8, borderRadiusScale: { sm: 6, md: 10, lg: 14 }, shadowProfile: 'moderate' } },
+  { id: 'forest', name: 'Forest', colors: ['#14532d', '#16a34a', '#4ade80', '#bbf7d0', '#f0fdf4'], mood: 'Organic and grounded', designGuidance: { spacingUnit: 8, borderRadiusScale: { sm: 8, md: 12, lg: 16 }, shadowProfile: 'subtle' } },
+  { id: 'slate', name: 'Slate', colors: ['#0f172a', '#334155', '#64748b', '#cbd5e1', '#f8fafc'], mood: 'Neutral product UI', designGuidance: { spacingUnit: 8, borderRadiusScale: { sm: 4, md: 6, lg: 8 }, shadowProfile: 'moderate' } },
+  { id: 'berry', name: 'Berry', colors: ['#4a044e', '#a21caf', '#e879f9', '#f5d0fe', '#fdf4ff'], mood: 'Playful bold contrast', designGuidance: { spacingUnit: 8, borderRadiusScale: { sm: 6, md: 10, lg: 14 }, shadowProfile: 'dramatic' } },
+  { id: 'premium-fintech', name: 'Premium Fintech', colors: ['#533afd', '#061b31', '#ea2261', '#f96bee', '#e5edf5'], mood: 'Premium fintech confidence', designGuidance: { spacingUnit: 8, borderRadiusScale: { sm: 4, md: 6, lg: 8 }, shadowProfile: 'dramatic' } },
+  { id: 'editorial-soft', name: 'Editorial Soft', colors: ['#ffffff', '#f6f5f4', '#615d59', '#0075de', '#31302e'], mood: 'Warm editorial minimalism', designGuidance: { spacingUnit: 8, borderRadiusScale: { sm: 4, md: 8, lg: 12 }, shadowProfile: 'subtle' } },
+  { id: 'media-night', name: 'Media Night', colors: ['#121212', '#181818', '#1f1f1f', '#1ed760', '#b3b3b3'], mood: 'Immersive dark media', designGuidance: { spacingUnit: 8, borderRadiusScale: { sm: 6, md: 8, lg: 12 }, shadowProfile: 'dramatic' } },
+  { id: 'ops-control', name: 'Ops Control', colors: ['#08090a', '#191a1b', '#5e6ad2', '#7170ff', '#d0d6e0'], mood: 'Precision dark tooling', designGuidance: { spacingUnit: 4, borderRadiusScale: { sm: 2, md: 6, lg: 8 }, shadowProfile: 'subtle' } },
+  { id: 'warm-hospitality', name: 'Warm Hospitality', colors: ['#ff385c', '#ffb400', '#00a699', '#f7f7f7', '#484848'], mood: 'Hospitality with warmth', designGuidance: { spacingUnit: 8, borderRadiusScale: { sm: 8, md: 12, lg: 16 }, shadowProfile: 'moderate' } },
+  { id: 'neon-developer', name: 'Neon Developer', colors: ['#0f172a', '#111827', '#3ecf8e', '#80ed99', '#f8fafc'], mood: 'Developer green glow', designGuidance: { spacingUnit: 8, borderRadiusScale: { sm: 4, md: 8, lg: 12 }, shadowProfile: 'dramatic' } },
+  { id: 'mono-ink', name: 'Monochrome Ink', colors: ['#000000', '#171717', '#404040', '#fafafa', '#2563eb'], mood: 'Monochrome with sharp accent', designGuidance: { spacingUnit: 8, borderRadiusScale: { sm: 2, md: 4, lg: 6 }, shadowProfile: 'subtle' } },
+  { id: 'electric-builder', name: 'Electric Builder', colors: ['#146ef5', '#2f66f3', '#9ec5fe', '#f8fbff', '#0b1220'], mood: 'Energetic builder UI', designGuidance: { spacingUnit: 8, borderRadiusScale: { sm: 6, md: 10, lg: 16 }, shadowProfile: 'dramatic' } },
 ];
 
 // ── Font pair presets ──────────────────────────────────────────────────────
-export const FONT_PAIRS: { id: string; heading: string; body: string; label: string; style: string }[] = [
-  { id: 'default', heading: 'Inter', body: 'Inter', label: 'Clean', style: 'Modern sans-serif' },
-  { id: 'elegant', heading: 'Playfair Display', body: 'Inter', label: 'Elegant', style: 'Serif + sans' },
-  { id: 'modern', heading: 'Space Grotesk', body: 'DM Sans', label: 'Techy', style: 'Geometric sans' },
-  { id: 'friendly', heading: 'Poppins', body: 'Open Sans', label: 'Friendly', style: 'Rounded sans' },
-  { id: 'fintech', heading: 'Space Grotesk', body: 'Source Sans 3', label: 'Fintech', style: 'Engineered and premium' },
-  { id: 'editorial', heading: 'DM Sans', body: 'Inter', label: 'Editorial', style: 'Calm product documentation' },
-  { id: 'ops', heading: 'Inter', body: 'Inter', label: 'Ops', style: 'Dense and precise' },
-  { id: 'music', heading: 'Montserrat', body: 'Nunito Sans', label: 'Music', style: 'Bold and compact' },
-  { id: 'hospitality', heading: 'Nunito Sans', body: 'Source Sans 3', label: 'Hospitality', style: 'Friendly and human' },
-  { id: 'luxury', heading: 'Cormorant Garamond', body: 'Work Sans', label: 'Luxury', style: 'High-contrast serif voice' },
-  { id: 'neo-grotesk', heading: 'Plus Jakarta Sans', body: 'Manrope', label: 'SaaS', style: 'Neutral modern app' },
-  { id: 'retro-tech', heading: 'Bebas Neue', body: 'Space Mono', label: 'Retro Tech', style: 'Display plus mono' },
+export const FONT_PAIRS: { id: string; heading: string; body: string; label: string; style: string; designGuidance?: { headingSize?: number; bodySize?: number; lineHeightMultiplier?: number; letterSpacing?: Record<string, number> } }[] = [
+  { id: 'default', heading: 'Inter', body: 'Inter', label: 'Clean', style: 'Modern sans-serif', designGuidance: { headingSize: 32, bodySize: 16, lineHeightMultiplier: 1.5, letterSpacing: { heading: -0.5, body: 0 } } },
+  { id: 'elegant', heading: 'Playfair Display', body: 'Inter', label: 'Elegant', style: 'Serif + sans', designGuidance: { headingSize: 36, bodySize: 16, lineHeightMultiplier: 1.6, letterSpacing: { heading: -1, body: 0 } } },
+  { id: 'modern', heading: 'Space Grotesk', body: 'DM Sans', label: 'Techy', style: 'Geometric sans', designGuidance: { headingSize: 32, bodySize: 15, lineHeightMultiplier: 1.4, letterSpacing: { heading: -0.3, body: 0.5 } } },
+  { id: 'friendly', heading: 'Poppins', body: 'Open Sans', label: 'Friendly', style: 'Rounded sans', designGuidance: { headingSize: 34, bodySize: 16, lineHeightMultiplier: 1.6, letterSpacing: { heading: 0, body: 0.2 } } },
+  { id: 'fintech', heading: 'Space Grotesk', body: 'Source Sans 3', label: 'Fintech', style: 'Engineered and premium', designGuidance: { headingSize: 32, bodySize: 14, lineHeightMultiplier: 1.4, letterSpacing: { heading: -0.6, body: 0 } } },
+  { id: 'editorial', heading: 'DM Sans', body: 'Inter', label: 'Editorial', style: 'Calm product documentation', designGuidance: { headingSize: 28, bodySize: 16, lineHeightMultiplier: 1.7, letterSpacing: { heading: -0.2, body: 0.3 } } },
+  { id: 'ops', heading: 'Inter', body: 'Inter', label: 'Ops', style: 'Dense and precise', designGuidance: { headingSize: 24, bodySize: 13, lineHeightMultiplier: 1.3, letterSpacing: { heading: -0.3, body: 0 } } },
+  { id: 'music', heading: 'Montserrat', body: 'Nunito Sans', label: 'Music', style: 'Bold and compact', designGuidance: { headingSize: 36, bodySize: 15, lineHeightMultiplier: 1.4, letterSpacing: { heading: -0.5, body: 0.1 } } },
+  { id: 'hospitality', heading: 'Nunito Sans', body: 'Source Sans 3', label: 'Hospitality', style: 'Friendly and human', designGuidance: { headingSize: 34, bodySize: 16, lineHeightMultiplier: 1.6, letterSpacing: { heading: 0, body: 0.3 } } },
+  { id: 'luxury', heading: 'Cormorant Garamond', body: 'Work Sans', label: 'Luxury', style: 'High-contrast serif voice', designGuidance: { headingSize: 40, bodySize: 16, lineHeightMultiplier: 1.8, letterSpacing: { heading: -1.5, body: 0.5 } } },
+  { id: 'neo-grotesk', heading: 'Plus Jakarta Sans', body: 'Manrope', label: 'SaaS', style: 'Neutral modern app', designGuidance: { headingSize: 30, bodySize: 16, lineHeightMultiplier: 1.5, letterSpacing: { heading: -0.3, body: 0.2 } } },
+  { id: 'retro-tech', heading: 'Bebas Neue', body: 'Space Mono', label: 'Retro Tech', style: 'Display plus mono', designGuidance: { headingSize: 40, bodySize: 13, lineHeightMultiplier: 1.6, letterSpacing: { heading: 1, body: 0 } } },
 ];
 
 export interface ThemeQuickPickerProps {
