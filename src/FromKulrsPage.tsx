@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { LayoutSpec } from './layout-schema';
 import { saveDesignSpec, setCurrentDesignName } from './utils/persistence';
-import { generateThemeFromPalette } from './theme/themeGenerator';
+import type { DesignTheme } from './theme/types';
 import { lighten, darken } from './utils/color';
 import { loadGoogleFont } from './utils/googleFonts';
 import {
@@ -41,6 +41,72 @@ function parseKulrsParams(): KulrsParams {
     template: (sp.get('template') as KulrsTemplate) || 'top-nav',
     theme,
     customBg,
+  };
+}
+
+/* ── Theme builder for Kulrs imports ───────────────────────────────── */
+
+/**
+ * Build a DesignTheme that matches the actual colors used in the Kulrs preview.
+ * Instead of algorithmically deriving from palette (which causes drift),
+ * we use the resolved ThemeColors that was used to render the preview,
+ * guaranteeing preview and editor will look identical.
+ */
+function buildThemeFromResolvedColors(
+  paletteColors: string[],
+  headingFont: string,
+  bodyFont: string,
+  themeMode: ThemeMode,
+  resolvedColors: ThemeColors,
+): DesignTheme {
+  const isPaletteDark = resolvedColors.isDark;
+  
+  // Map the resolved theme colors to semantic tokens
+  // These are the ACTUAL colors that the preview rendered with
+  return {
+    id: `kulrs_${themeMode}_${Date.now().toString(36)}`,
+    name: `Kulrs ${themeMode === 'dark' ? 'Dark' : 'Light'}`,
+    paletteColors,
+    mode: themeMode === 'dark' ? 'dark' : 'light',
+    colors: {
+      // Backgrounds — use resolved colors
+      'color.background.primary': resolvedColors.pageBg,
+      'color.background.secondary': resolvedColors.cardBg,
+      'color.background.tertiary': resolvedColors.cardBg,
+      'color.background.inverse': isPaletteDark ? resolvedColors.pageBg : resolvedColors.cardBg,
+      
+      // Text — use resolved colors
+      'color.text.primary': resolvedColors.textPrimary,
+      'color.text.secondary': resolvedColors.textSecondary,
+      'color.text.inverse': isPaletteDark ? resolvedColors.textSecondary : resolvedColors.textPrimary,
+      'color.text.link': safe(paletteColors, 2), // Use 3rd palette color as link
+      
+      // Borders — use resolved colors
+      'color.border.primary': resolvedColors.border,
+      'color.border.secondary': resolvedColors.border,
+      'color.border.focus': safe(paletteColors, 0), // Primary palette color for focus
+      
+      // Actions — use palette colors for interactive elements
+      'color.action.primary': safe(paletteColors, 0),
+      'color.action.primaryHover': darken(safe(paletteColors, 0), 0.15),
+      'color.action.secondary': safe(paletteColors, 1),
+      'color.action.secondaryHover': darken(safe(paletteColors, 1), 0.15),
+      
+      // Status — derive from palette colors
+      'color.status.success': safe(paletteColors, 2),
+      'color.status.warning': safe(paletteColors, 3),
+      'color.status.error': safe(paletteColors, 1),
+      'color.status.info': safe(paletteColors, 4),
+      
+      // Surface — use resolved colors 
+      'color.surface.card': resolvedColors.cardBg,
+      'color.surface.overlay': resolvedColors.cardBg,
+      
+      // Accent — use palette colors
+      'color.accent.primary': safe(paletteColors, 0),
+      'color.accent.secondary': safe(paletteColors, 1),
+    },
+    typography: { headingFont, bodyFont, monoFont: 'Fira Code' },
   };
 }
 
@@ -274,12 +340,15 @@ export default function FromKulrsPage() {
   const handleEditInVizail = () => {
     saveDesignSpec(spec);
     setCurrentDesignName(`Kulrs Import — ${TEMPLATE_LABELS[template]}`);
-    // Also save the Kulrs palette as a design theme so it's available in the editor
-    const themeMode = theme === 'dark' ? 'dark' : 'light';
-    const designTheme = generateThemeFromPalette(colors, themeMode as 'light' | 'dark', {
-      name: `Kulrs ${themeMode === 'dark' ? 'Dark' : 'Light'}`,
-      typography: { headingFont, bodyFont },
-    });
+    // Build a theme that matches the exact colors used in this preview
+    // This guarantees preview and editor will render identically
+    const designTheme = buildThemeFromResolvedColors(
+      colors,
+      headingFont,
+      bodyFont,
+      theme,
+      themeColors,
+    );
     try {
       localStorage.setItem('vizail_design_theme', JSON.stringify(designTheme));
     } catch { /* ignore */ }
