@@ -1,14 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Stage, Layer } from 'react-konva';
 import type { LayoutSpec } from './layout-schema';
 import { saveDesignSpec, setCurrentDesignName } from './utils/persistence';
-import { generateThemeFromPalette } from './theme/themeGenerator';
-import { lighten, darken } from './utils/color';
 import { loadGoogleFont } from './utils/googleFonts';
 import {
-  safe, textOn, heroTint, cardTint, borderTint,
-  resolveTheme, buildTopNav, buildLeftNav, buildMobile, buildDashboard, buildLanding,
+  safe,
+  heroTint,
+  resolveTheme,
+  buildTopNav,
+  buildLeftNav,
+  buildMobile,
+  buildDashboard,
+  buildLanding,
 } from './canvas/kulrsBuilders';
+import { renderNode, useFontLoading } from './canvas/CanvasRenderer';
 import type { ThemeColors, ThemeMode } from './canvas/kulrsBuilders';
+import type { DesignTheme } from './theme/types';
 
 /* ── URL param parsing ─────────────────────────────────────────────── */
 
@@ -70,189 +77,55 @@ const TEMPLATE_LABELS: Record<KulrsTemplate, string> = {
   'landing': 'Landing Page',
 };
 
-/* ── HTML Preview Components ───────────────────────────────────────── */
-
-function PreviewTopNav({ colors, hf, bf, t }: { colors: string[]; hf: string; bf: string; t: ThemeColors }) {
-  const nav = safe(colors, 0);
-  const hero = safe(colors, 1);
-  const accent = safe(colors, 2);
-  return (
-    <div style={{ fontFamily: bf, background: t.pageBg, minHeight: '100%' }}>
-      <header style={{ background: nav, padding: '0 32px', height: 56, display: 'flex', alignItems: 'center', gap: 32 }}>
-        <span style={{ fontFamily: hf, fontWeight: 700, fontSize: 20, color: textOn(nav) }}>Brand</span>
-        {['Home', 'Features', 'Pricing', 'About'].map(l => (
-          <span key={l} style={{ fontSize: 14, color: textOn(nav), opacity: 0.8 }}>{l}</span>
-        ))}
-      </header>
-      <section style={{ background: heroTint(hero, t.isDark), padding: '64px 80px' }}>
-        <h1 style={{ fontFamily: hf, fontSize: 40, fontWeight: 700, color: t.isDark ? lighten(hero, 0.3) : darken(hero, 0.3), margin: 0 }}>Welcome to Our Platform</h1>
-        <p style={{ fontSize: 18, color: t.isDark ? lighten(hero, 0.5) : hero, marginTop: 12 }}>Build amazing things with our tools</p>
-        <button style={{ marginTop: 24, padding: '12px 28px', background: accent, color: textOn(accent), border: 'none', borderRadius: 8, fontFamily: bf, fontSize: 15, fontWeight: 600, cursor: 'pointer' }}>Get Started</button>
-      </section>
-      <section style={{ padding: '48px 80px' }}>
-        <div style={{ background: t.cardBg, borderRadius: 12, border: `1px solid ${t.border}`, padding: 32 }}>
-          <h2 style={{ fontFamily: hf, fontSize: 22, color: t.textPrimary, margin: 0 }}>Featured Content</h2>
-          <div style={{ marginTop: 20, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
-            {colors.map((c, i) => (
-              <div key={i} style={{ height: 80, borderRadius: 8, background: cardTint(c, t.isDark), border: `1px solid ${borderTint(c, t.isDark)}` }} />
-            ))}
-          </div>
-        </div>
-      </section>
-    </div>
-  );
-}
-
-function PreviewLeftNav({ colors, hf, bf, t }: { colors: string[]; hf: string; bf: string; t: ThemeColors }) {
-  const sidebar = safe(colors, 0);
-  return (
-    <div style={{ fontFamily: bf, display: 'flex', minHeight: '100%' }}>
-      <aside style={{ width: 220, background: sidebar, padding: '24px 16px', flexShrink: 0 }}>
-        <div style={{ fontFamily: hf, fontWeight: 700, fontSize: 18, color: textOn(sidebar), marginBottom: 32 }}>Dashboard</div>
-        {['Overview', 'Analytics', 'Settings'].map((item, i) => (
-          <div key={item} style={{ padding: '10px 12px', borderRadius: 8, background: i === 0 ? lighten(sidebar, 0.15) : 'transparent', color: textOn(sidebar), opacity: i === 0 ? 1 : 0.7, fontSize: 14, marginBottom: 4 }}>{item}</div>
-        ))}
-      </aside>
-      <main style={{ flex: 1, background: t.pageBg }}>
-        <header style={{ background: t.cardBg, borderBottom: `1px solid ${t.border}`, padding: '16px 24px' }}>
-          <span style={{ fontFamily: hf, fontWeight: 600, fontSize: 18, color: t.textPrimary }}>Overview</span>
-        </header>
-        <div style={{ padding: 24, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
-          {colors.slice(0, 3).map((c, i) => (
-            <div key={i} style={{ background: t.cardBg, borderRadius: 12, border: `1px solid ${t.border}`, overflow: 'hidden' }}>
-              <div style={{ height: 4, background: c }} />
-              <div style={{ padding: 20 }}>
-                <div style={{ fontFamily: hf, fontWeight: 700, fontSize: 28, color: c }}>{(i + 1) * 2847}</div>
-                <div style={{ fontSize: 13, color: t.textSecondary, marginTop: 4 }}>{['Users', 'Revenue', 'Orders'][i]}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-        <div style={{ margin: '0 24px', background: t.cardBg, borderRadius: 12, border: `1px solid ${t.border}`, height: 260, padding: 20 }}>
-          <span style={{ fontFamily: hf, fontWeight: 600, color: t.textPrimary }}>Main Content</span>
-        </div>
-      </main>
-    </div>
-  );
-}
-
-function PreviewMobile({ colors, hf, bf, t }: { colors: string[]; hf: string; bf: string; t: ThemeColors }) {
+function buildImportTheme(
+  colors: string[],
+  headingFont: string,
+  bodyFont: string,
+  theme: ThemeMode,
+  resolved: ThemeColors,
+): DesignTheme {
   const primary = safe(colors, 0);
-  return (
-    <div style={{ fontFamily: bf, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100%', background: t.pageBg, padding: 32 }}>
-      <div style={{ width: 375, height: 760, background: t.cardBg, borderRadius: 44, border: `2px solid ${t.border}`, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ background: primary, padding: '12px 20px 0' }}>
-          <div style={{ fontSize: 13, color: textOn(primary), fontWeight: 600 }}>9:41</div>
-          <div style={{ fontFamily: hf, fontWeight: 700, fontSize: 20, color: textOn(primary), padding: '12px 0 16px' }}>Home</div>
-        </div>
-        <div style={{ flex: 1, padding: 16, display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto' }}>
-          {colors.map((c, i) => (
-            <div key={i} style={{ borderRadius: 16, background: cardTint(c, t.isDark), border: `1px solid ${borderTint(c, t.isDark)}`, padding: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ width: 6, height: 48, borderRadius: 3, background: c, flexShrink: 0 }} />
-              <div>
-                <div style={{ fontFamily: hf, fontWeight: 600, fontSize: 15, color: t.textPrimary }}>Card {i + 1}</div>
-                <div style={{ fontSize: 13, color: t.textSecondary, marginTop: 2 }}>Description text here</div>
-              </div>
-            </div>
-          ))}
-        </div>
-        <div style={{ borderTop: `1px solid ${t.border}`, display: 'flex', justifyContent: 'center', padding: '12px 0 24px', gap: 32 }}>
-          {['Home', 'Search', 'Profile'].map((label, i) => (
-            <span key={label} style={{ fontSize: 12, color: i === 0 ? primary : t.textSecondary, fontWeight: i === 0 ? 600 : 400 }}>{label}</span>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
+  const secondary = safe(colors, 1);
+  const tertiary = safe(colors, 2);
+  const mode: 'light' | 'dark' = theme === 'dark' ? 'dark' : (resolved.isDark ? 'dark' : 'light');
 
-function PreviewDashboard({ colors, hf, bf, t }: { colors: string[]; hf: string; bf: string; t: ThemeColors }) {
-  const primary = safe(colors, 0);
-  return (
-    <div style={{ fontFamily: bf, background: t.pageBg, minHeight: '100%' }}>
-      <header style={{ background: primary, padding: '0 32px', height: 56, display: 'flex', alignItems: 'center' }}>
-        <span style={{ fontFamily: hf, fontWeight: 700, fontSize: 18, color: textOn(primary) }}>Dashboard</span>
-      </header>
-      <div style={{ padding: 24, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 16 }}>
-        {colors.slice(0, 4).map((c, i) => (
-          <div key={i} style={{ background: t.cardBg, borderRadius: 12, border: `1px solid ${t.border}`, overflow: 'hidden' }}>
-            <div style={{ height: 4, background: c }} />
-            <div style={{ padding: 20 }}>
-              <div style={{ fontFamily: hf, fontWeight: 700, fontSize: 32, color: c }}>{(i + 1) * 1234}</div>
-              <div style={{ fontSize: 13, color: t.textSecondary, marginTop: 4 }}>{['Users', 'Revenue', 'Orders', 'Growth'][i]}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-      <div style={{ padding: '0 24px', display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16 }}>
-        <div style={{ background: t.cardBg, borderRadius: 12, border: `1px solid ${t.border}`, padding: 24 }}>
-          <span style={{ fontFamily: hf, fontWeight: 600, fontSize: 16, color: t.textPrimary }}>Performance Overview</span>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12, marginTop: 24, height: 160 }}>
-            {[0.6, 0.9, 0.4, 0.75, 0.55, 0.85, 0.7].map((h, i) => (
-              <div key={i} style={{ flex: 1, height: `${h * 100}%`, background: safe(colors, i % colors.length), borderRadius: 4, opacity: 0.85 }} />
-            ))}
-          </div>
-        </div>
-        <div style={{ background: t.cardBg, borderRadius: 12, border: `1px solid ${t.border}`, padding: 24 }}>
-          <span style={{ fontFamily: hf, fontWeight: 600, fontSize: 16, color: t.textPrimary }}>Recent Activity</span>
-          <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {[0, 1, 2, 3].map(i => (
-              <div key={i} style={{ padding: 12, borderRadius: 8, background: i === 0 ? (t.isDark ? darken(safe(colors, 1), 0.7) : lighten(safe(colors, 1), 0.92)) : (t.isDark ? lighten(t.pageBg, 0.05) : '#f8fafc'), border: `1px solid ${t.border}`, fontSize: 13, color: t.textSecondary }}>
-                Activity item {i + 1}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  return {
+    id: `kulrs_import_${Date.now().toString(36)}`,
+    name: `Kulrs ${mode === 'dark' ? 'Dark' : 'Light'}`,
+    paletteColors: colors,
+    mode,
+    colors: {
+      'color.background.primary': resolved.pageBg,
+      'color.background.secondary': heroTint(secondary, resolved.isDark),
+      'color.background.tertiary': heroTint(primary, resolved.isDark),
+      'color.background.inverse': resolved.isDark ? '#f1f5f9' : '#0f172a',
+      'color.text.primary': resolved.textPrimary,
+      'color.text.secondary': resolved.textSecondary,
+      'color.text.inverse': resolved.isDark ? '#0f172a' : '#ffffff',
+      'color.text.link': primary,
+      'color.border.primary': resolved.border,
+      'color.border.secondary': resolved.border,
+      'color.border.focus': primary,
+      'color.action.primary': primary,
+      'color.action.primaryHover': secondary,
+      'color.action.secondary': secondary,
+      'color.action.secondaryHover': tertiary,
+      'color.status.success': colors[2] ?? '#22c55e',
+      'color.status.warning': colors[3] ?? '#eab308',
+      'color.status.error': colors[4] ?? '#ef4444',
+      'color.status.info': colors[1] ?? '#3b82f6',
+      'color.surface.card': resolved.cardBg,
+      'color.surface.overlay': resolved.isDark ? '#0b1220' : '#e2e8f0',
+      'color.accent.primary': primary,
+      'color.accent.secondary': secondary,
+    },
+    typography: {
+      headingFont,
+      bodyFont,
+      monoFont: 'Fira Code',
+    },
+  };
 }
-
-function PreviewLanding({ colors, hf, bf, t }: { colors: string[]; hf: string; bf: string; t: ThemeColors }) {
-  const primary = safe(colors, 0);
-  return (
-    <div style={{ fontFamily: bf, background: t.pageBg, minHeight: '100%' }}>
-      <nav style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 48px', height: 64, borderBottom: `1px solid ${t.border}` }}>
-        <span style={{ fontFamily: hf, fontWeight: 700, fontSize: 22, color: primary }}>Brand</span>
-        <button style={{ padding: '8px 20px', background: primary, color: textOn(primary), border: 'none', borderRadius: 8, fontFamily: bf, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Sign Up</button>
-      </nav>
-      <section style={{ background: heroTint(primary, t.isDark), padding: '80px 120px' }}>
-        <h1 style={{ fontFamily: hf, fontSize: 48, fontWeight: 700, color: t.isDark ? lighten(primary, 0.3) : darken(primary, 0.2), margin: 0, lineHeight: 1.2 }}>Build Something Amazing</h1>
-        <p style={{ fontSize: 18, color: t.textSecondary, marginTop: 16, maxWidth: 500 }}>The all-in-one platform for creators, designers, and developers to bring their ideas to life.</p>
-        <div style={{ display: 'flex', gap: 12, marginTop: 32 }}>
-          <button style={{ padding: '14px 28px', background: primary, color: textOn(primary), border: 'none', borderRadius: 10, fontFamily: bf, fontSize: 15, fontWeight: 600, cursor: 'pointer' }}>Get Started</button>
-          <button style={{ padding: '14px 28px', background: 'transparent', color: t.isDark ? lighten(primary, 0.4) : primary, border: `2px solid ${primary}`, borderRadius: 10, fontFamily: bf, fontSize: 15, fontWeight: 600, cursor: 'pointer' }}>Learn More</button>
-        </div>
-      </section>
-      <section style={{ padding: '64px 120px' }}>
-        <h2 style={{ fontFamily: hf, textAlign: 'center', fontSize: 28, color: t.textPrimary }}>Features</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 24, marginTop: 40 }}>
-          {['Fast', 'Secure', 'Scalable'].map((f, i) => (
-            <div key={f} style={{ padding: 28, borderRadius: 16, border: `1px solid ${t.border}`, background: t.cardBg }}>
-              <div style={{ width: 44, height: 44, borderRadius: 12, background: t.isDark ? darken(safe(colors, i), 0.5) : lighten(safe(colors, i), 0.85), display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <div style={{ width: 20, height: 20, borderRadius: 10, background: safe(colors, i) }} />
-              </div>
-              <h3 style={{ fontFamily: hf, fontSize: 18, color: t.textPrimary, marginTop: 16 }}>{f}</h3>
-              <p style={{ fontSize: 14, color: t.textSecondary, marginTop: 8, lineHeight: 1.6 }}>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</p>
-            </div>
-          ))}
-        </div>
-      </section>
-      <section style={{ margin: '0 60px 48px', padding: '48px 80px', background: primary, borderRadius: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2 style={{ fontFamily: hf, fontSize: 28, color: textOn(primary), fontWeight: 700, margin: 0 }}>Ready to get started?</h2>
-        <button style={{ padding: '14px 28px', background: textOn(primary), color: primary, border: 'none', borderRadius: 10, fontFamily: bf, fontSize: 15, fontWeight: 600, cursor: 'pointer' }}>Start Free Trial</button>
-      </section>
-    </div>
-  );
-}
-
-const PREVIEW_MAP: Record<KulrsTemplate, React.FC<{ colors: string[]; hf: string; bf: string; t: ThemeColors }>> = {
-  'top-nav': PreviewTopNav,
-  'left-nav': PreviewLeftNav,
-  'mobile': PreviewMobile,
-  'dashboard': PreviewDashboard,
-  'landing': PreviewLanding,
-};
 
 /* ── Main page component ───────────────────────────────────────────── */
 
@@ -260,12 +133,12 @@ export default function FromKulrsPage() {
   const params = useMemo(() => parseKulrsParams(), []);
   const { colors, headingFont, bodyFont, template, theme, customBg } = params;
   const themeColors = useMemo(() => resolveTheme(theme, customBg), [theme, customBg]);
+  useFontLoading();
 
   useGoogleFonts(useMemo(() => [headingFont, bodyFont], [headingFont, bodyFont]));
 
   const [editOpened, setEditOpened] = useState(false);
 
-  const Preview = PREVIEW_MAP[template] || PreviewTopNav;
   const spec = useMemo(
     () => (TEMPLATE_BUILDERS[template] || buildTopNav)(colors, headingFont, bodyFont, themeColors),
     [colors, headingFont, bodyFont, template, themeColors],
@@ -274,12 +147,8 @@ export default function FromKulrsPage() {
   const handleEditInVizail = () => {
     saveDesignSpec(spec);
     setCurrentDesignName(`Kulrs Import — ${TEMPLATE_LABELS[template]}`);
-    // Also save the Kulrs palette as a design theme so it's available in the editor
-    const themeMode = theme === 'dark' ? 'dark' : 'light';
-    const designTheme = generateThemeFromPalette(colors, themeMode as 'light' | 'dark', {
-      name: `Kulrs ${themeMode === 'dark' ? 'Dark' : 'Light'}`,
-      typography: { headingFont, bodyFont },
-    });
+    // Save a theme that matches the exact imported structure/colors.
+    const designTheme = buildImportTheme(colors, headingFont, bodyFont, theme, themeColors);
     try {
       localStorage.setItem('vizail_design_theme', JSON.stringify(designTheme));
     } catch { /* ignore */ }
@@ -357,15 +226,19 @@ export default function FromKulrsPage() {
       {/* Preview area */}
       <div style={{ flex: 1, overflow: 'auto', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: 32 }}>
         <div style={{
-          width: template === 'mobile' ? 500 : 1200,
+          width: spec.root.size.width,
           maxWidth: '100%',
           background: themeColors.pageBg,
           borderRadius: 12,
           overflow: 'hidden',
           boxShadow: '0 25px 50px -12px rgba(0,0,0,0.4)',
-          minHeight: template === 'mobile' ? 860 : 600,
+          minHeight: spec.root.size.height,
         }}>
-          <Preview colors={colors} hf={headingFont} bf={bodyFont} t={themeColors} />
+          <Stage width={spec.root.size.width} height={spec.root.size.height}>
+            <Layer>
+              {spec.root.children.map(renderNode)}
+            </Layer>
+          </Stage>
         </div>
       </div>
 
