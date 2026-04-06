@@ -9,7 +9,8 @@
  * Issue #213 – Implement template and preset selection screens
  */
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { darken, lighten } from '../utils/color';
 import type { StyleMood, StyleIndustry } from '../style-flow/types';
 
 // ── Preset templates ──────────────────────────────────────────────────────────
@@ -104,6 +105,40 @@ const TEMPLATE_PRESETS: TemplatePreset[] = [
   },
 ];
 
+type ColorSchemeStyle = 'bright' | 'neutral' | 'high-contrast' | 'minimal';
+
+const FONT_OPTIONS = [
+  'Inter',
+  'Outfit',
+  'Poppins',
+  'DM Sans',
+  'Manrope',
+  'Space Grotesk',
+  'Playfair Display',
+  'JetBrains Mono',
+  'Nunito',
+  'Lora',
+];
+
+function buildSchemeColors(
+  base: [string, string, string, string],
+  scheme: ColorSchemeStyle,
+  primary: string,
+  accent: string,
+): [string, string, string, string] {
+  if (scheme === 'bright') {
+    return [primary, accent, lighten(primary, 0.85), lighten(accent, 0.7)];
+  }
+  if (scheme === 'high-contrast') {
+    return [darken(primary, 0.35), accent, '#0f172a', '#f8fafc'];
+  }
+  if (scheme === 'minimal') {
+    return [primary, accent, '#f8fafc', '#e2e8f0'];
+  }
+  // neutral
+  return [primary, accent, lighten(base[2], 0.25), darken(base[3], 0.15)];
+}
+
 // ── Props ─────────────────────────────────────────────────────────────────────
 
 export interface MobileTemplatePickStepProps {
@@ -117,8 +152,23 @@ export interface MobileTemplatePickStepProps {
 
 export function MobileTemplatePickStep({ onPick, onBack }: MobileTemplatePickStepProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [schemeStyle, setSchemeStyle] = useState<ColorSchemeStyle>('neutral');
+  const [primarySkew, setPrimarySkew] = useState<string>('#14b8a6');
+  const [accentSkew, setAccentSkew] = useState<string>('#ec4899');
+  const [headingFont, setHeadingFont] = useState<string>('Inter');
+  const [bodyFont, setBodyFont] = useState<string>('Inter');
 
   const selectedPreset = TEMPLATE_PRESETS.find((t) => t.id === selectedId) ?? null;
+
+  const configuredPreset = useMemo(() => {
+    if (!selectedPreset) return null;
+    return {
+      ...selectedPreset,
+      colors: buildSchemeColors(selectedPreset.colors, schemeStyle, primarySkew, accentSkew),
+      headingFont,
+      bodyFont,
+    } as TemplatePreset;
+  }, [selectedPreset, schemeStyle, primarySkew, accentSkew, headingFont, bodyFont]);
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-950 text-white px-5 pt-6 pb-8">
@@ -152,7 +202,13 @@ export function MobileTemplatePickStep({ onPick, onBack }: MobileTemplatePickSte
               <button
                 type="button"
                 aria-pressed={isSelected}
-                onClick={() => setSelectedId(preset.id)}
+                onClick={() => {
+                  setSelectedId(preset.id);
+                  setPrimarySkew(preset.colors[0]);
+                  setAccentSkew(preset.colors[1]);
+                  setHeadingFont(preset.headingFont);
+                  setBodyFont(preset.bodyFont);
+                }}
                 className={`w-full flex items-center gap-4 p-3 rounded-xl border transition-all duration-150
                   focus:outline-none focus:ring-2 focus:ring-cyan-400/50
                   ${
@@ -195,12 +251,81 @@ export function MobileTemplatePickStep({ onPick, onBack }: MobileTemplatePickSte
         })}
       </ul>
 
+      {selectedPreset && (
+        <section className="mt-6 rounded-2xl border border-white/10 bg-white/[0.04] p-4 space-y-4">
+          <div>
+            <p className="text-[11px] font-semibold text-white/40 uppercase tracking-wider mb-2">
+              Step 2: color direction
+            </p>
+            <div className="grid grid-cols-2 gap-2" role="group" aria-label="Template color scheme style">
+              {(['bright', 'neutral', 'high-contrast', 'minimal'] as ColorSchemeStyle[]).map((style) => {
+                const active = schemeStyle === style;
+                return (
+                  <button
+                    key={style}
+                    type="button"
+                    onClick={() => setSchemeStyle(style)}
+                    aria-pressed={active}
+                    className={`px-3 py-2 rounded-lg border text-xs capitalize text-left ${active ? 'border-cyan-400/60 bg-cyan-500/10 text-white' : 'border-white/10 text-white/70'}`}
+                  >
+                    {style.replace('-', ' ')}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <label className="text-xs text-white/70 flex flex-col gap-1">
+              Primary skew
+              <input type="color" value={primarySkew} onChange={(e) => setPrimarySkew(e.target.value)} className="w-full h-10 rounded-lg border border-white/10 bg-transparent" />
+            </label>
+            <label className="text-xs text-white/70 flex flex-col gap-1">
+              Accent skew
+              <input type="color" value={accentSkew} onChange={(e) => setAccentSkew(e.target.value)} className="w-full h-10 rounded-lg border border-white/10 bg-transparent" />
+            </label>
+          </div>
+
+          <div>
+            <p className="text-[11px] font-semibold text-white/40 uppercase tracking-wider mb-2">
+              Step 3: typography
+            </p>
+            <div className="grid grid-cols-1 gap-2">
+              <label className="text-xs text-white/70">Heading font</label>
+              <div className="grid grid-cols-[1fr_1fr] gap-2">
+                <select value={headingFont} onChange={(e) => setHeadingFont(e.target.value)} className="rounded-lg border border-white/10 bg-slate-900 text-white text-sm px-2 py-2">
+                  {FONT_OPTIONS.map((font) => <option key={font} value={font}>{font}</option>)}
+                </select>
+                <input value={headingFont} onChange={(e) => setHeadingFont(e.target.value)} className="rounded-lg border border-white/10 bg-slate-900 text-white text-sm px-2 py-2" aria-label="Custom heading font" />
+              </div>
+
+              <label className="text-xs text-white/70 mt-1">Body font</label>
+              <div className="grid grid-cols-[1fr_1fr] gap-2">
+                <select value={bodyFont} onChange={(e) => setBodyFont(e.target.value)} className="rounded-lg border border-white/10 bg-slate-900 text-white text-sm px-2 py-2">
+                  {FONT_OPTIONS.map((font) => <option key={font} value={font}>{font}</option>)}
+                </select>
+                <input value={bodyFont} onChange={(e) => setBodyFont(e.target.value)} className="rounded-lg border border-white/10 bg-slate-900 text-white text-sm px-2 py-2" aria-label="Custom body font" />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <p className="text-[11px] text-white/45 mb-2">Preview palette</p>
+            <div className="flex gap-1">
+              {(configuredPreset?.colors ?? selectedPreset.colors).map((hex) => (
+                <span key={hex} className="h-7 flex-1 rounded-md border border-white/10" style={{ backgroundColor: hex }} />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* CTA */}
       <button
         type="button"
-        disabled={!selectedPreset}
+        disabled={!configuredPreset}
         onClick={() => {
-          if (selectedPreset) onPick(selectedPreset);
+          if (configuredPreset) onPick(configuredPreset);
         }}
         className="mt-8 w-full py-4 rounded-2xl font-semibold text-base transition-all duration-200
                    disabled:opacity-40 disabled:cursor-not-allowed

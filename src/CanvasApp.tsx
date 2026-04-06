@@ -48,6 +48,7 @@ import { bindAndApplyTheme } from './theme';
 import { TEMPLATES } from './templates';
 import { getRoomIdFromURL, generateRoomId, getUserId, getDisplayName, getWebSocketUrl, buildInitialSpec } from './utils/canvasHelpers';
 import { MobileHandoffBanner } from './components/canvas/MobileHandoffBanner';
+import { snapshotToLayoutSpec } from './mobile/snapshotToLayoutSpec';
 
 export default function CanvasApp() {
   // Design mode (#142): null = not chosen yet, shown as modal on first load
@@ -285,7 +286,11 @@ export default function CanvasApp() {
         typography: { headingFont: mobileSnapshot.headingFont, bodyFont: mobileSnapshot.bodyFont },
       },
     );
-    setSpec(prev => bindAndApplyTheme(prev, newTheme));
+
+    // Start from the snapshot-derived layout so mobile typography and colors
+    // are materially present in the imported design, then apply the theme.
+    const snapshotSpec = snapshotToLayoutSpec(mobileSnapshot);
+    setSpec(bindAndApplyTheme(snapshotSpec, newTheme));
     dismissMobileHandoff();
   }, [mobileSnapshot, applyPalette, setSpec, dismissMobileHandoff]);
 

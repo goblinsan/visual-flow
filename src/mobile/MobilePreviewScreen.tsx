@@ -10,7 +10,9 @@
  * Issue #215 – Lightweight live preview and summary review
  */
 
+import { useEffect } from 'react';
 import type { MobileDesignSnapshot } from './types';
+import { loadGoogleFont } from '../utils/googleFonts';
 
 export interface MobilePreviewScreenProps {
   snapshot: MobileDesignSnapshot;
@@ -26,6 +28,12 @@ export function MobilePreviewScreen({
   onConfirm,
 }: MobilePreviewScreenProps) {
   const { primaryColor, accentColor, headingFont, bodyFont, mood, industry, outputType = 'mobile-app' } = snapshot;
+
+  useEffect(() => {
+    [headingFont, bodyFont].filter(Boolean).forEach((font) => {
+      loadGoogleFont(font, [400, 500, 600, 700]);
+    });
+  }, [headingFont, bodyFont]);
 
   const outputLabel = outputType.replace('-', ' ');
 
@@ -65,7 +73,7 @@ export function MobilePreviewScreen({
               {mood.charAt(0).toUpperCase() + mood.slice(1)} {industry}
             </p>
           </div>
-          <div className="p-3 space-y-2" style={{ backgroundColor: '#f8f8f8' }}>
+          <div className="p-3 space-y-2" style={{ backgroundColor: '#f8f8f8', fontFamily: bodyFont }}>
             {[accentColor, primaryColor, accentColor].map((color, i) => (
               <div key={i} className="rounded-lg p-3 flex items-center gap-2" style={{ backgroundColor: '#fff', borderLeft: `4px solid ${color}` }}>
                 <div className="w-4 h-4 rounded" style={{ backgroundColor: color }} />
@@ -90,7 +98,7 @@ export function MobilePreviewScreen({
             </span>
             <span className="text-[10px] text-white/70 uppercase">{outputLabel}</span>
           </div>
-          <div className="p-3 grid gap-2" style={{ backgroundColor: '#f8fafc' }}>
+          <div className="p-3 grid gap-2" style={{ backgroundColor: '#f8fafc', fontFamily: bodyFont }}>
             <div className="rounded-lg p-3" style={{ backgroundColor: '#ffffff', borderTop: `3px solid ${accentColor}` }}>
               <div className="h-2 rounded mb-2" style={{ width: '72%', backgroundColor: '#dbe2ea' }} />
               <div className="h-1.5 rounded" style={{ width: '48%', backgroundColor: '#e2e8f0' }} />
@@ -135,7 +143,7 @@ export function MobilePreviewScreen({
           <span className="font-semibold text-white" style={{ fontFamily: headingFont }}>
             {headingFont}
           </span>{' '}
-          / {bodyFont}
+          / <span style={{ fontFamily: bodyFont }}>{bodyFont}</span>
         </p>
       </div>
 
