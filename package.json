@@ -16,6 +16,7 @@
     "lint:strict": "STRICT_TYPES=1 eslint . --ext .ts,.tsx"
   },
   "dependencies": {
+    "@goblinsan/design-themes": "^0.1.0",
     "@dnd-kit/core": "^6.1.0",
     "@fortawesome/fontawesome-free": "^7.1.0",
     "@fortawesome/fontawesome-svg-core": "^7.1.0",

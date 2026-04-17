@@ -1,4 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
+import {
+  buildThemeGuidanceTokens,
+  resolveThemeGuidance,
+} from '@goblinsan/design-themes';
 import type { LayoutSpec } from './layout-schema';
 import { saveDesignSpec, setCurrentDesignName } from './utils/persistence';
 import type { DesignTheme } from './theme/types';
@@ -21,6 +25,16 @@ interface KulrsParams {
   template: KulrsTemplate;
   theme: ThemeMode;
   customBg: string;
+  guidanceId: string | null;
+}
+
+function safeResolveGuidance(guidanceId: string | null) {
+  if (!guidanceId) return null;
+  try {
+    return resolveThemeGuidance(guidanceId);
+  } catch {
+    return null;
+  }
 }
 
 function parseKulrsParams(): KulrsParams {
@@ -41,6 +55,7 @@ function parseKulrsParams(): KulrsParams {
     template: (sp.get('template') as KulrsTemplate) || 'top-nav',
     theme,
     customBg,
+    guidanceId: sp.get('guidance'),
   };
 }
 
@@ -58,15 +73,24 @@ function buildThemeFromResolvedColors(
   bodyFont: string,
   themeMode: ThemeMode,
   resolvedColors: ThemeColors,
+  guidanceId: string | null,
 ): DesignTheme {
   const primary = safe(paletteColors, 0);
   const isPaletteDark = resolvedColors.isDark;
+  const guidance = safeResolveGuidance(guidanceId);
+  const guidanceTokens = guidance
+    ? Object.fromEntries(
+        buildThemeGuidanceTokens(guidance.guidance.id).map((token) => [token.name, token.value]),
+      )
+    : undefined;
   
   // Map the resolved theme colors to semantic tokens
   // These are the ACTUAL colors that the preview rendered with
   return {
     id: `kulrs_${themeMode}_${Date.now().toString(36)}`,
-    name: `Kulrs ${themeMode === 'dark' ? 'Dark' : 'Light'}`,
+    name: guidance?.guidance.name ?? `Kulrs ${themeMode === 'dark' ? 'Dark' : 'Light'}`,
+    guidanceId: guidance?.guidance.id,
+    guidanceName: guidance?.guidance.name,
     paletteColors,
     mode: themeMode === 'dark' ? 'dark' : 'light',
     colors: {
@@ -110,6 +134,7 @@ function buildThemeFromResolvedColors(
       'color.accent.secondary': safe(paletteColors, 1),
     },
     typography: { headingFont, bodyFont, monoFont: 'Fira Code' },
+    guidanceTokens,
   };
 }
 
@@ -327,8 +352,9 @@ const PREVIEW_MAP: Record<KulrsTemplate, React.FC<{ colors: string[]; hf: string
 
 export default function FromKulrsPage() {
   const params = useMemo(() => parseKulrsParams(), []);
-  const { colors, headingFont, bodyFont, template, theme, customBg } = params;
+  const { colors, headingFont, bodyFont, template, theme, customBg, guidanceId } = params;
   const themeColors = useMemo(() => resolveTheme(theme, customBg), [theme, customBg]);
+  const guidance = useMemo(() => safeResolveGuidance(guidanceId), [guidanceId]);
 
   useGoogleFonts(useMemo(() => [headingFont, bodyFont], [headingFont, bodyFont]));
 
@@ -351,6 +377,7 @@ export default function FromKulrsPage() {
       bodyFont,
       theme,
       themeColors,
+      guidanceId,
     );
     try {
       localStorage.setItem('vizail_design_theme', JSON.stringify(designTheme));
@@ -403,6 +430,11 @@ export default function FromKulrsPage() {
           <span style={{ fontSize: 12, color: '#94a3b8', marginRight: 8 }}>
             {headingFont} / {bodyFont}
           </span>
+          {guidance && (
+            <span style={{ fontSize: 12, color: '#94a3b8', marginRight: 8 }}>
+              {guidance.guidance.name}
+            </span>
+          )}
           <button
             onClick={handleCopyLink}
             style={{
@@ -447,6 +479,8 @@ export default function FromKulrsPage() {
         padding: '12px 24px', background: '#1e293b', borderTop: '1px solid #334155',
         fontSize: 12, color: '#64748b', gap: 16, flexShrink: 0,
       }}>
+        {guidance && <span>{guidance.guidance.summary}</span>}
+        {guidance && <span>•</span>}
         <span>Palette from <a href="https://kulrs.com" target="_blank" rel="noopener noreferrer" style={{ color: '#94a3b8', textDecoration: 'underline' }}>kulrs.com</a></span>
         <span>•</span>
         <span>Design with <a href="https://vizail.com" target="_blank" rel="noopener noreferrer" style={{ color: '#94a3b8', textDecoration: 'underline' }}>vizail.com</a></span>

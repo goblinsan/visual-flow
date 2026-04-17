@@ -80,6 +80,8 @@ describe('StyleSelection', () => {
       typographyPairingId: null,
       buttonStyleId: null,
       navigationStyleId: null,
+      finalConceptId: null,
+      lockedAspects: [],
     };
     expect(selection.recommendationId).toBeNull();
     expect(Object.keys(selection.tokenOverrides)).toHaveLength(0);
@@ -95,6 +97,8 @@ describe('StyleSelection', () => {
       typographyPairingId: null,
       buttonStyleId: null,
       navigationStyleId: null,
+      finalConceptId: null,
+      lockedAspects: [],
     };
     expect(selection.tokenOverrides['color-primary']).toBe('#FF0000');
   });
@@ -106,6 +110,8 @@ describe('StyleSelection', () => {
       typographyPairingId: 'serif-elegance',
       buttonStyleId: 'pill',
       navigationStyleId: 'sidebar',
+      finalConceptId: null,
+      lockedAspects: [],
     };
     expect(selection.typographyPairingId).toBe('serif-elegance');
     expect(selection.buttonStyleId).toBe('pill');
@@ -168,6 +174,8 @@ describe('JourneyState', () => {
         typographyPairingId: null,
         buttonStyleId: null,
         navigationStyleId: null,
+        finalConceptId: null,
+        lockedAspects: [],
       },
       exportPackage: null,
       startedAt: new Date().toISOString(),

@@ -4,60 +4,8 @@
  * Phase 3 (#184)
  */
 
-import type { TypographyPairing } from '../types';
-
-// ── Curated typography pairings ───────────────────────────────────────────────
-
-export const TYPOGRAPHY_PAIRINGS: TypographyPairing[] = [
-  {
-    id: 'modern-sans',
-    name: 'Modern Sans',
-    headingFont: 'Inter',
-    bodyFont: 'Inter',
-    description: 'Clean and neutral — works for any brand.',
-    tags: ['minimal', 'technical', 'universal'],
-  },
-  {
-    id: 'serif-elegance',
-    name: 'Serif Elegance',
-    headingFont: 'Playfair Display',
-    bodyFont: 'Lato',
-    description: 'Editorial feel with refined serif headings.',
-    tags: ['elegant', 'fashion', 'editorial'],
-  },
-  {
-    id: 'display-bold',
-    name: 'Display Bold',
-    headingFont: 'Montserrat',
-    bodyFont: 'Open Sans',
-    description: 'Strong, prominent headings with readable body copy.',
-    tags: ['bold', 'marketing'],
-  },
-  {
-    id: 'humanist',
-    name: 'Humanist',
-    headingFont: 'Nunito',
-    bodyFont: 'Source Sans 3',
-    description: 'Friendly and accessible, ideal for consumer apps.',
-    tags: ['playful', 'friendly', 'health'],
-  },
-  {
-    id: 'classic-mix',
-    name: 'Classic Mix',
-    headingFont: 'Merriweather',
-    bodyFont: 'Inter',
-    description: 'Classic serif headings paired with a modern sans body.',
-    tags: ['elegant', 'education', 'finance'],
-  },
-  {
-    id: 'tech-mono',
-    name: 'Tech Mono',
-    headingFont: 'Space Grotesk',
-    bodyFont: 'JetBrains Mono',
-    description: 'Distinctive technical feel for developer-focused products.',
-    tags: ['technical', 'developer'],
-  },
-];
+export { TYPOGRAPHY_PAIRINGS } from '../themeCatalog';
+import { TYPOGRAPHY_PAIRINGS } from '../themeCatalog';
 
 // ── Component ─────────────────────────────────────────────────────────────────
 

@@ -19,21 +19,20 @@ import type {
   StyleRecommendation,
   LockableAspect,
 } from './types';
+import {
+  BUTTON_STYLES,
+  NAVIGATION_STYLES,
+  TYPOGRAPHY_PAIRINGS,
+  guidanceForMood,
+  guidanceTokens,
+  resolveThemeGuidance,
+} from './themeCatalog';
 
 // ── Internal option tables (must stay in sync with panel components) ──────────
 
-const TYPOGRAPHY_IDS = [
-  'modern-sans',
-  'serif-elegance',
-  'display-bold',
-  'humanist',
-  'classic-mix',
-  'mono-code',
-];
-
-const BUTTON_IDS = ['rounded', 'pill', 'sharp', 'ghost-border', 'minimal-link'];
-
-const NAVIGATION_IDS = ['top-bar', 'sidebar', 'tab-bar', 'floating', 'bottom-bar'];
+const TYPOGRAPHY_IDS = TYPOGRAPHY_PAIRINGS.map((item) => item.id);
+const BUTTON_IDS = BUTTON_STYLES.map((item) => item.id);
+const NAVIGATION_IDS = NAVIGATION_STYLES.map((item) => item.id);
 
 // ── Color palettes (one per mood) ────────────────────────────────────────────
 
@@ -101,12 +100,12 @@ function buildRecommendation(
   paletteIndex: number,
   conceptIndex: number,
 ): StyleRecommendation {
+  const guidance = guidanceForMood(mood);
+  const resolved = resolveThemeGuidance(guidance.id);
+  const prefersDark = guidance.defaultMode === 'dark';
   const palettes = MOOD_PALETTES[mood];
   const palette = palettes[paletteIndex % palettes.length];
   const [c1, c2, c3, c4] = palette;
-
-  const isElegant = mood === 'elegant';
-  const headingFont = isElegant ? 'Playfair Display' : mood === 'technical' ? 'JetBrains Mono' : 'Inter';
 
   return {
     id: `concept-${mood}-${industry}-${conceptIndex}`,
@@ -118,12 +117,12 @@ function buildRecommendation(
       { role: 'secondary', hex: c2 },
       { role: 'accent', hex: c3 },
       { role: 'highlight', hex: c4 },
-      { role: 'surface', hex: conceptIndex === 2 ? '#121212' : '#FFFFFF' },
-      { role: 'text', hex: conceptIndex === 2 ? '#E0E0E0' : '#111111' },
+      { role: 'surface', hex: prefersDark || conceptIndex === 2 ? '#121212' : '#FFFFFF' },
+      { role: 'text', hex: prefersDark || conceptIndex === 2 ? '#E0E0E0' : '#111111' },
     ],
     typography: {
-      headingFont,
-      bodyFont: 'Inter',
+      headingFont: resolved.typography.headingFont,
+      bodyFont: resolved.typography.bodyFont,
       baseSizePx: 16,
       lineHeight: 1.6,
     },
@@ -132,10 +131,13 @@ function buildRecommendation(
       { name: 'color-secondary', value: c2 },
       { name: 'color-accent', value: c3 },
       { name: 'color-highlight', value: c4 },
-      { name: 'font-heading', value: headingFont },
-      { name: 'font-body', value: 'Inter' },
+      { name: 'font-heading', value: resolved.typography.headingFont },
+      { name: 'font-body', value: resolved.typography.bodyFont },
       { name: 'font-size-base', value: '16px' },
       { name: 'line-height-base', value: '1.6' },
+      ...guidanceTokens(guidance.id).filter(
+        (token) => token.name !== 'font-heading' && token.name !== 'font-body',
+      ),
     ],
   };
 }
@@ -183,6 +185,7 @@ export function generateConcepts(
   // Use the first mood as the primary seed for determinism.
   const primaryMood: StyleMood = moods[0] ?? 'minimal';
   const moodIndex = ['minimal', 'bold', 'playful', 'elegant', 'technical'].indexOf(primaryMood);
+  const baseGuidance = resolveThemeGuidance(guidanceForMood(primaryMood).id);
 
   const concepts: StyleConcept[] = [];
 
@@ -195,17 +198,17 @@ export function generateConcepts(
     // ── Typography ───────────────────────────────────────────────────────────
     const typographyPairingId: string = locked.includes('typography') && lockedValues.typography
       ? lockedValues.typography
-      : pick(TYPOGRAPHY_IDS, moodIndex, i);
+      : pick(TYPOGRAPHY_IDS, TYPOGRAPHY_IDS.indexOf(baseGuidance.typography.id), i);
 
     // ── Button style ─────────────────────────────────────────────────────────
     const buttonStyleId: string = locked.includes('buttons') && lockedValues.buttons
       ? lockedValues.buttons
-      : pick(BUTTON_IDS, moodIndex + 1, i);
+      : pick(BUTTON_IDS, BUTTON_IDS.indexOf(baseGuidance.button.id), i);
 
     // ── Navigation style ─────────────────────────────────────────────────────
     const navigationStyleId: string = locked.includes('navigation') && lockedValues.navigation
       ? lockedValues.navigation
-      : pick(NAVIGATION_IDS, moodIndex + 2, i);
+      : pick(NAVIGATION_IDS, NAVIGATION_IDS.indexOf(baseGuidance.navigation.id), i);
 
     // ── Concept identity ─────────────────────────────────────────────────────
     const adjectives = CONCEPT_ADJECTIVES[primaryMood];

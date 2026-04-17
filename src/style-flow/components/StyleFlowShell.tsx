@@ -24,15 +24,23 @@ import {
 } from '../telemetry';
 import { StepProgress } from './StepProgress';
 import { PreviewScaffold } from './PreviewScaffold';
-import { TypographyPanel, TYPOGRAPHY_PAIRINGS } from './TypographyPanel';
-import { ButtonStylePanel, BUTTON_STYLES } from './ButtonStylePanel';
-import { NavigationStylePanel, NAVIGATION_STYLES } from './NavigationStylePanel';
+import { TypographyPanel } from './TypographyPanel';
+import { ButtonStylePanel } from './ButtonStylePanel';
+import { NavigationStylePanel } from './NavigationStylePanel';
 import { ConceptComparisonPanel } from './ConceptComparisonPanel';
 import { generateConcepts } from '../conceptGenerator';
 import type { ConceptGeneratorOptions } from '../conceptGenerator';
 import { exportConceptAsPng } from '../imageExport';
 import { buildCanvasScene } from '../canvasHandoff';
 import { buildReactTailwindPackage } from '../codeExport';
+import {
+  BUTTON_STYLES,
+  NAVIGATION_STYLES,
+  TYPOGRAPHY_PAIRINGS,
+  guidanceForMood,
+  guidanceTokens,
+  resolveThemeGuidance,
+} from '../themeCatalog';
 import type { LayoutSpec } from '../../layout-schema';
 
 // ── Mood & industry options ───────────────────────────────────────────────────
@@ -80,6 +88,9 @@ function generateRecommendations(
   industry: StyleIndustry,
 ): StyleRecommendation[] {
   const moodStr = moods[0] ?? 'minimal';
+  const guidance = guidanceForMood(moodStr);
+  const resolved = resolveThemeGuidance(guidance.id);
+  const isDarkGuidance = guidance.defaultMode === 'dark';
   const palettes: Record<StyleMood, [string, string, string, string]> = {
     minimal: ['#1A1A2E', '#16213E', '#0F3460', '#E94560'],
     bold: ['#FF6B35', '#F7931E', '#FFD23F', '#EE4266'],
@@ -94,12 +105,12 @@ function generateRecommendations(
       { role: 'primary', hex: c1 },
       { role: 'secondary', hex: c2 },
       { role: 'accent', hex: c3 },
-      { role: 'surface', hex: '#ffffff' },
-      { role: 'text', hex: '#111111' },
+      { role: 'surface', hex: isDarkGuidance ? '#121212' : '#ffffff' },
+      { role: 'text', hex: isDarkGuidance ? '#E2E8F0' : '#111111' },
     ],
     typography: {
-      headingFont: moodStr === 'elegant' ? 'Playfair Display' : 'Inter',
-      bodyFont: 'Inter',
+      headingFont: resolved.typography.headingFont,
+      bodyFont: resolved.typography.bodyFont,
       baseSizePx: 16,
       lineHeight: 1.6,
     },
@@ -108,10 +119,13 @@ function generateRecommendations(
       { name: 'color-secondary', value: c2 },
       { name: 'color-accent', value: c3 },
       { name: 'color-highlight', value: c4 },
-      { name: 'font-heading', value: moodStr === 'elegant' ? 'Playfair Display' : 'Inter' },
-      { name: 'font-body', value: 'Inter' },
+      { name: 'font-heading', value: resolved.typography.headingFont },
+      { name: 'font-body', value: resolved.typography.bodyFont },
       { name: 'font-size-base', value: '16px' },
       { name: 'line-height-base', value: '1.6' },
+      ...guidanceTokens(guidance.id).filter(
+        (token) => token.name !== 'font-heading' && token.name !== 'font-body',
+      ),
     ],
   };
 

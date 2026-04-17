@@ -4,57 +4,8 @@
  * Phase 3 (#185)
  */
 
-import type { ButtonStyle } from '../types';
-
-// ── Button style catalog ──────────────────────────────────────────────────────
-
-export const BUTTON_STYLES: ButtonStyle[] = [
-  {
-    id: 'rounded',
-    name: 'Rounded',
-    description: 'Balanced corner radius — professional and modern.',
-    borderRadius: '0.375rem',
-    fontWeight: '600',
-    paddingX: '1rem',
-    outlined: false,
-  },
-  {
-    id: 'pill',
-    name: 'Pill',
-    description: 'Fully rounded edges — friendly and approachable.',
-    borderRadius: '9999px',
-    fontWeight: '600',
-    paddingX: '1.25rem',
-    outlined: false,
-  },
-  {
-    id: 'sharp',
-    name: 'Sharp',
-    description: 'Zero radius — precise and decisive.',
-    borderRadius: '0',
-    fontWeight: '700',
-    paddingX: '1rem',
-    outlined: false,
-  },
-  {
-    id: 'soft',
-    name: 'Soft',
-    description: 'Subtle rounding with a gentle feel — warm and inviting.',
-    borderRadius: '0.5rem',
-    fontWeight: '500',
-    paddingX: '1rem',
-    outlined: false,
-  },
-  {
-    id: 'outlined',
-    name: 'Outlined',
-    description: 'Transparent with a visible border — minimal and elegant.',
-    borderRadius: '0.375rem',
-    fontWeight: '500',
-    paddingX: '1rem',
-    outlined: true,
-  },
-];
+export { BUTTON_STYLES } from '../themeCatalog';
+import { BUTTON_STYLES } from '../themeCatalog';
 
 // ── Component ─────────────────────────────────────────────────────────────────
 

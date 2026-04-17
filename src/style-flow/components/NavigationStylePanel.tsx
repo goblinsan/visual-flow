@@ -5,41 +5,8 @@
  */
 
 import type { NavigationStyle } from '../types';
-
-// ── Navigation style catalog ──────────────────────────────────────────────────
-
-export const NAVIGATION_STYLES: NavigationStyle[] = [
-  {
-    id: 'top-bar',
-    name: 'Top Bar',
-    description: 'Horizontal navigation at the top — familiar and widely used.',
-    variant: 'top-bar',
-  },
-  {
-    id: 'sidebar',
-    name: 'Sidebar',
-    description: 'Vertical navigation on the left — ideal for dashboards and apps.',
-    variant: 'sidebar',
-  },
-  {
-    id: 'tab-bar',
-    name: 'Tab Bar',
-    description: 'Tabbed sections below a header — great for content categories.',
-    variant: 'tab-bar',
-  },
-  {
-    id: 'floating',
-    name: 'Floating Nav',
-    description: 'Pill-shaped floating navigation — modern and unobtrusive.',
-    variant: 'floating',
-  },
-  {
-    id: 'bottom-bar',
-    name: 'Bottom Bar',
-    description: 'Navigation pinned to the bottom — mobile-first patterns.',
-    variant: 'bottom-bar',
-  },
-];
+export { NAVIGATION_STYLES } from '../themeCatalog';
+import { NAVIGATION_STYLES } from '../themeCatalog';
 
 // ── Mini preview scenes ───────────────────────────────────────────────────────
 

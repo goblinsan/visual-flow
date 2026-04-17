@@ -121,6 +121,10 @@ export interface DesignTheme {
   id: string;
   /** Human-readable name */
   name: string;
+  /** Shared guidance profile id when the theme came from design-themes */
+  guidanceId?: string;
+  /** Human-readable shared guidance name */
+  guidanceName?: string;
   /** The kulrs palette ID this theme was derived from (if any) */
   kulrsPaletteId?: string;
   /** Raw palette hex colors from Kulrs */
@@ -131,6 +135,8 @@ export interface DesignTheme {
   colors: Record<ColorTokenName, string>;
   /** Typography settings */
   typography: ThemeTypography;
+  /** Non-color theme tokens carried alongside the color tokens */
+  guidanceTokens?: Record<string, string>;
 }
 
 // ---------------------------------------------------------------------------
