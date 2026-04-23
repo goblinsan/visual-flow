@@ -6,6 +6,9 @@ export interface SvgBaseElement {
   stroke: string;
   strokeWidth: number;
   opacity: number;
+  rotate: number;
+  skewX: number;
+  skewY: number;
 }
 
 export interface SvgRectElement extends SvgBaseElement {

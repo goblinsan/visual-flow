@@ -48,6 +48,41 @@ function r2(n: number): string {
   return parseFloat(n.toFixed(2)).toString();
 }
 
+const FONT_FAMILIES = [
+  'sans-serif', 'serif', 'monospace', 'cursive', 'fantasy',
+  'Arial', 'Helvetica', 'Verdana', 'Trebuchet MS', 'Georgia',
+  'Times New Roman', 'Courier New', 'Impact', 'Comic Sans MS',
+  'Palatino', 'Garamond',
+];
+
+function getElementCenter(el: SvgElement): { cx: number; cy: number } {
+  switch (el.type) {
+    case 'rect': return { cx: el.x + el.width / 2, cy: el.y + el.height / 2 };
+    case 'circle': return { cx: el.cx, cy: el.cy };
+    case 'ellipse': return { cx: el.cx, cy: el.cy };
+    case 'line': return { cx: (el.x1 + el.x2) / 2, cy: (el.y1 + el.y2) / 2 };
+    case 'text': return { cx: el.x, cy: el.y };
+    case 'image': return { cx: el.x + el.width / 2, cy: el.y + el.height / 2 };
+    case 'path': {
+      const m = /[Mm]\s*([-\d.]+)[,\s]+([-\d.]+)/.exec(el.d);
+      return m ? { cx: parseFloat(m[1]), cy: parseFloat(m[2]) } : { cx: 0, cy: 0 };
+    }
+  }
+}
+
+function buildTransform(el: SvgElement): string | undefined {
+  const rotate = el.rotate;
+  const skewX = el.skewX;
+  const skewY = el.skewY;
+  if (rotate === 0 && skewX === 0 && skewY === 0) return undefined;
+  const { cx, cy } = getElementCenter(el);
+  const parts: string[] = [];
+  if (rotate !== 0) parts.push(`rotate(${rotate} ${r2(cx)} ${r2(cy)})`);
+  if (skewX !== 0) parts.push(`skewX(${skewX})`);
+  if (skewY !== 0) parts.push(`skewY(${skewY})`);
+  return parts.length > 0 ? parts.join(' ') : undefined;
+}
+
 /** Converts a BezierNode array to an SVG path `d` string. */
 function nodesToPathD(nodes: BezierNode[], closed: boolean): string {
   if (nodes.length === 0) return '';
@@ -255,21 +290,23 @@ function PathNodeEditor({
 
 function elementToSvgString(el: SvgElement): string {
   const op = (v: number) => (v !== 1 ? ` opacity="${v}"` : '');
+  const tf = buildTransform(el);
+  const tAttr = tf ? ` transform="${tf}"` : '';
   switch (el.type) {
     case 'rect':
-      return `<rect x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" rx="${el.rx}" fill="${el.fill}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}"${op(el.opacity)}/>`;
+      return `<rect x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" rx="${el.rx}" fill="${el.fill}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}"${op(el.opacity)}${tAttr}/>`;
     case 'circle':
-      return `<circle cx="${el.cx}" cy="${el.cy}" r="${el.r}" fill="${el.fill}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}"${op(el.opacity)}/>`;
+      return `<circle cx="${el.cx}" cy="${el.cy}" r="${el.r}" fill="${el.fill}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}"${op(el.opacity)}${tAttr}/>`;
     case 'ellipse':
-      return `<ellipse cx="${el.cx}" cy="${el.cy}" rx="${el.rx}" ry="${el.ry}" fill="${el.fill}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}"${op(el.opacity)}/>`;
+      return `<ellipse cx="${el.cx}" cy="${el.cy}" rx="${el.rx}" ry="${el.ry}" fill="${el.fill}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}"${op(el.opacity)}${tAttr}/>`;
     case 'line':
-      return `<line x1="${el.x1}" y1="${el.y1}" x2="${el.x2}" y2="${el.y2}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}"${op(el.opacity)}/>`;
+      return `<line x1="${el.x1}" y1="${el.y1}" x2="${el.x2}" y2="${el.y2}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}"${op(el.opacity)}${tAttr}/>`;
     case 'path':
-      return `<path d="${el.d}" fill="${el.fill}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}"${op(el.opacity)}/>`;
+      return `<path d="${el.d}" fill="${el.fill}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}"${op(el.opacity)}${tAttr}/>`;
     case 'text':
-      return `<text x="${el.x}" y="${el.y}" font-size="${el.fontSize}" font-family="${el.fontFamily}" fill="${el.fill}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}"${op(el.opacity)}>${el.content}</text>`;
+      return `<text x="${el.x}" y="${el.y}" font-size="${el.fontSize}" font-family="${el.fontFamily}" fill="${el.fill}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}"${op(el.opacity)}${tAttr}>${el.content}</text>`;
     case 'image':
-      return `<image x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" href="${el.href}"${op(el.opacity)}/>`;
+      return `<image x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" href="${el.href}"${op(el.opacity)}${tAttr}/>`;
   }
 }
 
@@ -311,21 +348,21 @@ function previewElement(d: DrawingState, fill: string, stroke: string, strokeWid
 
   switch (d.tool) {
     case 'rect':
-      return { id: '__preview__', type: 'rect', x, y, width: w, height: h, rx: 0, fill, stroke, strokeWidth, opacity: 0.8 };
+      return { id: '__preview__', type: 'rect', x, y, width: w, height: h, rx: 0, fill, stroke, strokeWidth, opacity: 0.8, rotate: 0, skewX: 0, skewY: 0 };
     case 'circle': {
       const r = Math.max(w, h) / 2;
       const cx = (startX + currentX) / 2;
       const cy = (startY + currentY) / 2;
-      return { id: '__preview__', type: 'circle', cx, cy, r, fill, stroke, strokeWidth, opacity: 0.8 };
+      return { id: '__preview__', type: 'circle', cx, cy, r, fill, stroke, strokeWidth, opacity: 0.8, rotate: 0, skewX: 0, skewY: 0 };
     }
     case 'ellipse':
-      return { id: '__preview__', type: 'ellipse', cx: x + w / 2, cy: y + h / 2, rx: w / 2, ry: h / 2, fill, stroke, strokeWidth, opacity: 0.8 };
+      return { id: '__preview__', type: 'ellipse', cx: x + w / 2, cy: y + h / 2, rx: w / 2, ry: h / 2, fill, stroke, strokeWidth, opacity: 0.8, rotate: 0, skewX: 0, skewY: 0 };
     case 'line':
-      return { id: '__preview__', type: 'line', x1: startX, y1: startY, x2: currentX, y2: currentY, fill, stroke, strokeWidth, opacity: 0.8 };
+      return { id: '__preview__', type: 'line', x1: startX, y1: startY, x2: currentX, y2: currentY, fill, stroke, strokeWidth, opacity: 0.8, rotate: 0, skewX: 0, skewY: 0 };
     case 'freehand': {
       if (!d.points || d.points.length < 2) return null;
       const pathD = d.points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x},${p.y}`).join(' ');
-      return { id: '__preview__', type: 'path', d: pathD, fill: 'none', stroke, strokeWidth, opacity: 0.8 };
+      return { id: '__preview__', type: 'path', d: pathD, fill: 'none', stroke, strokeWidth, opacity: 0.8, rotate: 0, skewX: 0, skewY: 0 };
     }
     default:
       return null;
@@ -393,10 +430,12 @@ function RenderElement({
   }, [handleMouseMove, handleMouseUp]);
 
   const selectionStyle = selected ? { outline: '2px dashed #3b82f6', outlineOffset: '2px' } : {};
+  const elTransform = buildTransform(el);
   const baseProps = {
     onMouseDown: handleMouseDown,
     style: selectionStyle,
     cursor: 'default' as const,
+    ...(elTransform !== undefined && { transform: elTransform }),
   };
 
   switch (el.type) {
@@ -509,6 +548,10 @@ function PropertiesPanel({
   onUpdateStart,
   onUpdateEnd,
   onDelete,
+  onBringToFront,
+  onSendToBack,
+  onMoveUp,
+  onMoveDown,
 }: {
   elements: SvgElement[];
   selectedId: string | null;
@@ -516,6 +559,10 @@ function PropertiesPanel({
   onUpdateStart: () => void;
   onUpdateEnd: () => void;
   onDelete: (id: string) => void;
+  onBringToFront: (id: string) => void;
+  onSendToBack: (id: string) => void;
+  onMoveUp: (id: string) => void;
+  onMoveDown: (id: string) => void;
 }) {
   const el = elements.find(e => e.id === selectedId);
 
@@ -536,6 +583,14 @@ function PropertiesPanel({
   return (
     <div className="w-56 bg-gray-50 border-l border-gray-200 p-3 overflow-y-auto flex flex-col gap-3 text-xs">
       <h3 className="font-semibold text-gray-700 text-sm">{el.type} properties</h3>
+
+      {/* Z-order controls */}
+      <div className="flex gap-1">
+        <button title="Send to Back" onClick={() => onSendToBack(el.id)} className="flex-1 bg-gray-100 hover:bg-gray-200 border rounded py-1 text-xs" ><i className="fa-solid fa-angles-down" /></button>
+        <button title="Move Down" onClick={() => onMoveDown(el.id)} className="flex-1 bg-gray-100 hover:bg-gray-200 border rounded py-1 text-xs"><i className="fa-solid fa-angle-down" /></button>
+        <button title="Move Up" onClick={() => onMoveUp(el.id)} className="flex-1 bg-gray-100 hover:bg-gray-200 border rounded py-1 text-xs"><i className="fa-solid fa-angle-up" /></button>
+        <button title="Bring to Front" onClick={() => onBringToFront(el.id)} className="flex-1 bg-gray-100 hover:bg-gray-200 border rounded py-1 text-xs"><i className="fa-solid fa-angles-up" /></button>
+      </div>
 
       {/* Common */}
       <label className="flex flex-col gap-1">
@@ -562,6 +617,21 @@ function PropertiesPanel({
       <label className="flex flex-col gap-1">
         <span className="text-gray-500">Opacity</span>
         <input type="number" min={0} max={1} step={0.05} value={el.opacity} onFocus={onUpdateStart} onBlur={onUpdateEnd} onChange={e => update({ opacity: parseFloat(e.target.value) || 0 } as Partial<SvgElement>)} className="border rounded px-1 py-0.5 w-full" />
+      </label>
+
+      <label className="flex flex-col gap-1">
+        <span className="text-gray-500">Rotate (°)</span>
+        <input type="number" step={1} value={el.rotate} onFocus={onUpdateStart} onBlur={onUpdateEnd} onChange={e => update({ rotate: parseFloat(e.target.value) || 0 } as Partial<SvgElement>)} className="border rounded px-1 py-0.5 w-full" />
+      </label>
+
+      <label className="flex flex-col gap-1">
+        <span className="text-gray-500">Skew X (°)</span>
+        <input type="number" step={1} value={el.skewX} onFocus={onUpdateStart} onBlur={onUpdateEnd} onChange={e => update({ skewX: parseFloat(e.target.value) || 0 } as Partial<SvgElement>)} className="border rounded px-1 py-0.5 w-full" />
+      </label>
+
+      <label className="flex flex-col gap-1">
+        <span className="text-gray-500">Skew Y (°)</span>
+        <input type="number" step={1} value={el.skewY} onFocus={onUpdateStart} onBlur={onUpdateEnd} onChange={e => update({ skewY: parseFloat(e.target.value) || 0 } as Partial<SvgElement>)} className="border rounded px-1 py-0.5 w-full" />
       </label>
 
       {/* Element-specific */}
@@ -638,7 +708,10 @@ function PropertiesPanel({
           </label>
           <label className="flex flex-col gap-1">
             <span className="text-gray-500">Font Family</span>
-            <input type="text" value={el.fontFamily} onFocus={onUpdateStart} onBlur={onUpdateEnd} onChange={e => update({ fontFamily: e.target.value } as Partial<SvgElement>)} className="border rounded px-1 py-0.5 w-full" />
+            <input type="text" list="svg-font-families" value={el.fontFamily} onFocus={onUpdateStart} onBlur={onUpdateEnd} onChange={e => update({ fontFamily: e.target.value } as Partial<SvgElement>)} className="border rounded px-1 py-0.5 w-full" />
+            <datalist id="svg-font-families">
+              {FONT_FAMILIES.map(f => <option key={f} value={f} />)}
+            </datalist>
           </label>
         </>
       )}
@@ -754,7 +827,7 @@ export function SvgEditor() {
           if (penState && penState.nodes.length >= 2) {
             e.preventDefault();
             const d = nodesToPathD(penState.nodes, true);
-            const newEl: SvgPathElement = { id: nextId(), type: 'path', d, fill, stroke, strokeWidth, opacity: 1 };
+            const newEl: SvgPathElement = { id: nextId(), type: 'path', d, fill, stroke, strokeWidth, opacity: 1, rotate: 0, skewX: 0, skewY: 0 };
             setElementsWithHistory([...elements, newEl]);
             setSelectedId(newEl.id);
             setPenState(null);
@@ -789,7 +862,7 @@ export function SvgEditor() {
         const first = penState.nodes[0];
         if (penState.nodes.length >= 3 && Math.hypot(pt.x - first.x, pt.y - first.y) < 10) {
           const d = nodesToPathD(penState.nodes, true);
-          const newEl: SvgPathElement = { id: nextId(), type: 'path', d, fill, stroke, strokeWidth, opacity: 1 };
+          const newEl: SvgPathElement = { id: nextId(), type: 'path', d, fill, stroke, strokeWidth, opacity: 1, rotate: 0, skewX: 0, skewY: 0 };
           setElementsWithHistory([...elements, newEl]);
           setSelectedId(newEl.id);
           setPenState(null);
@@ -823,6 +896,9 @@ export function SvgEditor() {
         stroke: 'none',
         strokeWidth: 0,
         opacity: 1,
+        rotate: 0,
+        skewX: 0,
+        skewY: 0,
       };
       setElementsWithHistory([...elements, newEl]);
       return;
@@ -921,7 +997,7 @@ export function SvgEditor() {
     const h = Math.abs(currentY - startY);
 
     let newEl: SvgElement | null = null;
-    const base = { id: nextId(), fill, stroke, strokeWidth, opacity: 1 };
+    const base = { id: nextId(), fill, stroke, strokeWidth, opacity: 1, rotate: 0, skewX: 0, skewY: 0 };
 
     switch (drawing.tool) {
       case 'rect':
@@ -1020,6 +1096,38 @@ export function SvgEditor() {
   const handleDelete = useCallback((id: string) => {
     setElementsWithHistory(elements.filter(el => el.id !== id));
     setSelectedId(null);
+  }, [elements, setElementsWithHistory]);
+
+  const handleBringToFront = useCallback((id: string) => {
+    const idx = elements.findIndex(e => e.id === id);
+    if (idx === -1 || idx === elements.length - 1) return;
+    const next = [...elements];
+    next.push(next.splice(idx, 1)[0]);
+    setElementsWithHistory(next);
+  }, [elements, setElementsWithHistory]);
+
+  const handleSendToBack = useCallback((id: string) => {
+    const idx = elements.findIndex(e => e.id === id);
+    if (idx <= 0) return;
+    const next = [...elements];
+    next.unshift(next.splice(idx, 1)[0]);
+    setElementsWithHistory(next);
+  }, [elements, setElementsWithHistory]);
+
+  const handleMoveUp = useCallback((id: string) => {
+    const idx = elements.findIndex(e => e.id === id);
+    if (idx === -1 || idx === elements.length - 1) return;
+    const next = [...elements];
+    [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
+    setElementsWithHistory(next);
+  }, [elements, setElementsWithHistory]);
+
+  const handleMoveDown = useCallback((id: string) => {
+    const idx = elements.findIndex(e => e.id === id);
+    if (idx <= 0) return;
+    const next = [...elements];
+    [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
+    setElementsWithHistory(next);
   }, [elements, setElementsWithHistory]);
 
   // Start dragging an anchor or control-handle of the selected path element
@@ -1255,6 +1363,10 @@ export function SvgEditor() {
           onUpdateStart={handleUpdateStart}
           onUpdateEnd={handleUpdateEnd}
           onDelete={handleDelete}
+          onBringToFront={handleBringToFront}
+          onSendToBack={handleSendToBack}
+          onMoveUp={handleMoveUp}
+          onMoveDown={handleMoveDown}
         />
       </div>
     </div>

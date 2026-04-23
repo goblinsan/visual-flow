@@ -174,6 +174,7 @@ function parseElement(el: Element, parentTransform: Transform): SvgElement[] {
         width: raw.width * t.sx,
         height: raw.height * t.sy,
         rx: numAttr(el, 'rx') * Math.min(t.sx, t.sy),
+        rotate: 0, skewX: 0, skewY: 0,
       }];
     }
 
@@ -187,6 +188,7 @@ function parseElement(el: Element, parentTransform: Transform): SvgElement[] {
         cx: c.x,
         cy: c.y,
         r: raw.r * Math.min(t.sx, t.sy),
+        rotate: 0, skewX: 0, skewY: 0,
       }];
     }
 
@@ -201,6 +203,7 @@ function parseElement(el: Element, parentTransform: Transform): SvgElement[] {
         cy: c.y,
         rx: raw.rx * t.sx,
         ry: raw.ry * t.sy,
+        rotate: 0, skewX: 0, skewY: 0,
       }];
     }
 
@@ -213,6 +216,7 @@ function parseElement(el: Element, parentTransform: Transform): SvgElement[] {
         type: 'line',
         x1: p1.x, y1: p1.y,
         x2: p2.x, y2: p2.y,
+        rotate: 0, skewX: 0, skewY: 0,
       }];
     }
 
@@ -225,6 +229,7 @@ function parseElement(el: Element, parentTransform: Transform): SvgElement[] {
         d: (t.tx !== 0 || t.ty !== 0 || t.sx !== 1 || t.sy !== 1)
           ? applyTransformToPath(t, d)
           : d,
+        rotate: 0, skewX: 0, skewY: 0,
       }];
     }
 
@@ -241,6 +246,7 @@ function parseElement(el: Element, parentTransform: Transform): SvgElement[] {
         d: (t.tx !== 0 || t.ty !== 0 || t.sx !== 1 || t.sy !== 1)
           ? applyTransformToPath(t, d)
           : d,
+        rotate: 0, skewX: 0, skewY: 0,
       }];
     }
 
@@ -255,6 +261,7 @@ function parseElement(el: Element, parentTransform: Transform): SvgElement[] {
         content: el.textContent ?? '',
         fontSize: numAttr(el, 'font-size', 16) * Math.min(t.sx, t.sy),
         fontFamily: attr(el, 'font-family', 'sans-serif'),
+        rotate: 0, skewX: 0, skewY: 0,
       }];
     }
 
@@ -269,6 +276,7 @@ function parseElement(el: Element, parentTransform: Transform): SvgElement[] {
         width: numAttr(el, 'width') * t.sx,
         height: numAttr(el, 'height') * t.sy,
         href: attr(el, 'href', '') || attr(el, 'xlink:href', ''),
+        rotate: 0, skewX: 0, skewY: 0,
       }];
     }
 
