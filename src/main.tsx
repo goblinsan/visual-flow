@@ -9,6 +9,7 @@ import { MobileFlowShell } from './mobile/MobileFlowShell'
 import { MobileGate } from './mobile/MobileGate'
 import { useMobile } from './hooks/useMobile'
 import { saveMobileSnapshot } from './utils/persistence'
+import { SvgEditor } from './svg-editor/SvgEditor'
 
 // Route based on URL
 const isTestPage = window.location.search.includes('test=proposals');
@@ -16,6 +17,7 @@ const isStyleFlowTest = window.location.search.includes('test=styleflow');
 const isFromKulrs = window.location.pathname === '/from-kulrs';
 // Issue #210: explicit ?editor=mobile param forces the mobile shell regardless of device
 const forceMobile = window.location.search.includes('editor=mobile');
+const isSvgEditor = window.location.search.includes('editor=svg');
 
 /**
  * Root component.
@@ -35,6 +37,7 @@ function Root() {
   if (isFromKulrs) return <FromKulrsPage />;
   if (isTestPage)  return <ProposalsTestPage />;
   if (isStyleFlowTest) return <StyleFlowTestPage />;
+  if (isSvgEditor) return <SvgEditor />;
 
   if (forceMobile || isMobile) {
     return <MobileFlowShell onComplete={(snapshot) => saveMobileSnapshot(snapshot)} />;
