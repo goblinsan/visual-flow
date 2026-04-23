@@ -51,7 +51,8 @@ export function rasterImageToSvgElements(
       const imageData = ctx.getImageData(0, 0, canvasW, canvasH);
       const { data } = imageData;
 
-      const svgWidth = 800;
+      const DEFAULT_SVG_WIDTH = 800;
+      const svgWidth = DEFAULT_SVG_WIDTH;
       const svgHeight = Math.round((canvasH / canvasW) * svgWidth);
       const pixelW = svgWidth / canvasW;
       const pixelH = svgHeight / canvasH;

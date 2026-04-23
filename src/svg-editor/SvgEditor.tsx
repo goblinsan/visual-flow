@@ -105,11 +105,13 @@ function RenderElement({
   selected,
   onSelect,
   onMove,
+  onMoveEnd,
 }: {
   el: SvgElement;
   selected: boolean;
   onSelect: (id: string) => void;
   onMove: (id: string, dx: number, dy: number) => void;
+  onMoveEnd: () => void;
 }) {
   const dragStart = useRef<{ x: number; y: number } | null>(null);
   const moved = useRef(false);
@@ -135,9 +137,12 @@ function RenderElement({
     e.stopPropagation();
     if (!moved.current) {
       onSelect(el.id);
+    } else {
+      onMoveEnd();
     }
     dragStart.current = null;
-  }, [el.id, onSelect]);
+    moved.current = false;
+  }, [el.id, onSelect, onMoveEnd]);
 
   useEffect(() => {
     window.addEventListener('mousemove', handleMouseMove);
@@ -262,11 +267,15 @@ function PropertiesPanel({
   elements,
   selectedId,
   onUpdate,
+  onUpdateStart,
+  onUpdateEnd,
   onDelete,
 }: {
   elements: SvgElement[];
   selectedId: string | null;
   onUpdate: (id: string, updates: Partial<SvgElement>) => void;
+  onUpdateStart: () => void;
+  onUpdateEnd: () => void;
   onDelete: (id: string) => void;
 }) {
   const el = elements.find(e => e.id === selectedId);
@@ -293,27 +302,27 @@ function PropertiesPanel({
       <label className="flex flex-col gap-1">
         <span className="text-gray-500">Fill</span>
         <div className="flex gap-1 items-center">
-          <input type="color" value={el.fill === 'none' ? '#000000' : el.fill} onChange={e => update({ fill: e.target.value } as Partial<SvgElement>)} className="w-8 h-7 cursor-pointer border rounded" />
-          <input type="text" value={el.fill} onChange={e => update({ fill: e.target.value } as Partial<SvgElement>)} className="flex-1 border rounded px-1 py-0.5" />
+          <input type="color" value={el.fill === 'none' ? '#000000' : el.fill} onFocus={onUpdateStart} onBlur={onUpdateEnd} onChange={e => update({ fill: e.target.value } as Partial<SvgElement>)} className="w-8 h-7 cursor-pointer border rounded" />
+          <input type="text" value={el.fill} onFocus={onUpdateStart} onBlur={onUpdateEnd} onChange={e => update({ fill: e.target.value } as Partial<SvgElement>)} className="flex-1 border rounded px-1 py-0.5" />
         </div>
       </label>
 
       <label className="flex flex-col gap-1">
         <span className="text-gray-500">Stroke</span>
         <div className="flex gap-1 items-center">
-          <input type="color" value={el.stroke === 'none' ? '#000000' : el.stroke} onChange={e => update({ stroke: e.target.value } as Partial<SvgElement>)} className="w-8 h-7 cursor-pointer border rounded" />
-          <input type="text" value={el.stroke} onChange={e => update({ stroke: e.target.value } as Partial<SvgElement>)} className="flex-1 border rounded px-1 py-0.5" />
+          <input type="color" value={el.stroke === 'none' ? '#000000' : el.stroke} onFocus={onUpdateStart} onBlur={onUpdateEnd} onChange={e => update({ stroke: e.target.value } as Partial<SvgElement>)} className="w-8 h-7 cursor-pointer border rounded" />
+          <input type="text" value={el.stroke} onFocus={onUpdateStart} onBlur={onUpdateEnd} onChange={e => update({ stroke: e.target.value } as Partial<SvgElement>)} className="flex-1 border rounded px-1 py-0.5" />
         </div>
       </label>
 
       <label className="flex flex-col gap-1">
         <span className="text-gray-500">Stroke Width</span>
-        <input type="number" min={0} step={0.5} value={el.strokeWidth} onChange={e => update({ strokeWidth: parseFloat(e.target.value) || 0 } as Partial<SvgElement>)} className="border rounded px-1 py-0.5 w-full" />
+        <input type="number" min={0} step={0.5} value={el.strokeWidth} onFocus={onUpdateStart} onBlur={onUpdateEnd} onChange={e => update({ strokeWidth: parseFloat(e.target.value) || 0 } as Partial<SvgElement>)} className="border rounded px-1 py-0.5 w-full" />
       </label>
 
       <label className="flex flex-col gap-1">
         <span className="text-gray-500">Opacity</span>
-        <input type="number" min={0} max={1} step={0.05} value={el.opacity} onChange={e => update({ opacity: parseFloat(e.target.value) || 0 } as Partial<SvgElement>)} className="border rounded px-1 py-0.5 w-full" />
+        <input type="number" min={0} max={1} step={0.05} value={el.opacity} onFocus={onUpdateStart} onBlur={onUpdateEnd} onChange={e => update({ opacity: parseFloat(e.target.value) || 0 } as Partial<SvgElement>)} className="border rounded px-1 py-0.5 w-full" />
       </label>
 
       {/* Element-specific */}
@@ -322,12 +331,12 @@ function PropertiesPanel({
           {(['x', 'y', 'width', 'height'] as const).map(k => (
             <label key={k} className="flex flex-col gap-1">
               <span className="text-gray-500">{k}</span>
-              <input type="number" value={(el as SvgRectElement)[k]} onChange={e => update({ [k]: parseFloat(e.target.value) || 0 } as Partial<SvgElement>)} className="border rounded px-1 py-0.5 w-full" />
+              <input type="number" value={(el as SvgRectElement)[k]} onFocus={onUpdateStart} onBlur={onUpdateEnd} onChange={e => update({ [k]: parseFloat(e.target.value) || 0 } as Partial<SvgElement>)} className="border rounded px-1 py-0.5 w-full" />
             </label>
           ))}
           <label className="flex flex-col gap-1">
             <span className="text-gray-500">Corner Radius (rx)</span>
-            <input type="number" min={0} value={el.rx} onChange={e => update({ rx: parseFloat(e.target.value) || 0 } as Partial<SvgElement>)} className="border rounded px-1 py-0.5 w-full" />
+            <input type="number" min={0} value={el.rx} onFocus={onUpdateStart} onBlur={onUpdateEnd} onChange={e => update({ rx: parseFloat(e.target.value) || 0 } as Partial<SvgElement>)} className="border rounded px-1 py-0.5 w-full" />
           </label>
         </>
       )}
@@ -337,7 +346,7 @@ function PropertiesPanel({
           {(['cx', 'cy', 'r'] as const).map(k => (
             <label key={k} className="flex flex-col gap-1">
               <span className="text-gray-500">{k}</span>
-              <input type="number" value={(el as SvgCircleElement)[k]} onChange={e => update({ [k]: parseFloat(e.target.value) || 0 } as Partial<SvgElement>)} className="border rounded px-1 py-0.5 w-full" />
+              <input type="number" value={(el as SvgCircleElement)[k]} onFocus={onUpdateStart} onBlur={onUpdateEnd} onChange={e => update({ [k]: parseFloat(e.target.value) || 0 } as Partial<SvgElement>)} className="border rounded px-1 py-0.5 w-full" />
             </label>
           ))}
         </>
@@ -348,7 +357,7 @@ function PropertiesPanel({
           {(['cx', 'cy', 'rx', 'ry'] as const).map(k => (
             <label key={k} className="flex flex-col gap-1">
               <span className="text-gray-500">{k}</span>
-              <input type="number" value={(el as SvgEllipseElement)[k]} onChange={e => update({ [k]: parseFloat(e.target.value) || 0 } as Partial<SvgElement>)} className="border rounded px-1 py-0.5 w-full" />
+              <input type="number" value={(el as SvgEllipseElement)[k]} onFocus={onUpdateStart} onBlur={onUpdateEnd} onChange={e => update({ [k]: parseFloat(e.target.value) || 0 } as Partial<SvgElement>)} className="border rounded px-1 py-0.5 w-full" />
             </label>
           ))}
         </>
@@ -359,7 +368,7 @@ function PropertiesPanel({
           {(['x1', 'y1', 'x2', 'y2'] as const).map(k => (
             <label key={k} className="flex flex-col gap-1">
               <span className="text-gray-500">{k}</span>
-              <input type="number" value={(el as SvgLineElement)[k]} onChange={e => update({ [k]: parseFloat(e.target.value) || 0 } as Partial<SvgElement>)} className="border rounded px-1 py-0.5 w-full" />
+              <input type="number" value={(el as SvgLineElement)[k]} onFocus={onUpdateStart} onBlur={onUpdateEnd} onChange={e => update({ [k]: parseFloat(e.target.value) || 0 } as Partial<SvgElement>)} className="border rounded px-1 py-0.5 w-full" />
             </label>
           ))}
         </>
@@ -368,7 +377,7 @@ function PropertiesPanel({
       {el.type === 'path' && (
         <label className="flex flex-col gap-1">
           <span className="text-gray-500">Path d</span>
-          <textarea rows={4} value={(el as SvgPathElement).d} onChange={e => update({ d: e.target.value } as Partial<SvgElement>)} className="border rounded px-1 py-0.5 w-full text-xs font-mono resize-y" />
+          <textarea rows={4} value={(el as SvgPathElement).d} onFocus={onUpdateStart} onBlur={onUpdateEnd} onChange={e => update({ d: e.target.value } as Partial<SvgElement>)} className="border rounded px-1 py-0.5 w-full text-xs font-mono resize-y" />
         </label>
       )}
 
@@ -377,20 +386,20 @@ function PropertiesPanel({
           {(['x', 'y'] as const).map(k => (
             <label key={k} className="flex flex-col gap-1">
               <span className="text-gray-500">{k}</span>
-              <input type="number" value={(el as SvgTextElement)[k]} onChange={e => update({ [k]: parseFloat(e.target.value) || 0 } as Partial<SvgElement>)} className="border rounded px-1 py-0.5 w-full" />
+              <input type="number" value={(el as SvgTextElement)[k]} onFocus={onUpdateStart} onBlur={onUpdateEnd} onChange={e => update({ [k]: parseFloat(e.target.value) || 0 } as Partial<SvgElement>)} className="border rounded px-1 py-0.5 w-full" />
             </label>
           ))}
           <label className="flex flex-col gap-1">
             <span className="text-gray-500">Content</span>
-            <input type="text" value={el.content} onChange={e => update({ content: e.target.value } as Partial<SvgElement>)} className="border rounded px-1 py-0.5 w-full" />
+            <input type="text" value={el.content} onFocus={onUpdateStart} onBlur={onUpdateEnd} onChange={e => update({ content: e.target.value } as Partial<SvgElement>)} className="border rounded px-1 py-0.5 w-full" />
           </label>
           <label className="flex flex-col gap-1">
             <span className="text-gray-500">Font Size</span>
-            <input type="number" min={1} value={el.fontSize} onChange={e => update({ fontSize: parseFloat(e.target.value) || 16 } as Partial<SvgElement>)} className="border rounded px-1 py-0.5 w-full" />
+            <input type="number" min={1} value={el.fontSize} onFocus={onUpdateStart} onBlur={onUpdateEnd} onChange={e => update({ fontSize: parseFloat(e.target.value) || 16 } as Partial<SvgElement>)} className="border rounded px-1 py-0.5 w-full" />
           </label>
           <label className="flex flex-col gap-1">
             <span className="text-gray-500">Font Family</span>
-            <input type="text" value={el.fontFamily} onChange={e => update({ fontFamily: e.target.value } as Partial<SvgElement>)} className="border rounded px-1 py-0.5 w-full" />
+            <input type="text" value={el.fontFamily} onFocus={onUpdateStart} onBlur={onUpdateEnd} onChange={e => update({ fontFamily: e.target.value } as Partial<SvgElement>)} className="border rounded px-1 py-0.5 w-full" />
           </label>
         </>
       )}
@@ -400,7 +409,7 @@ function PropertiesPanel({
           {(['x', 'y', 'width', 'height'] as const).map(k => (
             <label key={k} className="flex flex-col gap-1">
               <span className="text-gray-500">{k}</span>
-              <input type="number" value={el[k]} onChange={e => update({ [k]: parseFloat(e.target.value) || 0 } as Partial<SvgElement>)} className="border rounded px-1 py-0.5 w-full" />
+              <input type="number" value={el[k]} onFocus={onUpdateStart} onBlur={onUpdateEnd} onChange={e => update({ [k]: parseFloat(e.target.value) || 0 } as Partial<SvgElement>)} className="border rounded px-1 py-0.5 w-full" />
             </label>
           ))}
         </>
@@ -609,25 +618,62 @@ export function SvgEditor() {
     if (tool === 'select') setSelectedId(id);
   }, [tool]);
 
+  // Snapshot elements before first move so that a completed drag is a single undo step.
+  const preMoveSnapshot = useRef<SvgElement[] | null>(null);
+
   const handleElementMove = useCallback((id: string, dx: number, dy: number) => {
     if (tool !== 'select') return;
-    setElements(prev => prev.map(el => {
-      if (el.id !== id) return el;
-      switch (el.type) {
-        case 'rect': return { ...el, x: el.x + dx, y: el.y + dy };
-        case 'circle': return { ...el, cx: el.cx + dx, cy: el.cy + dy };
-        case 'ellipse': return { ...el, cx: el.cx + dx, cy: el.cy + dy };
-        case 'line': return { ...el, x1: el.x1 + dx, y1: el.y1 + dy, x2: el.x2 + dx, y2: el.y2 + dy };
-        case 'text': return { ...el, x: el.x + dx, y: el.y + dy };
-        case 'image': return { ...el, x: el.x + dx, y: el.y + dy };
-        case 'path': return el; // skip transform for paths
+    // Capture the state before the first pixel of movement so undo can restore it.
+    setElements(prev => {
+      if (!preMoveSnapshot.current) {
+        preMoveSnapshot.current = prev;
       }
-    }));
+      return prev.map(el => {
+        if (el.id !== id) return el;
+        switch (el.type) {
+          case 'rect': return { ...el, x: el.x + dx, y: el.y + dy };
+          case 'circle': return { ...el, cx: el.cx + dx, cy: el.cy + dy };
+          case 'ellipse': return { ...el, cx: el.cx + dx, cy: el.cy + dy };
+          case 'line': return { ...el, x1: el.x1 + dx, y1: el.y1 + dy, x2: el.x2 + dx, y2: el.y2 + dy };
+          case 'text': return { ...el, x: el.x + dx, y: el.y + dy };
+          case 'image': return { ...el, x: el.x + dx, y: el.y + dy };
+          case 'path': return el; // paths cannot be moved by simple coordinate delta
+        }
+      });
+    });
   }, [tool]);
 
+  const handleMoveEnd = useCallback(() => {
+    // Push the pre-move snapshot to history so the completed drag is a single undo step.
+    if (preMoveSnapshot.current) {
+      const snapshot = preMoveSnapshot.current;
+      preMoveSnapshot.current = null;
+      setHistory(h => [...h, snapshot]);
+      setFuture([]);
+    }
+  }, []);
+
   const handleUpdate = useCallback((id: string, updates: Partial<SvgElement>) => {
-    // Update element immediately without adding to history (avoids flooding undo stack on every keystroke)
+    // Update element immediately without adding to history (avoids flooding undo stack on every keystroke).
+    // History is committed via handleUpdateStart when the user first focuses a property input.
     setElements(prev => prev.map(el => el.id === id ? { ...el, ...updates } as SvgElement : el));
+  }, []);
+
+  // Called when the user focuses a property field — captures state once per edit session.
+  const propEditCommitted = useRef(false);
+  const handleUpdateStart = useCallback(() => {
+    if (!propEditCommitted.current) {
+      propEditCommitted.current = true;
+      // Use a functional update to capture the current elements snapshot cleanly.
+      setElements(prev => {
+        setHistory(h => [...h, prev]);
+        setFuture([]);
+        return prev;
+      });
+    }
+  }, []);
+  const handleUpdateEnd = useCallback(() => {
+    propEditCommitted.current = false;
   }, []);
 
   const handleDelete = useCallback((id: string) => {
@@ -817,6 +863,7 @@ export function SvgEditor() {
                   selected={el.id === selectedId}
                   onSelect={handleElementSelect}
                   onMove={handleElementMove}
+                  onMoveEnd={handleMoveEnd}
                 />
               ))}
               {preview && <PreviewElement el={preview} />}
@@ -829,6 +876,8 @@ export function SvgEditor() {
           elements={elements}
           selectedId={selectedId}
           onUpdate={handleUpdate}
+          onUpdateStart={handleUpdateStart}
+          onUpdateEnd={handleUpdateEnd}
           onDelete={handleDelete}
         />
       </div>
