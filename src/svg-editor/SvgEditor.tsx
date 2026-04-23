@@ -7,14 +7,250 @@ import { parseSvgFile } from './svgParser';
 // Helpers
 // ---------------------------------------------------------------------------
 
-function getSvgPoint(e: React.MouseEvent, svgEl: SVGSVGElement): { x: number; y: number } {
+function clientToSvg(svgEl: SVGSVGElement, cx: number, cy: number): { x: number; y: number } {
   const pt = svgEl.createSVGPoint();
-  pt.x = e.clientX;
-  pt.y = e.clientY;
+  pt.x = cx; pt.y = cy;
   const ctm = svgEl.getScreenCTM();
   if (!ctm) return { x: 0, y: 0 };
-  const svgPt = pt.matrixTransform(ctm.inverse());
-  return { x: svgPt.x, y: svgPt.y };
+  const r = pt.matrixTransform(ctm.inverse());
+  return { x: r.x, y: r.y };
+}
+
+function getSvgPoint(e: React.MouseEvent, svgEl: SVGSVGElement): { x: number; y: number } {
+  return clientToSvg(svgEl, e.clientX, e.clientY);
+}
+
+// ---------------------------------------------------------------------------
+// Bézier pen types and helpers
+// ---------------------------------------------------------------------------
+
+interface BezierNode {
+  x: number; y: number;
+  cp1x: number; cp1y: number; // in-handle (arrives at this node)
+  cp2x: number; cp2y: number; // out-handle (departs from this node)
+}
+
+interface PenState {
+  nodes: BezierNode[];
+  dragging: boolean; // mouse button held — stretching the handle of the last node
+}
+
+interface NodeEditDrag {
+  pathId: string;
+  handleType: 'anchor' | 'cp1' | 'cp2';
+  handleIndex: number;
+  startNodes: BezierNode[]; // immutable snapshot taken at drag-start
+  grabPt: { x: number; y: number };  // SVG coords where the drag started
+  closed: boolean;
+}
+
+function r2(n: number): string {
+  return parseFloat(n.toFixed(2)).toString();
+}
+
+/** Converts a BezierNode array to an SVG path `d` string. */
+function nodesToPathD(nodes: BezierNode[], closed: boolean): string {
+  if (nodes.length === 0) return '';
+  const p = (x: number, y: number) => `${r2(x)},${r2(y)}`;
+  let d = `M ${p(nodes[0].x, nodes[0].y)}`;
+  for (let i = 1; i < nodes.length; i++) {
+    const prev = nodes[i - 1];
+    const curr = nodes[i];
+    const isLine =
+      Math.hypot(prev.cp2x - prev.x, prev.cp2y - prev.y) < 0.5 &&
+      Math.hypot(curr.cp1x - curr.x, curr.cp1y - curr.y) < 0.5;
+    d += isLine
+      ? ` L ${p(curr.x, curr.y)}`
+      : ` C ${p(prev.cp2x, prev.cp2y)} ${p(curr.cp1x, curr.cp1y)} ${p(curr.x, curr.y)}`;
+  }
+  if (closed && nodes.length > 1) {
+    const last = nodes[nodes.length - 1];
+    const first = nodes[0];
+    const isLine =
+      Math.hypot(last.cp2x - last.x, last.cp2y - last.y) < 0.5 &&
+      Math.hypot(first.cp1x - first.x, first.cp1y - first.y) < 0.5;
+    if (!isLine) {
+      d += ` C ${p(last.cp2x, last.cp2y)} ${p(first.cp1x, first.cp1y)} ${p(first.x, first.y)}`;
+    }
+    d += ' Z';
+  }
+  return d;
+}
+
+/** Tokenises an SVG path `d` attribute into command objects. */
+function parsePath(d: string): { cmd: string; args: number[] }[] {
+  const result: { cmd: string; args: number[] }[] = [];
+  const re = /([MmLlCcZz])|([+-]?(?:\d*\.)?\d+(?:[eE][+-]?\d+)?)/g;
+  let cur = '';
+  let args: number[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(d)) !== null) {
+    if (m[1]) {
+      if (cur) result.push({ cmd: cur, args });
+      cur = m[1]; args = [];
+    } else if (m[2] !== undefined) {
+      args.push(parseFloat(m[2]));
+    }
+  }
+  if (cur) result.push({ cmd: cur, args });
+  return result;
+}
+
+/**
+ * Parses an SVG path `d` string into a BezierNode array.
+ * Supports M/m, L/l, C/c, Z/z. Returns null for unsupported commands.
+ */
+function pathDToNodes(d: string): { nodes: BezierNode[]; closed: boolean } | null {
+  const cmds = parsePath(d);
+  const nodes: BezierNode[] = [];
+  let closed = false;
+  let cx = 0, cy = 0;
+  try {
+    for (const { cmd, args } of cmds) {
+      switch (cmd) {
+        case 'M': case 'm':
+          for (let i = 0; i + 1 < args.length; i += 2) {
+            if (cmd === 'M') { cx = args[i]; cy = args[i + 1]; }
+            else { cx += args[i]; cy += args[i + 1]; }
+            nodes.push({ x: cx, y: cy, cp1x: cx, cp1y: cy, cp2x: cx, cp2y: cy });
+          }
+          break;
+        case 'L': case 'l':
+          for (let i = 0; i + 1 < args.length; i += 2) {
+            if (cmd === 'L') { cx = args[i]; cy = args[i + 1]; }
+            else { cx += args[i]; cy += args[i + 1]; }
+            nodes.push({ x: cx, y: cy, cp1x: cx, cp1y: cy, cp2x: cx, cp2y: cy });
+          }
+          break;
+        case 'C': case 'c':
+          for (let i = 0; i + 5 < args.length; i += 6) {
+            const bx = cmd === 'c' ? cx : 0;
+            const by = cmd === 'c' ? cy : 0;
+            const x1 = args[i]     + bx, y1 = args[i + 1] + by;
+            const x2 = args[i + 2] + bx, y2 = args[i + 3] + by;
+            const nx = args[i + 4] + bx, ny = args[i + 5] + by;
+            if (nodes.length > 0) {
+              nodes[nodes.length - 1].cp2x = x1;
+              nodes[nodes.length - 1].cp2y = y1;
+            }
+            cx = nx; cy = ny;
+            // If this cubic bezier closes back to the first node it is the
+            // closing-segment curve; update first node's in-handle instead of
+            // adding a duplicate node.
+            if (nodes.length > 1 && Math.hypot(nx - nodes[0].x, ny - nodes[0].y) < 1) {
+              nodes[0].cp1x = x2; nodes[0].cp1y = y2;
+            } else {
+              nodes.push({ x: nx, y: ny, cp1x: x2, cp1y: y2, cp2x: nx, cp2y: ny });
+            }
+          }
+          break;
+        case 'Z': case 'z': closed = true; break;
+        default: return null; // unknown command — decline to parse
+      }
+    }
+  } catch { return null; }
+  return nodes.length > 0 ? { nodes, closed } : null;
+}
+
+// ---------------------------------------------------------------------------
+// Pen overlay (shown while the pen tool is active)
+// ---------------------------------------------------------------------------
+
+function PenOverlay({
+  penState,
+  previewPt,
+  stroke,
+  strokeWidth,
+}: {
+  penState: PenState;
+  previewPt: { x: number; y: number } | null;
+  stroke: string;
+  strokeWidth: number;
+}) {
+  const { nodes, dragging } = penState;
+  if (nodes.length === 0) return null;
+
+  // Rubber-band: add a virtual next-node at the mouse position so the user can
+  // preview the segment that will be drawn on the next click.
+  const previewNodes: BezierNode[] = [...nodes];
+  if (!dragging && previewPt) {
+    previewNodes.push({ x: previewPt.x, y: previewPt.y, cp1x: previewPt.x, cp1y: previewPt.y, cp2x: previewPt.x, cp2y: previewPt.y });
+  }
+  const pathD = previewNodes.length > 1 ? nodesToPathD(previewNodes, false) : '';
+
+  const SNAP = 10;
+  const nearFirst = !dragging && previewPt && nodes.length >= 3 &&
+    Math.hypot(previewPt.x - nodes[0].x, previewPt.y - nodes[0].y) < SNAP;
+
+  return (
+    <g pointerEvents="none">
+      {pathD && <path d={pathD} fill="none" stroke={stroke} strokeWidth={strokeWidth} strokeDasharray="5,3" opacity={0.7} />}
+      {nodes.map((node, i) => {
+        const hasCp1 = Math.hypot(node.cp1x - node.x, node.cp1y - node.y) > 0.5;
+        const hasCp2 = Math.hypot(node.cp2x - node.x, node.cp2y - node.y) > 0.5;
+        return (
+          <g key={i}>
+            {hasCp1 && <line x1={node.cp1x} y1={node.cp1y} x2={node.x} y2={node.y} stroke="#6366f1" strokeWidth={1} />}
+            {hasCp2 && <line x1={node.x} y1={node.y} x2={node.cp2x} y2={node.cp2y} stroke="#6366f1" strokeWidth={1} />}
+            {hasCp1 && <circle cx={node.cp1x} cy={node.cp1y} r={3.5} fill="#a78bfa" stroke="white" strokeWidth={1} />}
+            {hasCp2 && <circle cx={node.cp2x} cy={node.cp2y} r={3.5} fill="#a78bfa" stroke="white" strokeWidth={1} />}
+            <rect
+              x={node.x - 5} y={node.y - 5} width={10} height={10}
+              fill={i === 0 ? (nearFirst ? '#10b981' : '#dcfce7') : 'white'}
+              stroke={i === 0 ? '#10b981' : '#3b82f6'}
+              strokeWidth={1.5}
+            />
+          </g>
+        );
+      })}
+    </g>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Path node editor (shown when a path is selected in select mode)
+// ---------------------------------------------------------------------------
+
+function PathNodeEditor({
+  el,
+  onStartDrag,
+}: {
+  el: SvgPathElement;
+  onStartDrag: (handleType: 'anchor' | 'cp1' | 'cp2', handleIndex: number, e: React.MouseEvent) => void;
+}) {
+  const parsed = pathDToNodes(el.d);
+  if (!parsed) return null;
+  const { nodes } = parsed;
+  return (
+    <g>
+      {nodes.map((node, i) => {
+        const hasCp1 = Math.hypot(node.cp1x - node.x, node.cp1y - node.y) > 0.5;
+        const hasCp2 = Math.hypot(node.cp2x - node.x, node.cp2y - node.y) > 0.5;
+        return (
+          <g key={i}>
+            {hasCp1 && <line x1={node.cp1x} y1={node.cp1y} x2={node.x} y2={node.y} stroke="#6366f1" strokeWidth={1} pointerEvents="none" />}
+            {hasCp2 && <line x1={node.x} y1={node.y} x2={node.cp2x} y2={node.cp2y} stroke="#6366f1" strokeWidth={1} pointerEvents="none" />}
+            {hasCp1 && (
+              <circle cx={node.cp1x} cy={node.cp1y} r={5} fill="#a78bfa" stroke="white" strokeWidth={1.5}
+                style={{ cursor: 'crosshair' }}
+                onMouseDown={e => { e.stopPropagation(); onStartDrag('cp1', i, e); }} />
+            )}
+            {hasCp2 && (
+              <circle cx={node.cp2x} cy={node.cp2y} r={5} fill="#a78bfa" stroke="white" strokeWidth={1.5}
+                style={{ cursor: 'crosshair' }}
+                onMouseDown={e => { e.stopPropagation(); onStartDrag('cp2', i, e); }} />
+            )}
+            <rect
+              x={node.x - 5} y={node.y - 5} width={10} height={10}
+              fill="white" stroke="#3b82f6" strokeWidth={2}
+              style={{ cursor: 'move' }}
+              onMouseDown={e => { e.stopPropagation(); onStartDrag('anchor', i, e); }}
+            />
+          </g>
+        );
+      })}
+    </g>
+  );
 }
 
 function elementToSvgString(el: SvgElement): string {
@@ -444,6 +680,9 @@ export function SvgEditor() {
   const [future, setFuture] = useState<SvgElement[][]>([]);
   const [converting, setConverting] = useState(false);
   const [viewBoxStr, setViewBoxStr] = useState('0 0 800 600');
+  const [penState, setPenState] = useState<PenState | null>(null);
+  const [penMousePt, setPenMousePt] = useState<{ x: number; y: number } | null>(null);
+  const [nodeEditDrag, setNodeEditDrag] = useState<NodeEditDrag | null>(null);
 
   const svgRef = useRef<SVGSVGElement>(null);
   const idRef = useRef(0);
@@ -497,13 +736,31 @@ export function SvgEditor() {
       }
 
       switch (e.key) {
-        case 'v': case 'V': setTool('select'); break;
-        case 'r': case 'R': setTool('rect'); break;
-        case 'c': case 'C': setTool('circle'); break;
-        case 'e': case 'E': setTool('ellipse'); break;
-        case 'l': case 'L': setTool('line'); break;
-        case 'd': case 'D': setTool('freehand'); break;
-        case 't': case 'T': setTool('text'); break;
+        case 'v': case 'V': setPenState(null); setTool('select'); break;
+        case 'r': case 'R': setPenState(null); setTool('rect'); break;
+        case 'c': case 'C': setPenState(null); setTool('circle'); break;
+        case 'e': case 'E': setPenState(null); setTool('ellipse'); break;
+        case 'l': case 'L': setPenState(null); setTool('line'); break;
+        case 'd': case 'D': setPenState(null); setTool('freehand'); break;
+        case 't': case 'T': setPenState(null); setTool('text'); break;
+        case 'p': case 'P': setTool('pen'); break;
+        case 'Escape':
+          // Discard any in-progress pen path
+          setPenState(null);
+          setPenMousePt(null);
+          break;
+        case 'Enter':
+          // Close and commit the in-progress pen path
+          if (penState && penState.nodes.length >= 2) {
+            e.preventDefault();
+            const d = nodesToPathD(penState.nodes, true);
+            const newEl: SvgPathElement = { id: nextId(), type: 'path', d, fill, stroke, strokeWidth, opacity: 1 };
+            setElementsWithHistory([...elements, newEl]);
+            setSelectedId(newEl.id);
+            setPenState(null);
+            setPenMousePt(null);
+          }
+          break;
         case 'Delete': case 'Backspace':
           if (selectedId) {
             setElementsWithHistory(elements.filter(el => el.id !== selectedId));
@@ -514,12 +771,37 @@ export function SvgEditor() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [selectedId, elements, undo, redo, setElementsWithHistory]);
+  }, [selectedId, elements, penState, fill, stroke, strokeWidth, nextId, undo, redo, setElementsWithHistory]);
 
   // Mouse handlers
   const handleMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (!svgRef.current) return;
     const pt = getSvgPoint(e, svgRef.current);
+
+    // Pen tool: place / extend / close the bezier path
+    if (tool === 'pen') {
+      if (!penState) {
+        // Start a new path
+        const node: BezierNode = { x: pt.x, y: pt.y, cp1x: pt.x, cp1y: pt.y, cp2x: pt.x, cp2y: pt.y };
+        setPenState({ nodes: [node], dragging: true });
+      } else {
+        // Click near the first node to close and commit
+        const first = penState.nodes[0];
+        if (penState.nodes.length >= 3 && Math.hypot(pt.x - first.x, pt.y - first.y) < 10) {
+          const d = nodesToPathD(penState.nodes, true);
+          const newEl: SvgPathElement = { id: nextId(), type: 'path', d, fill, stroke, strokeWidth, opacity: 1 };
+          setElementsWithHistory([...elements, newEl]);
+          setSelectedId(newEl.id);
+          setPenState(null);
+          setPenMousePt(null);
+        } else {
+          // Add a new anchor and start stretching its handle
+          const node: BezierNode = { x: pt.x, y: pt.y, cp1x: pt.x, cp1y: pt.y, cp2x: pt.x, cp2y: pt.y };
+          setPenState({ nodes: [...penState.nodes, node], dragging: true });
+        }
+      }
+      return;
+    }
 
     if (tool === 'select') {
       setSelectedId(null);
@@ -554,11 +836,55 @@ export function SvgEditor() {
       currentY: pt.y,
       points: tool === 'freehand' ? [pt] : undefined,
     });
-  }, [tool, fill, elements, nextId, setElementsWithHistory]);
+  }, [tool, penState, fill, stroke, strokeWidth, elements, nextId, setElementsWithHistory]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
-    if (!drawing || !svgRef.current) return;
+    if (!svgRef.current) return;
     const pt = getSvgPoint(e, svgRef.current);
+
+    // Pen tool: update rubber-band and stretch handle of the last placed node
+    if (tool === 'pen') {
+      setPenMousePt(pt);
+      if (penState?.dragging) {
+        setPenState(prev => {
+          if (!prev || prev.nodes.length === 0) return prev;
+          const nodes = prev.nodes.map(n => ({ ...n }));
+          const last = nodes[nodes.length - 1];
+          last.cp2x = pt.x;
+          last.cp2y = pt.y;
+          // Mirror cp1 for a smooth (C1-continuous) node
+          last.cp1x = 2 * last.x - pt.x;
+          last.cp1y = 2 * last.y - pt.y;
+          return { ...prev, nodes };
+        });
+      }
+      return;
+    }
+
+    // Node edit drag: recompute node positions from the immutable drag-start
+    // snapshot so there is no stale-closure accumulation error.
+    if (nodeEditDrag) {
+      const { pathId, handleType, handleIndex, startNodes, grabPt, closed } = nodeEditDrag;
+      const nodes = startNodes.map(n => ({ ...n }));
+      const node = nodes[handleIndex];
+      const sn = startNodes[handleIndex];
+      const dx = pt.x - grabPt.x;
+      const dy = pt.y - grabPt.y;
+      if (handleType === 'anchor') {
+        node.x = sn.x + dx; node.y = sn.y + dy;
+        node.cp1x = sn.cp1x + dx; node.cp1y = sn.cp1y + dy;
+        node.cp2x = sn.cp2x + dx; node.cp2y = sn.cp2y + dy;
+      } else if (handleType === 'cp1') {
+        node.cp1x = pt.x; node.cp1y = pt.y;
+      } else {
+        node.cp2x = pt.x; node.cp2y = pt.y;
+      }
+      const newD = nodesToPathD(nodes, closed);
+      setElements(prev => prev.map(el => el.id === pathId ? { ...el, d: newD } as SvgElement : el));
+      return;
+    }
+
+    if (!drawing) return;
     setDrawing(d => {
       if (!d) return d;
       return {
@@ -568,9 +894,21 @@ export function SvgEditor() {
         points: d.points ? [...d.points, pt] : undefined,
       };
     });
-  }, [drawing]);
+  }, [tool, penState, nodeEditDrag, drawing]);
 
   const handleMouseUp = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+    // Finalise the bezier handle the user was stretching
+    if (tool === 'pen' && penState?.dragging) {
+      setPenState(prev => prev ? { ...prev, dragging: false } : null);
+      return;
+    }
+
+    // End a node-edit drag
+    if (nodeEditDrag) {
+      setNodeEditDrag(null);
+      return;
+    }
+
     if (!drawing || !svgRef.current) return;
     const pt = getSvgPoint(e, svgRef.current);
     const { startX, startY } = drawing;
@@ -615,7 +953,7 @@ export function SvgEditor() {
       setElementsWithHistory([...elements, newEl]);
       setSelectedId(newEl.id);
     }
-  }, [drawing, fill, stroke, strokeWidth, elements, nextId, setElementsWithHistory]);
+  }, [tool, penState, nodeEditDrag, drawing, fill, stroke, strokeWidth, elements, nextId, setElementsWithHistory]);
 
   const handleElementSelect = useCallback((id: string) => {
     if (tool === 'select') setSelectedId(id);
@@ -684,6 +1022,22 @@ export function SvgEditor() {
     setSelectedId(null);
   }, [elements, setElementsWithHistory]);
 
+  // Start dragging an anchor or control-handle of the selected path element
+  const handleStartNodeDrag = useCallback((
+    handleType: 'anchor' | 'cp1' | 'cp2',
+    handleIndex: number,
+    e: React.MouseEvent,
+  ) => {
+    if (!selectedId || !svgRef.current) return;
+    const pathEl = elements.find(el => el.id === selectedId);
+    if (!pathEl || pathEl.type !== 'path') return;
+    const parsed = pathDToNodes(pathEl.d);
+    if (!parsed) return;
+    const grabPt = getSvgPoint(e, svgRef.current);
+    pushHistory(elements);
+    setNodeEditDrag({ pathId: selectedId, handleType, handleIndex, startNodes: parsed.nodes, grabPt, closed: parsed.closed });
+  }, [selectedId, elements, pushHistory]);
+
   // Open SVG
   const handleOpenSvg = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -724,6 +1078,13 @@ export function SvgEditor() {
 
   const preview = drawing ? previewElement(drawing, fill, stroke, strokeWidth) : null;
 
+  // Switch tool, clearing any in-progress pen path
+  const activateTool = useCallback((t: SvgTool) => {
+    setPenState(null);
+    setPenMousePt(null);
+    setTool(t);
+  }, []);
+
   const toolButtons: { id: SvgTool; icon?: string; label: string; content?: string }[] = [
     { id: 'select', icon: 'fa-solid fa-arrow-pointer', label: 'Select (V)' },
     { id: 'rect', icon: 'fa-solid fa-square', label: 'Rectangle (R)' },
@@ -732,6 +1093,7 @@ export function SvgEditor() {
     { id: 'line', icon: 'fa-solid fa-minus', label: 'Line (L)' },
     { id: 'freehand', icon: 'fa-solid fa-pencil', label: 'Freehand (D)' },
     { id: 'text', icon: 'fa-solid fa-font', label: 'Text (T)' },
+    { id: 'pen', icon: 'fa-solid fa-bezier-curve', label: 'Pen / Bézier (P)' },
   ];
 
   return (
@@ -790,7 +1152,7 @@ export function SvgEditor() {
             <button
               key={btn.id}
               title={btn.label}
-              onClick={() => setTool(btn.id)}
+              onClick={() => activateTool(btn.id)}
               className={`w-9 h-9 rounded flex items-center justify-center text-sm transition-colors ${
                 tool === btn.id ? 'bg-blue-500 text-white' : 'text-gray-300 hover:bg-gray-700'
               }`}
@@ -870,6 +1232,17 @@ export function SvgEditor() {
                 />
               ))}
               {preview && <PreviewElement el={preview} />}
+              {/* Node editor overlay for selected path in select mode */}
+              {tool === 'select' && selectedId && (() => {
+                const sel = elements.find(el => el.id === selectedId);
+                return sel?.type === 'path'
+                  ? <PathNodeEditor el={sel} onStartDrag={handleStartNodeDrag} />
+                  : null;
+              })()}
+              {/* Pen tool in-progress path overlay */}
+              {tool === 'pen' && penState && (
+                <PenOverlay penState={penState} previewPt={penMousePt} stroke={stroke} strokeWidth={strokeWidth} />
+              )}
             </svg>
           </div>
         </main>

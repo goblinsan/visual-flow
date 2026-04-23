@@ -1,4 +1,4 @@
-export type SvgTool = 'select' | 'rect' | 'circle' | 'ellipse' | 'line' | 'freehand' | 'text';
+export type SvgTool = 'select' | 'rect' | 'circle' | 'ellipse' | 'line' | 'freehand' | 'text' | 'pen';
 
 export interface SvgBaseElement {
   id: string;
