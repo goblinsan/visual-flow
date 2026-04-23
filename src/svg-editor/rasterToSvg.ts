@@ -29,6 +29,11 @@ export function rasterImageToSvgElements(
     img.onload = () => {
       URL.revokeObjectURL(objectUrl);
 
+      if (img.width === 0 || img.height === 0) {
+        reject(new Error('Image has zero dimensions'));
+        return;
+      }
+
       const scale = Math.min(maxDimension / img.width, maxDimension / img.height, 1);
       const canvasW = Math.max(1, Math.round(img.width * scale));
       const canvasH = Math.max(1, Math.round(img.height * scale));

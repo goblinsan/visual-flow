@@ -626,6 +626,7 @@ export function SvgEditor() {
   }, [tool]);
 
   const handleUpdate = useCallback((id: string, updates: Partial<SvgElement>) => {
+    // Update element immediately without adding to history (avoids flooding undo stack on every keystroke)
     setElements(prev => prev.map(el => el.id === id ? { ...el, ...updates } as SvgElement : el));
   }, []);
 
@@ -648,7 +649,7 @@ export function SvgEditor() {
         setViewBoxStr(parsed.viewBoxStr);
         setSelectedId(null);
       } catch {
-        alert('Failed to parse SVG file.');
+        alert('Failed to parse SVG file. The file may be invalid or use unsupported features.');
       }
     };
     reader.readAsText(file);
@@ -667,7 +668,7 @@ export function SvgEditor() {
         setViewBoxStr(`0 0 ${result.svgWidth} ${result.svgHeight}`);
         setSelectedId(null);
       })
-      .catch(() => alert('Failed to convert image.'))
+      .catch((err: unknown) => alert(`Failed to convert image: ${err instanceof Error ? err.message : 'Unknown error'}.`))
       .finally(() => setConverting(false));
     e.target.value = '';
   }, [elements, pushHistory]);
