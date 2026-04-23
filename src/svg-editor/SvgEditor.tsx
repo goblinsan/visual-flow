@@ -134,6 +134,9 @@ function RenderElement({
   }, [el.id, onMove]);
 
   const handleMouseUp = useCallback((e: MouseEvent) => {
+    // Only handle if a mousedown happened on this element; otherwise every
+    // element's global listener would fire and select the wrong element.
+    if (!dragStart.current) return;
     e.stopPropagation();
     if (!moved.current) {
       onSelect(el.id);
