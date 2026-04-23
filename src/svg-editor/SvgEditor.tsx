@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import type { SvgTool, SvgElement, SvgRectElement, SvgCircleElement, SvgEllipseElement, SvgLineElement, SvgPathElement, SvgTextElement } from './types';
-import { rasterImageToSvgElements } from './rasterToSvg';
+import { traceImageToPaths } from './rasterToSvg';
 import { parseSvgFile } from './svgParser';
 
 // ---------------------------------------------------------------------------
@@ -707,7 +707,7 @@ export function SvgEditor() {
     const file = e.target.files?.[0];
     if (!file) return;
     setConverting(true);
-    rasterImageToSvgElements(file, { maxDimension: 150, colorLevels: 6 })
+    traceImageToPaths(file, { maxDimension: 300, edgeThreshold: 25, minContourLength: 8, simplifyTolerance: 1.5 })
       .then(result => {
         pushHistory(elements);
         setElements(result.elements);

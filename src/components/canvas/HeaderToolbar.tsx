@@ -115,6 +115,14 @@ export function HeaderToolbar({
                   </span>
                   <span className="text-[10px] text-gray-400 font-mono">⇧⌘E</span>
                 </button>
+                <div className="border-t border-gray-100 my-1" />
+                <button
+                  onClick={() => { window.location.href = '/?editor=svg'; }}
+                  className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[13px] hover:bg-blue-50 transition-colors duration-100"
+                >
+                  <i className="fa-solid fa-bezier-curve text-cyan-500 w-4 text-xs" />
+                  <span className="text-gray-700">SVG Editor…</span>
+                </button>
               </div>
             )}
           </div>
