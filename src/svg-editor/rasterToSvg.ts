@@ -265,6 +265,9 @@ export function traceImageToPaths(
             stroke: '#1e293b',
             strokeWidth: 1.5,
             opacity: 1,
+            rotate: 0,
+            skewX: 0,
+            skewY: 0,
           });
         }
       }
