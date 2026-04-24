@@ -173,6 +173,25 @@ function CanvasStage({
       onViewportChange({ scale, x: pos.x, y: pos.y });
     }
   }, [scale, pos.x, pos.y, onViewportChange]);
+
+  // Pick up an SVG exported from the SVG editor ("Use in Canvas" button)
+  useEffect(() => {
+    const pendingSvg = localStorage.getItem('vf_pending_svg');
+    if (!pendingSvg) return;
+    localStorage.removeItem('vf_pending_svg');
+    const img = new window.Image();
+    img.onload = () => {
+      const w = img.naturalWidth || 400;
+      const h = img.naturalHeight || 300;
+      const worldPos = { x: 100, y: 100 };
+      const imageNode = createImageNode(worldPos, pendingSvg, w, h);
+      setSpec(prev => appendNodesToRoot(prev, [imageNode]));
+      setSelection([imageNode.id]);
+      onToolChange?.('select');
+    };
+    img.src = pendingSvg;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   
   // Font loading - triggers re-render when fonts finish loading
   useFontLoading();
