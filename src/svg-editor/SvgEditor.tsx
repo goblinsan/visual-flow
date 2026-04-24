@@ -48,6 +48,116 @@ function r2(n: number): string {
   return parseFloat(n.toFixed(2)).toString();
 }
 
+// ---------------------------------------------------------------------------
+// Ramer-Douglas-Peucker simplification (inline copy for path simplification)
+// ---------------------------------------------------------------------------
+
+function rdpPerp(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
+  const dx = bx - ax, dy = by - ay;
+  const len2 = dx * dx + dy * dy;
+  if (len2 === 0) return Math.hypot(px - ax, py - ay);
+  return Math.abs(dx * (ay - py) - (ax - px) * dy) / Math.sqrt(len2);
+}
+
+function rdp2(pts: { x: number; y: number }[], eps: number): { x: number; y: number }[] {
+  if (pts.length <= 2) return pts;
+  let maxD = 0, idx = 0;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const d = rdpPerp(pts[i].x, pts[i].y, pts[0].x, pts[0].y, pts[pts.length - 1].x, pts[pts.length - 1].y);
+    if (d > maxD) { maxD = d; idx = i; }
+  }
+  if (maxD > eps) {
+    return [...rdp2(pts.slice(0, idx + 1), eps), ...rdp2(pts.slice(idx), eps).slice(1)];
+  }
+  return [pts[0], pts[pts.length - 1]];
+}
+
+// ---------------------------------------------------------------------------
+// Bounding box helpers
+// ---------------------------------------------------------------------------
+
+interface BBox { x: number; y: number; width: number; height: number }
+
+function getElementBBox(el: SvgElement): BBox {
+  switch (el.type) {
+    case 'rect':    return { x: el.x, y: el.y, width: el.width, height: el.height };
+    case 'circle':  return { x: el.cx - el.r, y: el.cy - el.r, width: el.r * 2, height: el.r * 2 };
+    case 'ellipse': return { x: el.cx - el.rx, y: el.cy - el.ry, width: el.rx * 2, height: el.ry * 2 };
+    case 'line':    return {
+      x: Math.min(el.x1, el.x2), y: Math.min(el.y1, el.y2),
+      width: Math.max(Math.abs(el.x2 - el.x1), 4), height: Math.max(Math.abs(el.y2 - el.y1), 4),
+    };
+    case 'image':   return { x: el.x, y: el.y, width: el.width, height: el.height };
+    case 'text':    return { x: el.x, y: el.y - el.fontSize, width: el.content.length * el.fontSize * 0.6 || 40, height: el.fontSize * 1.4 };
+    case 'path': {
+      const parsed = pathDToNodes(el.d);
+      if (!parsed || parsed.nodes.length === 0) return { x: 0, y: 0, width: 10, height: 10 };
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const n of parsed.nodes) {
+        minX = Math.min(minX, n.x, n.cp1x, n.cp2x);
+        minY = Math.min(minY, n.y, n.cp1y, n.cp2y);
+        maxX = Math.max(maxX, n.x, n.cp1x, n.cp2x);
+        maxY = Math.max(maxY, n.y, n.cp1y, n.cp2y);
+      }
+      return { x: minX, y: minY, width: Math.max(maxX - minX, 4), height: Math.max(maxY - minY, 4) };
+    }
+  }
+}
+
+/** Apply a new bounding box to an element, scaling its geometry accordingly. */
+function scaleElement(el: SvgElement, nb: BBox): SvgElement {
+  const ob = getElementBBox(el);
+  const sw = nb.width  / (ob.width  || 1);
+  const sh = nb.height / (ob.height || 1);
+  const tx = nb.x - ob.x * sw;
+  const ty = nb.y - ob.y * sh;
+  const sp = (px: number, py: number) => ({ x: px * sw + tx, y: py * sh + ty });
+  switch (el.type) {
+    case 'rect':    return { ...el, x: nb.x, y: nb.y, width: nb.width, height: nb.height };
+    case 'circle':  return { ...el, cx: nb.x + nb.width / 2, cy: nb.y + nb.height / 2, r: Math.min(nb.width, nb.height) / 2 };
+    case 'ellipse': return { ...el, cx: nb.x + nb.width / 2, cy: nb.y + nb.height / 2, rx: nb.width / 2, ry: nb.height / 2 };
+    case 'line': {
+      const p1 = sp(el.x1, el.y1); const p2 = sp(el.x2, el.y2);
+      return { ...el, x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y };
+    }
+    case 'image':   return { ...el, x: nb.x, y: nb.y, width: nb.width, height: nb.height };
+    case 'text':    return { ...el, x: nb.x, y: nb.y + nb.height * 0.85, fontSize: Math.max(4, nb.height / 1.4) };
+    case 'path': {
+      const parsed = pathDToNodes(el.d);
+      if (!parsed) return el;
+      const newNodes: BezierNode[] = parsed.nodes.map(n => {
+        const { x, y } = sp(n.x, n.y);
+        const { x: cp1x, y: cp1y } = sp(n.cp1x, n.cp1y);
+        const { x: cp2x, y: cp2y } = sp(n.cp2x, n.cp2y);
+        return { x, y, cp1x, cp1y, cp2x, cp2y };
+      });
+      return { ...el, d: nodesToPathD(newNodes, parsed.closed) };
+    }
+  }
+}
+
+/** Simplify a path using Ramer-Douglas-Peucker on its anchor nodes. */
+function simplifyPath(d: string, tolerance: number): string {
+  const parsed = pathDToNodes(d);
+  if (!parsed || parsed.nodes.length < 3) return d;
+  const pts = parsed.nodes.map(n => ({ x: n.x, y: n.y }));
+  const simplified = rdp2(pts, tolerance);
+  if (simplified.length < 2) return d;
+  const newD = simplified.map((p, i) => `${i === 0 ? 'M' : 'L'} ${r2(p.x)},${r2(p.y)}`).join(' ');
+  return parsed.closed ? newD + ' Z' : newD;
+}
+
+// BBox drag types
+type BBoxHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'rotate';
+
+interface BBoxDrag {
+  elId: string;
+  handleType: BBoxHandle;
+  startEl: SvgElement;
+  startBBox: BBox;
+  grabPt: { x: number; y: number };
+}
+
 const FONT_FAMILIES = [
   'sans-serif', 'serif', 'monospace', 'cursive', 'fantasy',
   'Arial', 'Helvetica', 'Verdana', 'Trebuchet MS', 'Georgia',
@@ -249,9 +359,11 @@ function PenOverlay({
 function PathNodeEditor({
   el,
   onStartDrag,
+  onDeleteNode,
 }: {
   el: SvgPathElement;
   onStartDrag: (handleType: 'anchor' | 'cp1' | 'cp2', handleIndex: number, e: React.MouseEvent) => void;
+  onDeleteNode: (index: number) => void;
 }) {
   const parsed = pathDToNodes(el.d);
   if (!parsed) return null;
@@ -280,10 +392,63 @@ function PathNodeEditor({
               fill="white" stroke="#3b82f6" strokeWidth={2}
               style={{ cursor: 'move' }}
               onMouseDown={e => { e.stopPropagation(); onStartDrag('anchor', i, e); }}
+              onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onDeleteNode(i); }}
             />
           </g>
         );
       })}
+    </g>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Selection bounding-box handles (scale + rotate)
+// ---------------------------------------------------------------------------
+
+const HANDLE_CURSOR: Record<BBoxHandle, string> = {
+  nw: 'nw-resize', n: 'n-resize', ne: 'ne-resize',
+  e: 'e-resize', se: 'se-resize', s: 's-resize',
+  sw: 'sw-resize', w: 'w-resize', rotate: 'alias',
+};
+
+function SelectionHandles({
+  el,
+  onStartBBoxDrag,
+}: {
+  el: SvgElement;
+  onStartBBoxDrag: (handleType: BBoxHandle, e: React.MouseEvent) => void;
+}) {
+  const { x, y, width: w, height: h } = getElementBBox(el);
+  const cx = x + w / 2, cy = y + h / 2;
+  const rotY = y - 20;
+  const handles: { type: BBoxHandle; hx: number; hy: number }[] = [
+    { type: 'nw', hx: x,      hy: y      },
+    { type: 'n',  hx: cx,     hy: y      },
+    { type: 'ne', hx: x + w,  hy: y      },
+    { type: 'e',  hx: x + w,  hy: cy     },
+    { type: 'se', hx: x + w,  hy: y + h  },
+    { type: 's',  hx: cx,     hy: y + h  },
+    { type: 'sw', hx: x,      hy: y + h  },
+    { type: 'w',  hx: x,      hy: cy     },
+  ];
+  return (
+    <g pointerEvents="all">
+      {/* Bounding box outline */}
+      <rect x={x} y={y} width={w} height={h} fill="none" stroke="#3b82f6" strokeWidth={0.75} strokeDasharray="4,2" pointerEvents="none" />
+      {/* Rotation handle line + circle */}
+      <line x1={cx} y1={y} x2={cx} y2={rotY} stroke="#3b82f6" strokeWidth={0.75} pointerEvents="none" />
+      <circle cx={cx} cy={rotY} r={6} fill="white" stroke="#3b82f6" strokeWidth={1.5}
+        style={{ cursor: HANDLE_CURSOR.rotate }}
+        onMouseDown={e => { e.stopPropagation(); onStartBBoxDrag('rotate', e); }} />
+      {/* Scale handles */}
+      {handles.map(({ type, hx, hy }) => (
+        <rect key={type}
+          x={hx - 4} y={hy - 4} width={8} height={8}
+          fill="white" stroke="#3b82f6" strokeWidth={1.5}
+          style={{ cursor: HANDLE_CURSOR[type] }}
+          onMouseDown={e => { e.stopPropagation(); onStartBBoxDrag(type, e); }}
+        />
+      ))}
     </g>
   );
 }
@@ -544,6 +709,9 @@ function PreviewElement({ el }: { el: SvgElement }) {
 function PropertiesPanel({
   elements,
   selectedId,
+  tool,
+  textDefaults,
+  onTextDefaultsChange,
   onUpdate,
   onUpdateStart,
   onUpdateEnd,
@@ -552,9 +720,13 @@ function PropertiesPanel({
   onSendToBack,
   onMoveUp,
   onMoveDown,
+  onSimplifyPath,
 }: {
   elements: SvgElement[];
   selectedId: string | null;
+  tool: SvgTool;
+  textDefaults: { fontSize: number; fontFamily: string };
+  onTextDefaultsChange: (d: Partial<{ fontSize: number; fontFamily: string }>) => void;
   onUpdate: (id: string, updates: Partial<SvgElement>) => void;
   onUpdateStart: () => void;
   onUpdateEnd: () => void;
@@ -563,17 +735,43 @@ function PropertiesPanel({
   onSendToBack: (id: string) => void;
   onMoveUp: (id: string) => void;
   onMoveDown: (id: string) => void;
+  onSimplifyPath: (tolerance: number) => void;
 }) {
+  const [simplifyTol, setSimplifyTol] = useState(2);
   const el = elements.find(e => e.id === selectedId);
 
   if (!el) {
     return (
       <div className="w-56 bg-gray-50 border-l border-gray-200 p-4 flex flex-col gap-3 text-sm">
-        <p className="text-gray-500 italic">Select an element to edit its properties</p>
-        <div className="text-gray-400 text-xs mt-2">
-          <div>Canvas: 800 × 600</div>
-          <div>Elements: {elements.length}</div>
-        </div>
+        {tool === 'text' ? (
+          <>
+            <h3 className="font-semibold text-gray-700 text-sm">Text defaults</h3>
+            <p className="text-gray-400 text-xs">These apply to new text elements you place.</p>
+            <label className="flex flex-col gap-1 text-xs">
+              <span className="text-gray-500">Font Size</span>
+              <input type="number" min={4} value={textDefaults.fontSize}
+                onChange={e => onTextDefaultsChange({ fontSize: parseFloat(e.target.value) || 16 })}
+                className="border rounded px-1 py-0.5 w-full" />
+            </label>
+            <label className="flex flex-col gap-1 text-xs">
+              <span className="text-gray-500">Font Family</span>
+              <input type="text" list="svg-font-families-td" value={textDefaults.fontFamily}
+                onChange={e => onTextDefaultsChange({ fontFamily: e.target.value })}
+                className="border rounded px-1 py-0.5 w-full" />
+              <datalist id="svg-font-families-td">
+                {FONT_FAMILIES.map(f => <option key={f} value={f} />)}
+              </datalist>
+            </label>
+          </>
+        ) : (
+          <>
+            <p className="text-gray-500 italic">Select an element to edit its properties</p>
+            <div className="text-gray-400 text-xs mt-2">
+              <div>Canvas: 800 × 600</div>
+              <div>Elements: {elements.length}</div>
+            </div>
+          </>
+        )}
       </div>
     );
   }
@@ -684,10 +882,26 @@ function PropertiesPanel({
       )}
 
       {el.type === 'path' && (
-        <label className="flex flex-col gap-1">
-          <span className="text-gray-500">Path d</span>
-          <textarea rows={4} value={(el as SvgPathElement).d} onFocus={onUpdateStart} onBlur={onUpdateEnd} onChange={e => update({ d: e.target.value } as Partial<SvgElement>)} className="border rounded px-1 py-0.5 w-full text-xs font-mono resize-y" />
-        </label>
+        <>
+          <label className="flex flex-col gap-1">
+            <span className="text-gray-500">Path d</span>
+            <textarea rows={4} value={(el as SvgPathElement).d} onFocus={onUpdateStart} onBlur={onUpdateEnd} onChange={e => update({ d: e.target.value } as Partial<SvgElement>)} className="border rounded px-1 py-0.5 w-full text-xs font-mono resize-y" />
+          </label>
+          <div className="flex flex-col gap-1">
+            <span className="text-gray-500">Simplify (tolerance)</span>
+            <div className="flex gap-1 items-center">
+              <input type="number" min={0.5} max={20} step={0.5} value={simplifyTol}
+                onChange={e => setSimplifyTol(parseFloat(e.target.value) || 2)}
+                className="flex-1 border rounded px-1 py-0.5" />
+              <button
+                onClick={() => onSimplifyPath(simplifyTol)}
+                className="bg-indigo-500 hover:bg-indigo-600 text-white rounded px-2 py-1 text-xs"
+                title="Reduce CV count using Ramer-Douglas-Peucker"
+              >Simplify</button>
+            </div>
+          </div>
+          <p className="text-gray-400 text-xs">Right-click an anchor node on canvas to delete it.</p>
+        </>
       )}
 
       {el.type === 'text' && (
@@ -756,6 +970,9 @@ export function SvgEditor() {
   const [penState, setPenState] = useState<PenState | null>(null);
   const [penMousePt, setPenMousePt] = useState<{ x: number; y: number } | null>(null);
   const [nodeEditDrag, setNodeEditDrag] = useState<NodeEditDrag | null>(null);
+  const [bboxDrag, setBboxDrag] = useState<BBoxDrag | null>(null);
+  const [textFontSize, setTextFontSize] = useState(20);
+  const [textFontFamily, setTextFontFamily] = useState('sans-serif');
 
   const svgRef = useRef<SVGSVGElement>(null);
   const idRef = useRef(0);
@@ -890,8 +1107,8 @@ export function SvgEditor() {
         x: pt.x,
         y: pt.y,
         content,
-        fontSize: 20,
-        fontFamily: 'sans-serif',
+        fontSize: textFontSize,
+        fontFamily: textFontFamily,
         fill,
         stroke: 'none',
         strokeWidth: 0,
@@ -937,8 +1154,36 @@ export function SvgEditor() {
       return;
     }
 
-    // Node edit drag: recompute node positions from the immutable drag-start
-    // snapshot so there is no stale-closure accumulation error.
+    // BBox drag: scale or rotate the selected element
+    if (bboxDrag) {
+      const { handleType, startEl, startBBox: ob } = bboxDrag;
+      const { x, y, width: w, height: h } = ob;
+      if (handleType === 'rotate') {
+        const cx = x + w / 2, cy = y + h / 2;
+        const startAngle = Math.atan2(bboxDrag.grabPt.y - cy, bboxDrag.grabPt.x - cx);
+        const curAngle = Math.atan2(pt.y - cy, pt.x - cx);
+        const deltaDeg = (curAngle - startAngle) * 180 / Math.PI;
+        const newRotate = ((startEl.rotate + deltaDeg) % 360 + 360) % 360;
+        setElements(prev => prev.map(el => el.id === bboxDrag.elId ? { ...el, rotate: newRotate } as SvgElement : el));
+      } else {
+        let nb: BBox = { ...ob };
+        switch (handleType) {
+          case 'se': nb = { x, y, width: Math.max(4, pt.x - x), height: Math.max(4, pt.y - y) }; break;
+          case 'sw': nb = { x: Math.min(pt.x, x + w - 4), y, width: Math.max(4, x + w - pt.x), height: Math.max(4, pt.y - y) }; break;
+          case 'ne': nb = { x, y: Math.min(pt.y, y + h - 4), width: Math.max(4, pt.x - x), height: Math.max(4, y + h - pt.y) }; break;
+          case 'nw': nb = { x: Math.min(pt.x, x + w - 4), y: Math.min(pt.y, y + h - 4), width: Math.max(4, x + w - pt.x), height: Math.max(4, y + h - pt.y) }; break;
+          case 'n':  nb = { x, y: Math.min(pt.y, y + h - 4), width: w, height: Math.max(4, y + h - pt.y) }; break;
+          case 's':  nb = { x, y, width: w, height: Math.max(4, pt.y - y) }; break;
+          case 'e':  nb = { x, y, width: Math.max(4, pt.x - x), height: h }; break;
+          case 'w':  nb = { x: Math.min(pt.x, x + w - 4), y, width: Math.max(4, x + w - pt.x), height: h }; break;
+        }
+        const newEl = scaleElement(startEl, nb);
+        setElements(prev => prev.map(el => el.id === bboxDrag.elId ? newEl : el));
+      }
+      return;
+    }
+
+
     if (nodeEditDrag) {
       const { pathId, handleType, handleIndex, startNodes, grabPt, closed } = nodeEditDrag;
       const nodes = startNodes.map(n => ({ ...n }));
@@ -970,12 +1215,18 @@ export function SvgEditor() {
         points: d.points ? [...d.points, pt] : undefined,
       };
     });
-  }, [tool, penState, nodeEditDrag, drawing]);
+  }, [tool, penState, nodeEditDrag, bboxDrag, drawing]);
 
   const handleMouseUp = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     // Finalise the bezier handle the user was stretching
     if (tool === 'pen' && penState?.dragging) {
       setPenState(prev => prev ? { ...prev, dragging: false } : null);
+      return;
+    }
+
+    // End a bbox drag
+    if (bboxDrag) {
+      setBboxDrag(null);
       return;
     }
 
@@ -1029,7 +1280,7 @@ export function SvgEditor() {
       setElementsWithHistory([...elements, newEl]);
       setSelectedId(newEl.id);
     }
-  }, [tool, penState, nodeEditDrag, drawing, fill, stroke, strokeWidth, elements, nextId, setElementsWithHistory]);
+  }, [tool, penState, bboxDrag, nodeEditDrag, drawing, fill, stroke, strokeWidth, elements, nextId, setElementsWithHistory]);
 
   const handleElementSelect = useCallback((id: string) => {
     if (tool === 'select') setSelectedId(id);
@@ -1146,6 +1397,57 @@ export function SvgEditor() {
     setNodeEditDrag({ pathId: selectedId, handleType, handleIndex, startNodes: parsed.nodes, grabPt, closed: parsed.closed });
   }, [selectedId, elements, pushHistory]);
 
+  // Start a bounding-box scale/rotate drag
+  const handleStartBBoxDrag = useCallback((handleType: BBoxHandle, e: React.MouseEvent) => {
+    if (!selectedId || !svgRef.current) return;
+    const el = elements.find(el => el.id === selectedId);
+    if (!el) return;
+    const grabPt = getSvgPoint(e, svgRef.current);
+    pushHistory(elements);
+    setBboxDrag({ elId: selectedId, handleType, startEl: el, startBBox: getElementBBox(el), grabPt });
+  }, [selectedId, elements, pushHistory]);
+
+  // Delete an anchor node from the selected path
+  const handleDeleteNode = useCallback((index: number) => {
+    if (!selectedId) return;
+    const pathEl = elements.find(el => el.id === selectedId);
+    if (!pathEl || pathEl.type !== 'path') return;
+    const parsed = pathDToNodes(pathEl.d);
+    if (!parsed || parsed.nodes.length <= 2) return; // keep at least 2 nodes
+    pushHistory(elements);
+    const newNodes = parsed.nodes.filter((_, i) => i !== index);
+    const newD = nodesToPathD(newNodes, parsed.closed);
+    setElements(prev => prev.map(el => el.id === selectedId ? { ...el, d: newD } as SvgElement : el));
+  }, [selectedId, elements, pushHistory]);
+
+  // Simplify the selected path using RDP
+  const handleSimplifyPath = useCallback((tolerance: number) => {
+    if (!selectedId) return;
+    const pathEl = elements.find(el => el.id === selectedId);
+    if (!pathEl || pathEl.type !== 'path') return;
+    pushHistory(elements);
+    const newD = simplifyPath(pathEl.d, tolerance);
+    setElements(prev => prev.map(el => el.id === selectedId ? { ...el, d: newD } as SvgElement : el));
+  }, [selectedId, elements, pushHistory]);
+
+  // Export SVG and navigate to main canvas, inserting the SVG as an image
+  const handleUseInCanvas = useCallback(() => {
+    if (elements.length === 0) { alert('Canvas is empty — add some elements first.'); return; }
+    const svgStr = buildSvgString(elements, viewBoxStr);
+    // Encode SVG string to base64 safely (handles Unicode characters)
+    const b64 = btoa(
+      encodeURIComponent(svgStr).replace(/%([0-9A-F]{2})/g, (_, p1) => String.fromCharCode(parseInt(p1, 16)))
+    );
+    const dataUrl = `data:image/svg+xml;base64,${b64}`;
+    try {
+      localStorage.setItem('vf_pending_svg', dataUrl);
+    } catch {
+      alert('Could not store SVG in local storage (storage quota exceeded). Try exporting as SVG and importing it manually.');
+      return;
+    }
+    window.location.href = '/';
+  }, [elements, viewBoxStr]);
+
   // Open SVG
   const handleOpenSvg = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1246,6 +1548,9 @@ export function SvgEditor() {
           <button onClick={() => exportSvg(elements, viewBoxStr)} className="bg-cyan-500 hover:bg-cyan-400 rounded px-3 py-1 text-sm font-medium transition-colors">
             Export SVG
           </button>
+          <button onClick={handleUseInCanvas} className="bg-green-500 hover:bg-green-400 rounded px-3 py-1 text-sm font-medium transition-colors">
+            Use in Canvas
+          </button>
         </div>
 
         <input ref={openSvgRef} type="file" accept=".svg" className="hidden" onChange={handleOpenSvg} />
@@ -1340,11 +1645,16 @@ export function SvgEditor() {
                 />
               ))}
               {preview && <PreviewElement el={preview} />}
+              {/* Bounding-box scale/rotate handles for selected element in select mode */}
+              {tool === 'select' && selectedId && (() => {
+                const sel = elements.find(el => el.id === selectedId);
+                return sel ? <SelectionHandles el={sel} onStartBBoxDrag={handleStartBBoxDrag} /> : null;
+              })()}
               {/* Node editor overlay for selected path in select mode */}
               {tool === 'select' && selectedId && (() => {
                 const sel = elements.find(el => el.id === selectedId);
                 return sel?.type === 'path'
-                  ? <PathNodeEditor el={sel} onStartDrag={handleStartNodeDrag} />
+                  ? <PathNodeEditor el={sel} onStartDrag={handleStartNodeDrag} onDeleteNode={handleDeleteNode} />
                   : null;
               })()}
               {/* Pen tool in-progress path overlay */}
@@ -1359,6 +1669,12 @@ export function SvgEditor() {
         <PropertiesPanel
           elements={elements}
           selectedId={selectedId}
+          tool={tool}
+          textDefaults={{ fontSize: textFontSize, fontFamily: textFontFamily }}
+          onTextDefaultsChange={d => {
+            if (d.fontSize !== undefined) setTextFontSize(d.fontSize);
+            if (d.fontFamily !== undefined) setTextFontFamily(d.fontFamily);
+          }}
           onUpdate={handleUpdate}
           onUpdateStart={handleUpdateStart}
           onUpdateEnd={handleUpdateEnd}
@@ -1367,6 +1683,7 @@ export function SvgEditor() {
           onSendToBack={handleSendToBack}
           onMoveUp={handleMoveUp}
           onMoveDown={handleMoveDown}
+          onSimplifyPath={handleSimplifyPath}
         />
       </div>
     </div>
